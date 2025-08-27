@@ -12,7 +12,6 @@
 /*}}}*/
 
 void NodalValuex( IssmDouble* pnodalvalue, int natureofdataenum,Elements* elements,Nodes* nodes, Vertices* vertices, Loads* loads, Materials* materials, Parameters* parameters);
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,int output_enum);
 
 class Nodalvalue: public Object, public Definition{
 

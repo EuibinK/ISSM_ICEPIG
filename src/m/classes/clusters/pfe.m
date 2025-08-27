@@ -10,7 +10,7 @@ classdef pfe
 		% {{{
 		name           = 'pfe'
 		login          = '';
-		modules        = {'comp-intel/2018.3.222' 'mpi-intel/2018.3.222' 'scicon/app-tools'};
+		modules        = {'comp-intel/2018.3.222' '/nasa/intel/impi/2021.3/modulefiles/mpi/2021.3.0' 'scicon/app-tools'};
 		numnodes       = 20;
 		cpuspernode    = 8;
 		port           = 1025;
@@ -48,9 +48,9 @@ classdef pfe
 			disp(sprintf('    cpuspernode: %i',cluster.cpuspernode));
 			disp(sprintf('    np: %i',cluster.nprocs()));
 			disp(sprintf('    port: %i',cluster.port));
-			disp(sprintf('    queue: %i',cluster.queue));
+			disp(sprintf('    queue: %s',cluster.queue));
 			disp(sprintf('    time: %i',cluster.time));
-			disp(sprintf('    processor: %i',cluster.processor));
+			disp(sprintf('    processor: %s',cluster.processor));
 			disp(sprintf('    srcpath: %s',cluster.srcpath));
 			disp(sprintf('    extpkgpath: %s',cluster.extpkgpath));
 			disp(sprintf('    codepath: %s',cluster.codepath));
@@ -180,7 +180,8 @@ classdef pfe
 			fprintf(fid,'source $ISSM_DIR/etc/environment.sh\n');       %FIXME
 			fprintf(fid,'cd %s/%s/\n\n',cluster.executionpath,dirname);
 			if ~isvalgrind,
-				fprintf(fid,'/u/scicon/tools/bin/toss3/several_tries mpiexec -np %i mbind.x -cs -n%i %s/%s %s %s/%s %s\n',cluster.nprocs(),cluster.cpuspernode,cluster.codepath,executable,solution,cluster.executionpath,dirname,modelname);
+				%fprintf(fid,'/u/scicon/tools/bin/several_tries mpiexec -np %i mbind.x -cs -n%i %s/%s %s %s/%s %s\n',cluster.nprocs(),cluster.cpuspernode,cluster.codepath,executable,solution,cluster.executionpath,dirname,modelname);
+				fprintf(fid,'mpiexec -np %i %s/%s %s %s/%s %s\n',cluster.nprocs(),cluster.codepath,executable,solution,cluster.executionpath,dirname,modelname);
 			else
 				fprintf(fid,'mpiexec -np %i valgrind --leak-check=full %s/%s %s %s %s\n',cluster.nprocs(),cluster.codepath,executable,solution,[cluster.executionpath '/' dirname],modelname);
 			end
@@ -430,10 +431,10 @@ classdef pfe
 				end
 			else
 				if ~isempty(restart)
-					launchcommand=['cd ' cluster.executionpath ' && cd ' dirname ' && qsub ' modelname '.queue '];
+					launchcommand=['cd ' cluster.executionpath ' && cd ' dirname ' && /PBS/bin/qsub ' modelname '.queue '];
 				else
 					launchcommand=['cd ' cluster.executionpath ' && rm -rf ./' dirname ' && mkdir ' dirname ...
-						' && cd ' dirname ' && mv ../' dirname '.tar.gz ./ && tar -zxf ' dirname '.tar.gz && qsub ' modelname '.queue '];
+						' && cd ' dirname ' && mv ../' dirname '.tar.gz ./ && tar -zxf ' dirname '.tar.gz && /PBS/bin/qsub ' modelname '.queue '];
 				end
 			end
 

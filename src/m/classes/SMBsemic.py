@@ -24,6 +24,7 @@ class SMBsemic(object):
         self.dailyairdensity = np.nan
         self.dailyairhumidity = np.nan
         self.dailytemperature = np.nan
+
         self.Tamp = np.nan
         self.mask = np.nan
         self.hice = np.nan
@@ -68,6 +69,8 @@ class SMBsemic(object):
 
         # method
         self.ismethod = 0
+        self.isdesertification = 0
+        self.isLWDcorrect = 0
 
         if len(args) == 0:
             self.setdefaultparameters()
@@ -90,10 +93,10 @@ class SMBsemic(object):
         s += '{}\n'.format(fielddisplay(self, 'dailyairdensity', 'daily air density [kg/m3]'))
         s += '{}\n'.format(fielddisplay(self, 'dailyairhumidity', 'daily air specific humidity [kg/kg]'))
         s += '{}\n'.format(fielddisplay(self, 'rlaps', 'present day lapse rate (default is 7.4 [degree/km]; Erokhina et al. 2017)'))
-        s += '{}\n'.format(fielddisplay(self, 'desfac', 'desertification elevation factor (default is -log(2.0)/1000 [1/km]; Vizcaino et al. 2010)'))
-        s += '{}\n'.format(fielddisplay(self, 'rdl', 'longwave downward radiation decrease (default is 0.29 [W/m^2/km]; Marty et al. 2002)'))
+        s += '{}\n'.format(fielddisplay(self, 'desfac', 'desertification elevation factor (default is -log(2.0)/1000 [1/m]; Vizcaino et al. 2010)'))
+        s += '{}\n'.format(fielddisplay(self, 'rdl', 'longwave downward radiation decrease (default is 29 [W/m^2/km]; Marty et al. 2002)'))
         s += '{}\n'.format(fielddisplay(self, 's0gcm', 'GCM reference elevation; (default is 0) [m]'))
-        s += '{}\n'.format(fielddisplay(self,'ismethod','method for calculating SMB with SEMIC. Default version of SEMIC is really slow. 0: steady, 1: transient (default: 0)'))
+        s += '{}\n'.format(fielddisplay(self, 'ismethod','method for calculating SMB with SEMIC. Default version of SEMIC is really slow. 0: steady, 1: transient (default: 0)'))
         if self.ismethod: # transient mode
             s += '{}\n'.format(fielddisplay(self,'desfacElevation','desertification elevation (default is 2000 m; Vizcaino et al. 2010)'))
             s += '{}\n'.format(fielddisplay(self,'Tamp','amplitude of diurnal cycle [K]'))
@@ -106,14 +109,21 @@ class SMBsemic(object):
             s += '{}\n'.format(fielddisplay(self,'rcrit','critical refreezing height for albedo [no unit]'))
 
             s += '\nSEMIC albedo parameters.\n'
-            s += '{}\n'.format(fielddisplay(self,'albedo_scheme','albedo scheme for SEMIC. 0: none, 1: slater, 2: isba, 3: denby, 4: alex (default is 0)'))
+            s += '{}\n'.format(fielddisplay(self,'albedo_scheme','albedo scheme for SEMIC. 0: none, 1: slater, 2: denby, 3: isba, 4: alex (default is 0)'))
             s += '{}\n'.format(fielddisplay(self,'alb_smax','maximum snow albedo (default: 0.79)'))
             s += '{}\n'.format(fielddisplay(self,'alb_smin','minimum snow albedo (default: 0.6)'))
             s += '{}\n'.format(fielddisplay(self,'albi','background albedo for bare ice (default: 0.41)'))
             s += '{}\n'.format(fielddisplay(self,'albl','background albedo for bare land (default: 0.07)'))
+            
+            s += '{}\n'.format(fielddisplay(self,'isdesertification','enable or disable desertification of Vizcaino et al. (2010). 0: off, 1: on (default: 1)'))
+            s += '{}\n'.format(fielddisplay(self,'isLWDcorrect','enable or disable downward longwave correction of Marty et al. (2002). 0: off, 1: on (default: 1)'))
         # albedo_scheme - 0: none, 1: slater, 2: isba, 3: denby, 4: alex.
-        if self.albedo_scheme == 1:
-            s += '\n\tSEMIC snow albedo parameters for Slater et al, (1998).\n'
+        if self.albedo_scheme == 0:
+            s += '\n\tSEMIC snow albedo parameter of None.\n'
+            s += '\t   albedo of snow is updated from albedo snow max (alb_smax).\n'
+            s += '\t   alb_snow = abl_smax \n '
+        elif self.albedo_scheme == 1:
+            s += '\n\tSEMIC snow albedo parameters of Slater et al, (1998).\n'
             s += '\t   alb = alb_smax - (alb_smax - alb_smin)*tm^(3.0)\n'
             s += '\t   tm  = 1 (tsurf > 273.15 K)\n'
             s += '\t         tm = f*(tsurf-tmin) (tmin <= tsurf < 273.15)\n'
@@ -122,16 +132,18 @@ class SMBsemic(object):
             s += '{}\n'.format(fielddisplay(self, 'tmin', 'minimum temperature for which albedo decline become effective. (default: 263.15 K)[unit: K])'))
             s += '{}\n'.format(fielddisplay(self, 'tmax', 'maxmium temperature for which albedo decline become effective. This value should be fixed. (default: 273.15 K)[unit: K])'))
         elif self.albedo_scheme == 2:
-            s += '\n\tSEMIC snow albedo parameters for ISBA.? where is citation?\n'
+            s += '\n\tSEMIC snow albedo parameters of Denby et al. (2002 Tellus)\n'
+            s += '{}\n'.format(fielddisplay(self,'mcrit','critical melt rate (defaut: 6e-8) [unit: m/sec]'))
+        elif self.albedo_scheme == 3:
+            s += '\n\tSEMIC snow albedo parameters of ISB (Douville et al., 1995).\n'
             s += '{}\n'.format(fielddisplay(self, 'mcrit', 'critical melt rate (default: 6e-8) [unit: m/sec]'))
             s += '{}\n'.format(fielddisplay(self, 'wcrit', 'critical liquid water content (default: 15) [unit: kg/m2]'))
             s += '{}\n'.format(fielddisplay(self, 'tau_a', 'dry albedo decline [unit: 1/day]'))
             s += '{}\n'.format(fielddisplay(self, 'tau_f', 'wet albedo decline [unit: 1/day]'))
-        elif self.albedo_scheme == 3:
-            s += '\n\tSEMIC snow albedo parameters for Denby et al. (2002 Tellus)\n'
-            s += '{}\n'.format(fielddisplay(self,'mcrit','critical melt rate (defaut: 6e-8) [unit: m/sec]'))
+            s += '\n\tReference'
+            s += '\tDouville, H., Royer, J.-F., and Mahfouf, J.-F.: A new snow parameterization for the Météo-France climate model. Part I: validation in stand-alone experiments, Climate Dynamics, 12, 21–35, https://doi.org/10.1007/s003820050092, 1995.'
         elif self.albedo_scheme == 4:
-            s += '\n\tSEMIC snow albedo parameters for Alex.?\n'
+            s += '\n\tSEMIC snow albedo parameters of Alex.?\n'
             s += '{}\n'.format(fielddisplay(self,'afac','[unit: ?]'))
             s += '{}\n'.format(fielddisplay(self,'tmid','[unit: ?]'))
         else:
@@ -166,9 +178,13 @@ class SMBsemic(object):
 
     def outputlists(self, md):  # {{{
         if self.ismethod:
-            list = ['SmbMassBalance', 'SmbMassBalanceSnow', 'SmbMelt', 'SmbAccumulation', 'SmbHIce', 'SmbHSnow', 'SmbAlbedo', 'SmbAlbedoSnow', 'TemperatureSEMIC']
+            list = ['default','SmbMassBalance', 'SmbMassBalanceSnow', 'SmbMassBalanceIce',
+                  'SmbMelt', 'SmbRefreeze','SmbAccumulation',
+                  'SmbHIce', 'SmbHSnow', 'SmbAlbedo', 'SmbAlbedoSnow', 'TemperatureSEMIC',
+                  'SmbSemicQmr', 'TotalSmb', 'TotalSmbMelt', 'TotalSmbRefreeze', 
+                  'SmbRunoff','SmbEvaporation']
         else:
-            list = ['SmbMassBalance']
+            list = ['default','SmbMassBalance']
         return list
     # }}}
 
@@ -217,9 +233,11 @@ class SMBsemic(object):
         self.desfac = -log(2.0) / 1000
         self.desfacElevation = 2000
         self.rlaps = 7.4
-        self.rdl = 0.29
+        self.rdl   = 29 # from Marty et al. (2002)
 
         self.ismethod = 0
+        self.isdesertification = 1
+        self.isLWDcorrect      = 1
         self.requested_outputs = ['default']
         return self
     # }}}
@@ -228,20 +246,22 @@ class SMBsemic(object):
         if 'MasstransportAnalysis' in analyses:
             md = checkfield(md, 'fieldname', 'smb.desfac', '<=', 1, 'numel', 1)
             md = checkfield(md, 'fieldname', 'smb.s0gcm', '>=', 0, 'NaN', 1, 'Inf', 1, 'size', [md.mesh.numberofvertices, 1])
-            md = checkfield(md, 'fieldname', 'smb.rlaps', '>=', 0, 'numel', 1)
-            md = checkfield(md, 'fieldname', 'smb.rdl', '>=', 0, 'numel', 1)
-            md = checkfield(md, 'fieldname', 'smb.dailysnowfall', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
-            md = checkfield(md, 'fieldname', 'smb.dailyrainfall', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
-            md = checkfield(md, 'fieldname', 'smb.dailydsradiation', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
-            md = checkfield(md, 'fieldname', 'smb.dailydlradiation', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
-            md = checkfield(md, 'fieldname', 'smb.dailywindspeed', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
-            md = checkfield(md, 'fieldname', 'smb.dailypressure', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
-            md = checkfield(md, 'fieldname', 'smb.dailyairdensity', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
-            md = checkfield(md, 'fieldname', 'smb.dailyairhumidity', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
-            md = checkfield(md, 'fieldname', 'smb.dailytemperature', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
+            md = checkfield(md, 'fieldname', 'smb.rlaps', '>=', 0, 'numel', 1);
+            md = checkfield(md, 'fieldname', 'smb.rdl', '>=', 0, 'numel', 1);
+            md = checkfield(md, 'fieldname', 'smb.dailysnowfall','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+            md = checkfield(md, 'fieldname', 'smb.dailyrainfall','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+            md = checkfield(md, 'fieldname', 'smb.dailydsradiation','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+            md = checkfield(md, 'fieldname', 'smb.dailydlradiation','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+            md = checkfield(md, 'fieldname', 'smb.dailywindspeed','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+            md = checkfield(md, 'fieldname', 'smb.dailypressure','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+            md = checkfield(md, 'fieldname', 'smb.dailyairdensity','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+            md = checkfield(md, 'fieldname', 'smb.dailyairhumidity','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+            md = checkfield(md, 'fieldname', 'smb.dailytemperature','timeseries',1,'NaN',1,'Inf',1,'>=',0);
 
             # TODO: transient model should be merged with SEMIC developed by Ruckamp et al. (2018)
             md = checkfield(md, 'fieldname', 'smb.ismethod', 'numel', 1, 'values', [0, 1])
+            md = checkfield(md, 'fieldname', 'smb.isdesertification', 'Nan',1, 'Inf', 1, 'numel', 1, 'values', [0, 1])
+            md = checkfield(md, 'fieldname', 'smb.isLWDcorrect', 'Nan',1, 'Inf',1, 'numel', 1, 'values', [0, 1])
             if self.ismethod: # transient mode
                 md = checkfield(md, 'fieldname', 'smb.desfacElevation', '>=', 0, 'numel', 1)
                 md = checkfield(md, 'fieldname', 'smb.albedo_scheme', 'NaN', 1, 'Inf', 1, 'numel', 1, 'values', [0, 1, 2, 3, 4])
@@ -287,6 +307,7 @@ class SMBsemic(object):
             WriteData(fid, prefix, 'object', self, 'class', 'smb', 'fieldname', 'mask', 'format', 'DoubleMat', 'mattype', 1)
             WriteData(fid, prefix, 'object', self, 'class', 'smb', 'fieldname', 'hice', 'format', 'DoubleMat', 'mattype', 1)
             WriteData(fid, prefix, 'object', self, 'class', 'smb', 'fieldname', 'hsnow', 'format', 'DoubleMat', 'mattype', 1)
+            WriteData(fid, prefix, 'object', self, 'class', 'smb', 'fieldname', 'qmr', 'format', 'DoubleMat', 'mattype', 1)
 
             WriteData(fid, prefix, 'object', self, 'class', 'smb', 'fieldname', 'hcrit', 'format', 'Double')
             WriteData(fid, prefix, 'object', self, 'class', 'smb', 'fieldname', 'rcrit', 'format', 'Double')
@@ -313,6 +334,10 @@ class SMBsemic(object):
             # for alex
             WriteData(fid, prefix, 'object', self, 'class', 'smb', 'fieldname', 'tmid', 'format', 'Double')
             WriteData(fid, prefix, 'object', self, 'class', 'smb', 'fieldname', 'afac', 'format', 'Double')
+        #specific parameterization
+        WriteData(fid, prefix, 'object', self, 'class', 'smb', 'fieldname','isdesertification', 'format', 'Integer')
+        WriteData(fid, prefix, 'object', self, 'class', 'smb', 'fieldname','isLWDcorrect', 'format', 'Integer')
+
         WriteData(fid, prefix, 'object', self, 'fieldname', 'steps_per_step', 'format', 'Integer')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'averaging', 'format', 'Integer')
 

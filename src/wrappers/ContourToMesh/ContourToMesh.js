@@ -79,7 +79,7 @@ function ContourToMesh(indexin,xin,yin,contour,interptype,edgevalue){
 	else throw Error('ContourToMeshModule error message: wrong interpolation type!');
 	/*}}}*/
 
-	/*Free ressources: */
+	/*Free resources: */
 	Module._free(pin_nod); 
 	Module._free(pin_nel); 
 	

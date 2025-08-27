@@ -20,7 +20,7 @@ class Friction{
 		int         law;
 		int         domaintype;
 		int         linearize;
-		IssmDouble  apply_dim;
+		IssmPDouble apply_dim;
 		Input      *vx_input;
 		Input      *vy_input;
 		Input      *vz_input;
@@ -31,14 +31,14 @@ class Friction{
 		Friction();
 		Friction(Element* element_in);
 		Friction(Element* element_in, int dim);
-		Friction(Element* element_in, IssmDouble dim);
+		Friction(Element* element_in, IssmPDouble dim);
 		~Friction();
 
 		void  Echo(void);
 		void  GetAlphaComplement(IssmDouble* alpha_complement,Gauss* gauss);
 		void  GetAlphaHydroComplement(IssmDouble* alpha_complement,Gauss* gauss);
 		void  GetAlphaTempComplement(IssmDouble* alpha_complement,Gauss* gauss);
-		void  GetAlphaViscousComplement(IssmDouble* alpha_complement,Gauss* gauss);
+		void  GetAlphaBuddComplement(IssmDouble* alpha_complement,Gauss* gauss);
 		void  GetAlphaSchoofComplement(IssmDouble* alpha_complement,Gauss* gauss);
 		void  GetAlphaCoulomb2Complement(IssmDouble* alpha_complement,Gauss* gauss);
 		void  GetAlphaRegCoulombComplement(IssmDouble* alpha_complement,Gauss* gauss);
@@ -50,7 +50,7 @@ class Friction{
 		void  GetAlpha2Josh(IssmDouble* palpha2,Gauss* gauss);
 		void  GetAlpha2Shakti(IssmDouble* palpha2,Gauss* gauss);
 		void  GetAlpha2Temp(IssmDouble* palpha2,Gauss* gauss);
-		void  GetAlpha2Viscous(IssmDouble* palpha2,Gauss* gauss);
+		void  GetAlpha2Budd(IssmDouble* palpha2,Gauss* gauss);
 		void  GetAlpha2WaterLayer(IssmDouble* palpha2,Gauss* gauss);
 		void  GetAlpha2Weertman(IssmDouble* palpha2,Gauss* gauss);
 		void  GetAlpha2WeertmanTemp(IssmDouble* palpha2,Gauss* gauss);

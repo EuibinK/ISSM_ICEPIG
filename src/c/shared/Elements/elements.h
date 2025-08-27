@@ -1,7 +1,6 @@
 /*!\file: elements.h
  * \brief prototypes for elements.h
  */ 
-#define _IS_MULTI_ICE_
 
 #ifndef _SHARED_ELEMENTS_H_
 #define _SHARED_ELEMENTS_H_
@@ -14,11 +13,8 @@ IssmDouble CuffeyTemperate(IssmDouble temperature, IssmDouble waterfraction, Iss
 IssmDouble Paterson(IssmDouble temperature);
 IssmDouble Arrhenius(IssmDouble temperature,IssmDouble depth,IssmDouble n);
 IssmDouble NyeH2O(IssmDouble temperature);
-IssmDouble GBSH2O(IssmDouble temperature);
 IssmDouble NyeCO2(IssmDouble temperature);
-#ifdef _IS_MULTI_ICE_
-IssmDouble NyeN2 (IssmDouble temperature);  
-#endif
+IssmDouble GBSH2O(IssmDouble temperature, IssmDouble phi);
 IssmDouble LliboutryDuval(IssmDouble enthalpy, IssmDouble pressure, IssmDouble n, IssmDouble betaCC, IssmDouble referencetemperature, IssmDouble heatcapacity, IssmDouble latentheat);
 // IssmDouble LliboutryDuval(IssmDouble temperature, IssmDouble waterfraction, IssmDouble depth,IssmDouble n);
 IssmDouble EstarLambdaS(IssmDouble epseff, IssmDouble epsprime_norm);
@@ -63,4 +59,7 @@ void printarray(int* array,int lines,int cols=1);
 void printarray(bool* array,int lines,int cols=1);
 void printsparsity(IssmPDouble* array,int lines,int cols=1);
 void printbinary(int n);
+void InversionStatsHeader(int NJ);
+void InversionStatsIter(int iter,double J, double Gnorm, double* Jlist, int N);
+void InversionStatsFooter(int NJ);
 #endif //ifndef _SHARED_ELEMENTS_H_

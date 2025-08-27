@@ -1,4 +1,4 @@
-/*\file FetchData.cpp:
+/* \file FetchJavascriptData.cpp:
  * \brief: general I/O interface to fetch data in javascript
  */
 
@@ -21,14 +21,14 @@ void FetchData(char** pstring, char* stringin){
 	*pstring=string;
 }
 /*}}}*/
-/*FUNCTION FetchData(int* pinteger, int integer){{{*/
-void FetchData(int* pinteger, int integer){
-	*pinteger=integer;
-}
-/*}}}*/
 /*FUNCTION FetchData(double* pscalar, double scalar){{{*/
 void FetchData(double* pscalar, double scalar){
 	*pscalar=scalar;
+}
+/*}}}*/
+/*FUNCTION FetchData(int* pinteger, int integer){{{*/
+void FetchData(int* pinteger, int integer){
+	*pinteger=integer;
 }
 /*}}}*/
 /*FUNCTION FetchData(double **pvector, double* vectorin, int nods){{{*/
@@ -50,6 +50,27 @@ void FetchData(double** pvector, int* pnods, double* vectorin, int nods){
 	*pnods=nods;
 }
 /*}}}*/
+/*FUNCTION FetchData(double **pmatrix, int* pM, int* matrix, int M, int N){{{*/
+void FetchData(double **pmatrix, int* pM, int* matrixin, int M, int N){
+	double*  outmatrix=NULL;
+	int      outmatrix_rows;
+
+	if(M == 0 || N == 0){
+		/*Nothing to pick up. Just initialize matrix pointer to NULL: */
+		outmatrix_rows=0;
+		outmatrix=NULL;
+	}
+	else if (pmatrix && matrixin){
+		outmatrix_rows=M;
+		outmatrix=xNew<IssmPDouble>(M*N);
+		for(int i=0;i<M*N;i++){outmatrix[i]=(IssmPDouble)matrixin[i];}
+	}
+
+	/*Assign output pointers:*/
+	*pmatrix=outmatrix;
+	if (pM){*pM=outmatrix_rows;}
+}
+/*}}}*/
 /*FUNCTION FetchData(double **pmatrix, int* pM, int* pN, int* matrix, int M, int N){{{*/
 void FetchData(double **pmatrix, int* pM, int* pN, int* matrixin, int M, int N){
 	double*  outmatrix=NULL;
@@ -61,7 +82,7 @@ void FetchData(double **pmatrix, int* pM, int* pN, int* matrixin, int M, int N){
 		outmatrix_cols=0;
 		outmatrix=NULL;
 	}
-    else if (pmatrix && matrixin){
+	else if (pmatrix && matrixin){
 		outmatrix_rows=M;
 		outmatrix_cols=N;
 		outmatrix=xNew<IssmPDouble>(M*N);
@@ -72,6 +93,26 @@ void FetchData(double **pmatrix, int* pM, int* pN, int* matrixin, int M, int N){
 	*pmatrix=outmatrix;
 	if (pM){*pM=outmatrix_rows;}
 	if (pN){*pN=outmatrix_cols;}
+}
+/*}}}*/
+/*FUNCTION FetchData(double **pmatrix, int* pM, double* matrix, int M, int N){{{*/
+void FetchData(double **pmatrix, int* pM, double* matrixin, int M, int N){
+	double*  outmatrix=NULL;
+	int      outmatrix_rows;
+
+	if(M == 0 || N == 0){
+		/*Nothing to pick up. Just initialize matrix pointer to NULL: */
+		outmatrix_rows=0;
+		outmatrix=NULL;
+	}
+	else if (pmatrix && matrixin){
+		outmatrix_rows=M;
+		outmatrix=xNew<IssmPDouble>(M*N); xMemCpy<IssmPDouble>(outmatrix,matrixin,M*N);
+	}
+
+	/*Assign output pointers:*/
+	*pmatrix=outmatrix;
+	if (pM){*pM=outmatrix_rows;}
 }
 /*}}}*/
 /*FUNCTION FetchData(double **pmatrix, int* pM, int* pN, double* matrix, int M, int N){{{*/
@@ -85,7 +126,7 @@ void FetchData(double **pmatrix, int* pM, int* pN, double* matrixin, int M, int 
 		outmatrix_cols=0;
 		outmatrix=NULL;
 	}
-    else if (pmatrix && matrixin){
+	else if (pmatrix && matrixin){
 		outmatrix_rows=M;
 		outmatrix_cols=N;
 		outmatrix=xNew<IssmPDouble>(M*N); xMemCpy<IssmPDouble>(outmatrix,matrixin,M*N);
@@ -95,6 +136,26 @@ void FetchData(double **pmatrix, int* pM, int* pN, double* matrixin, int M, int 
 	*pmatrix=outmatrix;
 	if (pM){*pM=outmatrix_rows;}
 	if (pN){*pN=outmatrix_cols;}
+}
+/*}}}*/
+/*FUNCTION FetchData(int **pmatrix, int* pM, int* matrix, int M, int N){{{*/
+void FetchData(int **pmatrix, int* pM, int* matrixin, int M, int N){
+	int*     outmatrix=NULL;
+	int      outmatrix_rows;
+
+	if(M == 0 || N == 0){
+		/*Nothing to pick up. Just initialize matrix pointer to NULL: */
+		outmatrix_rows=0;
+		outmatrix=NULL;
+	}
+	else if (pmatrix && matrixin){
+		outmatrix_rows=M;
+		outmatrix=xNew<int>(M*N); xMemCpy<int>(outmatrix,matrixin,M*N);
+	}
+
+	/*Assign output pointers:*/
+	*pmatrix=outmatrix;
+	if (pM){*pM=outmatrix_rows;}
 }
 /*}}}*/
 /*FUNCTION FetchData(int **pmatrix, int* pM, int* pN, int* matrix, int M, int N){{{*/
@@ -108,7 +169,7 @@ void FetchData(int **pmatrix, int* pM, int* pN, int* matrixin, int M, int N){
 		outmatrix_cols=0;
 		outmatrix=NULL;
 	}
-    else if (pmatrix && matrixin){
+	else if (pmatrix && matrixin){
 		outmatrix_rows=M;
 		outmatrix_cols=N;
 		outmatrix=xNew<int>(M*N); xMemCpy<int>(outmatrix,matrixin,M*N);
@@ -186,30 +247,30 @@ void FetchData(BamgOpts** pbamgopts, double anisomax, double coeff, double cutof
 
 	BamgOpts *bamgopts      = new BamgOpts();
 
-    /*Parameters*/
-    bamgopts->anisomax	    = anisomax;
-    bamgopts->coeff	        = coeff;
-    bamgopts->cutoff    	= cutoff;
-    bamgopts->errg	        = errg;
-    bamgopts->gradation	    = gradation;
-    bamgopts->Hessiantype	= Hessiantype;
-    bamgopts->maxnbv	    = maxnbv;
-    bamgopts->maxsubdiv	    = maxsubdiv;
-    bamgopts->Metrictype	= Metrictype;
-    bamgopts->nbjacobi	    = nbjacobi;
-    bamgopts->nbsmooth	    = nbsmooth;
-    bamgopts->omega	        = omega;
-    bamgopts->power	        = power;
-    bamgopts->verbose	    = verbose;
+	/*Parameters*/
+	bamgopts->anisomax	    = anisomax;
+	bamgopts->coeff	        = coeff;
+	bamgopts->cutoff    	= cutoff;
+	bamgopts->errg	        = errg;
+	bamgopts->gradation	    = gradation;
+	bamgopts->Hessiantype	= Hessiantype;
+	bamgopts->maxnbv	    = maxnbv;
+	bamgopts->maxsubdiv	    = maxsubdiv;
+	bamgopts->Metrictype	= Metrictype;
+	bamgopts->nbjacobi	    = nbjacobi;
+	bamgopts->nbsmooth	    = nbsmooth;
+	bamgopts->omega	        = omega;
+	bamgopts->power	        = power;
+	bamgopts->verbose	    = verbose;
 
-    /*Flags*/
-    bamgopts->Crack	        = Crack;
-    bamgopts->KeepVertices	= KeepVertices;
-    bamgopts->splitcorners	= splitcorners;
+	/*Flags*/
+	bamgopts->Crack	        = Crack;
+	bamgopts->KeepVertices	= KeepVertices;
+	bamgopts->splitcorners	= splitcorners;
 
-    /*Metric related*/
-    bamgopts->hmin	        = hmin;
-    bamgopts->hmax       	= hmax;
+	/*Metric related*/
+	bamgopts->hmin	        = hmin;
+	bamgopts->hmax       	= hmax;
 	FetchData(&bamgopts->hminVertices, &bamgopts->hminVerticesSize[0], &bamgopts->hminVerticesSize[1], hminVertices, hminVerticesSize[0], hminVerticesSize[1]);
 	FetchData(&bamgopts->hmaxVertices, &bamgopts->hmaxVerticesSize[0], &bamgopts->hmaxVerticesSize[1], hmaxVertices, hmaxVerticesSize[0], hmaxVerticesSize[1]);
 	FetchData(&bamgopts->hVertices, &bamgopts->hVerticesLength, hVertices, hVerticesLength);

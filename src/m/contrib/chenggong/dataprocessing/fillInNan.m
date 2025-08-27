@@ -2,8 +2,6 @@ function newdata = fillInNan(md, data, varargin)
 %fillInNan - use the mean of surrouding data to iteratidatay fill in the Nan in data
 %		data should have the same size as md.mesh.x
 %
-% Author: Cheng Gong
-% Last modified: 2021-12-08
 nanvflag = find(isnan(data));
 NNanv = length(nanvflag);
 

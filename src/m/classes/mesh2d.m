@@ -75,11 +75,11 @@ classdef mesh2d
 		end % }}}
 		function self = setdefaultparameters(self) % {{{
 
-			%the connectivity is the averaged number of nodes linked to a
-			%given node through an edge. This connectivity is used to initially
-			%allocate memory to the stiffness matrix. A value of 16 seems to
-			%give a good memory/time ration. This value can be checked in
-			%trunk/test/Miscellaneous/runme.m
+			%The connectivity is the average number of nodes linked to a given 
+			%node through an edge. This connectivity is used to initially allocate 
+			%memory to the stiffness matrix. A value of 16 seems to give a good 
+			%memory/time ratio. This value can be checked in
+			%test/Miscellaneous/runme.m
 			self.average_vertex_connectivity=25;
 		end % }}}
 		function md = checkconsistency(self,md,solution,analyses) % {{{

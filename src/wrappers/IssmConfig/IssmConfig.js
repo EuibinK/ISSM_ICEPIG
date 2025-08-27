@@ -17,7 +17,7 @@ function IssmConfig(string){
 	var value = Module.getValue(pvalue, 'double');
 	/*}}}*/
 
-	/*Free ressources: */
+	/*Free resources: */
 	Module._free(pvalue); 
 
 	return value;

@@ -9,9 +9,6 @@
 #include "./Definition.h"
 #include "./FemModel.h"
 
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,int output_enum);
-void  GetVectorFromInputsx( IssmDouble** pvector, int* pvector_size, FemModel* femmodel,int name);
-
 class Misfit: public Object, public Definition{
 
 	public: 

@@ -18,7 +18,6 @@ classdef discovery
 		time          = 10; %in hours
 		memory        = 2;  %in Gb
 		email         = 'END,FAIL';
-
 	end
 	%}}}
 	methods
@@ -103,7 +102,7 @@ classdef discovery
 			fprintf(fid,'#SBATCH -e %s.errlog \n',modelname);
 			fprintf(fid,'#SBATCH --nodes=%i\n',cluster.numnodes);
 			fprintf(fid,'#SBATCH --ntasks-per-node=%i\n',cluster.cpuspernode);
-			fprintf(fid,'#SBATCH --time=%s\n',datestr(cluster.time/24,'HH:MM:SS')); %walltime is in HH:MM:SS format. cluster.time is in hour
+			fprintf(fid,'#SBATCH --time=%s\n',eraseBetween(datestr(cluster.time/24,'dd-HH:MM:SS'),1,1)); %walltime is in d-HH:MM:SS format. cluster.time is in hour
 			fprintf(fid,'#SBATCH --mem=%iG\n',cluster.memory);
 			if ~isempty(cluster.email)
 				fprintf(fid,'#SBATCH --mail-type=%s\n',cluster.email);

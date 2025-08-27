@@ -1,5 +1,5 @@
-/* \file WriteData.c:
- * \brief: general interface for writing data
+/*\file WriteMatlabData.c:
+ *\brief: general I/O interface to write data in matlab
  */
 
 #ifdef HAVE_CONFIG_H
@@ -294,7 +294,7 @@ void WriteData(mxArray** pdataref,IssmDenseMat<double>* matrix){
 		mxSetN(dataref,cols);
 		mxSetPr(dataref,tmatrix_ptr);
 
-		/*Free ressources:*/
+		/*Free resources:*/
 		xDelete<double>(matrix_ptr);
 	}
 	else{

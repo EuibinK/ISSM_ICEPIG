@@ -3,9 +3,6 @@ function temp = interpISMIP6Temp(X, Y)
 %
 %	X and Y are the coordinates of the mesh
 %
-%  Author: Cheng Gong
-%  Last modified: 2021-12-06
-
 filename = '/totten_1/ModelData/Greenland/ISMIP6/GreenlandISMIP6-Morlighem-2020-10-01.nc';
 
 x = ncread(filename, 'x');

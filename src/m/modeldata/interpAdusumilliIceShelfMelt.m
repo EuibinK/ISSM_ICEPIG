@@ -13,7 +13,9 @@ function output = interpAdusumilliIceShelfMelt(X,Y)
 % define path and filename for this machine
 switch (oshostname()),
 	case {'totten'}
-		filename ='/totten_1/ModelData/Antarctica/Adusumilli2020IceShelfMelt/ANT_iceshelf_melt_rates_CS2_2010-2018_v0.h5';
+		filename = '/totten_1/ModelData/Antarctica/Adusumilli2020IceShelfMelt/ANT_iceshelf_melt_rates_CS2_2010-2018_v0.h5';
+	case {'thwaites','larsen','astrid'}
+		filename = '/u/astrid-r1b/ModelData/Adusumilli2020IceShelfMelt/ANT_iceshelf_melt_rates_CS2_2010-2018_v0.h5';
 	otherwise
 		error('hostname not supported yet');
 end

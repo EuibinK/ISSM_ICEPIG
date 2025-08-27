@@ -191,6 +191,10 @@ def ReadData(fid, md):  # {{{
             field = field * yts
         elif fieldname == 'VyAverage':
             field = field * yts
+        elif fieldname == 'VxDebris':
+            field = field * yts
+        elif fieldname == 'VyDebris':
+            field = field * yts
         elif fieldname == 'BasalforcingsGroundediceMeltingRate':
             field = field * yts
         elif fieldname == 'BasalforcingsFloatingiceMeltingRate':
@@ -210,6 +214,10 @@ def ReadData(fid, md):  # {{{
         elif fieldname == 'TotalSmb':
             field = field / pow(10.0, 12) * yts # (GigaTon/year)
         elif fieldname == 'TotalSmbScaled':
+            field = field / pow(10.0, 12) * yts # (GigaTon/year)
+        elif fieldname == 'TotalSmbMelt':
+            field = field / pow(10.0, 12) * yts # (GigaTon/year)
+        elif fieldname == 'TotalSmbRefreeze':
             field = field / pow(10.0, 12) * yts # (GigaTon/year)
         elif fieldname == 'GroundinglineMassFlux':
             field = field / pow(10.0, 12) * yts # (GigaTon/year)

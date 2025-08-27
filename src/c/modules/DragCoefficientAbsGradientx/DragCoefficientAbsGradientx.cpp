@@ -68,6 +68,7 @@ IssmDouble DragCoefficientAbsGradient(Element* element){
 	switch(frictionlaw) {
 		case 2:
 		case 11:
+		case 13:
 		case 14:
 			drag_input = basalelement->GetInput(FrictionCEnum); _assert_(drag_input);
 			break;

@@ -14,8 +14,6 @@ function plotCompareTransientFlowline(velList, titleList, md, flowline, TStart, 
 %   xl:			xlim value
 %   yl:			ylim value
 %
-%   Author: Cheng Gong
-%   Date: 2021-12-06
 
 N = length(velList);
 vel_flowline = cell(N,1);

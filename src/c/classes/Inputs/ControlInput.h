@@ -47,5 +47,6 @@ class ControlInput: public Input{
 		void SetGradient(int interp,int numindices,int* indices,IssmDouble* values_in,int n);
 		TriaInput* GetTriaInput();
 		PentaInput* GetPentaInput();
+		void AverageAndReplace(void);
 };
 #endif  /* _CONTROLINPUT_H */

@@ -1,5 +1,5 @@
-/* \file WriteData.c:
- * \brief: general interface for writing data
+/* \file WriteJavascriptData.cpp:
+ * \brief: general I/O interface to fetch data in javascript
  */
 
 #ifdef HAVE_CONFIG_H

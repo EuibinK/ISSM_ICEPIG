@@ -2,7 +2,7 @@ from ContourToNodes_python import ContourToNodes_python
 
 
 def ContourToNodes(x, y, contourname, edgevalue):
-    """CONTOURTONODES - flags vertices inside contour
+    """ContourToNodes - flags vertices inside contour
 
     x, y:           list of nodes
     contourname:    name of .exp/.shp file containing the contours, or resulting structure from call to expread/shpread

@@ -8,8 +8,6 @@ function w2 = wfDistance(x, y)
 %
 %   w2:  Wasserstein-Fourier Distance, or W2 distance of sx and sy
 %
-%   Author: Cheng Gong
-%   Date: 2021-08-18
 N = length(x);
 Sinv=linspace(0,1,N);
 

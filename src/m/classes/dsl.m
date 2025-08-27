@@ -68,22 +68,25 @@ classdef dsl
 
 			if isnan(self.global_average_thermosteric_sea_level)
 				self.global_average_thermosteric_sea_level=[0;0];
-				disp('      no dsl.global_average_thermosteric_sea_level specified: transient values set at zero');
+				disp('      no dsl.global_average_thermosteric_sea_level specified: transient values set to zero');
 			end
 			if isnan(self.sea_surface_height_above_geoid)
 				self.sea_surface_height_above_geoid=[zeros(md.mesh.numberofvertices,1);0];
-				disp('      no dsl.sea_surface_height_above_geoid specified: transient values set at zero');
+				disp('      no dsl.sea_surface_height_above_geoid specified: transient values set to zero');
 			end
 			if isnan(self.sea_water_pressure_at_sea_floor)
 				self.sea_water_pressure_at_sea_floor=[zeros(md.mesh.numberofvertices,1);0];
-				disp('      no dsl.sea_water_pressure_at_sea_floor specified: transient values set at zero');
+				disp('      no dsl.sea_water_pressure_at_sea_floor specified: transient values set to zero');
 			end
 		end % }}}
 		function savemodeljs(self,fid,modelname) % {{{
+			% NOTE: Commented out for now as class is not currently included in 
+			% issm.js
+			%
 
-			writejs1Darray(fid,[modelname '.dsl.global_average_thermosteric_sea_level'],self.global_average_thermosteric_sea_level);
-			writejs1Darray(fid,[modelname '.dsl.sea_surface_height_above_geoid'],self.sea_surface_height_above_geoid);
-			writejs1Darray(fid,[modelname '.dsl.sea_water_pressure_at_sea_floor'],self.sea_water_pressure_at_sea_floor);
+			% writejs1Darray(fid,[modelname '.dsl.global_average_thermosteric_sea_level'],self.global_average_thermosteric_sea_level);
+			% writejs1Darray(fid,[modelname '.dsl.sea_surface_height_above_geoid'],self.sea_surface_height_above_geoid);
+			% writejs1Darray(fid,[modelname '.dsl.sea_water_pressure_at_sea_floor'],self.sea_water_pressure_at_sea_floor);
 
 		end % }}}
 	end

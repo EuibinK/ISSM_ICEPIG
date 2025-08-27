@@ -306,6 +306,7 @@ void PentaRef::GetNodalFunctions(IssmDouble* basis,Gauss* gauss_in,int finiteele
 			basis[5]=gauss->coord3*(1.+zeta)/2.;
 			basis[6]=27.*gauss->coord1*gauss->coord2*gauss->coord3*(1.+zeta)*(1.-zeta);
 			return;
+			#ifndef _HAVE_AD_
 		case P2xP1Enum:
 			/*Corner nodes*/
 			basis[ 0]=gauss->coord1*(2.*gauss->coord1-1.)*(1.-zeta)/2.;
@@ -458,6 +459,7 @@ void PentaRef::GetNodalFunctions(IssmDouble* basis,Gauss* gauss_in,int finiteele
 			basis[13]=gauss->coord2*(-8./3.)*(zeta-1.0)*zeta*(zeta+0.5)*(zeta+1.);
 			basis[14]=gauss->coord3*(-8./3.)*(zeta-1.0)*zeta*(zeta+0.5)*(zeta+1.);
 			return;
+			#endif
 		default:
 			_error_("Element type "<<EnumToStringx(finiteelement)<<" not supported yet");
 	}
@@ -570,6 +572,7 @@ void PentaRef::GetNodalFunctionsDerivativesReference(IssmDouble* dbasis,Gauss* g
 			dbasis[NUMNODESP1b*1+6] = 27.*(1.+zeta)*(1.-zeta)*SQRT3*(-1./6.*gauss->coord2*gauss->coord3 - 1./6.*gauss->coord1*gauss->coord3 +1./3.*gauss->coord1*gauss->coord2);
 			dbasis[NUMNODESP1b*2+6] = -54*gauss->coord1*gauss->coord2*gauss->coord3*zeta;
 			return;
+			#ifndef _HAVE_AD_
 		case P2xP1Enum:
 			/*Nodal function 1*/
 			dbasis[NUMNODESP2xP1*0+0 ] = .5*(1.-zeta)*(-2.*gauss->coord1 + 0.5);
@@ -1056,6 +1059,7 @@ void PentaRef::GetNodalFunctionsDerivativesReference(IssmDouble* dbasis,Gauss* g
 			dbasis[NUMNODESP1xP4*2+14] = gauss->coord3* (-8./3.)*((2. *zeta -1. )*(zeta+0.5)*(zeta +1.) +  zeta*(zeta -1.)*( 2.*zeta + 3./2.));
 
 			return;
+			#endif
 		default:
 			_error_("Element type "<<EnumToStringx(finiteelement)<<" not supported yet");
 	}

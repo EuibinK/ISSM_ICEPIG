@@ -138,7 +138,7 @@ h = colormap(gca,c);
 %wrapping
 if exist(options,'wrapping'),
 	if ~exist(options,'colormap'),
-		h=jet;
+		h=turbo();
 	end
 	colormap(repmat(h,getfieldvalue(options,'wrapping',1),1));
 end

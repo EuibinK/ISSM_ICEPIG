@@ -31,9 +31,23 @@ Cflevelsetmisfit::Cflevelsetmisfit(){/*{{{*/
 	this->model_enum = UNDEF;
 	this->datatime=0.;
 	this->timepassedflag = false;
+	this->J = 0.;
 }
 /*}}}*/
-Cflevelsetmisfit::Cflevelsetmisfit(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime, bool in_timepassedflag){/*{{{*/
+Cflevelsetmisfit::Cflevelsetmisfit(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime){/*{{{*/
+
+	this->definitionenum=in_definitionenum;
+
+	this->name		= xNew<char>(strlen(in_name)+1);
+	xMemCpy<char>(this->name,in_name,strlen(in_name)+1);
+
+	this->model_enum=in_model_enum;
+	this->datatime=in_datatime;
+	this->timepassedflag=false;
+	this->J = 0.;
+}
+/*}}}*/
+Cflevelsetmisfit::Cflevelsetmisfit(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime, bool in_timepassedflag, IssmDouble in_J){/*{{{*/
 
 	this->definitionenum=in_definitionenum;
 
@@ -43,6 +57,7 @@ Cflevelsetmisfit::Cflevelsetmisfit(char* in_name, int in_definitionenum, int in_
 	this->model_enum=in_model_enum;
 	this->datatime=in_datatime;
 	this->timepassedflag=in_timepassedflag;
+	this->J = in_J;
 }
 /*}}}*/
 Cflevelsetmisfit::~Cflevelsetmisfit(){/*{{{*/
@@ -51,7 +66,7 @@ Cflevelsetmisfit::~Cflevelsetmisfit(){/*{{{*/
 /*}}}*/
 /*Object virtual function resolutoin: */
 Object* Cflevelsetmisfit::copy() {/*{{{*/
-	Cflevelsetmisfit* mf = new Cflevelsetmisfit(this->name,this->definitionenum, this->model_enum,this->datatime,this->timepassedflag);
+	Cflevelsetmisfit* mf = new Cflevelsetmisfit(this->name,this->definitionenum, this->model_enum,this->datatime,this->timepassedflag, this->J);
 	return (Object*) mf;
 }
 /*}}}*/
@@ -81,6 +96,7 @@ void Cflevelsetmisfit::Marshall(MarshallHandle* marshallhandle){/*{{{*/
 	marshallhandle->call(this->name);
 	marshallhandle->call(this->datatime);
 	marshallhandle->call(this->timepassedflag);
+	marshallhandle->call(this->J);
 } 
 /*}}}*/
 int Cflevelsetmisfit::ObjectEnum(void){/*{{{*/
@@ -105,26 +121,25 @@ IssmDouble Cflevelsetmisfit::Response(FemModel* femmodel){/*{{{*/
 
 	 /*recover time parameters: */
 	 femmodel->parameters->FindParam(&time,TimeEnum);
-
-	 IssmDouble J=0.;
-	 IssmDouble J_sum=0.;
-
 	 if(datatime<=time && !timepassedflag){
+
+		 IssmDouble J_part = 0.;
+		 IssmDouble J_sum  = 0.;
+
 		 for(Object* & object : femmodel->elements->objects){
 			 Element* element=xDynamicCast<Element*>(object);
-			 J+=this->Cflevelsetmisfit_Calculation(element,model_enum);
+			 J_part+=this->Cflevelsetmisfit_Calculation(element,model_enum);
 		 }
 
-		 ISSM_MPI_Allreduce ( (void*)&J,(void*)&J_sum,1,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,IssmComm::GetComm());
+		 ISSM_MPI_Allreduce ( (void*)&J_part,(void*)&J_sum,1,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,IssmComm::GetComm());
 		 ISSM_MPI_Bcast(&J_sum,1,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
-		 J=J_sum;
 
 		 this->timepassedflag = true;
-		 return J;
+		 this->J = J_sum;
 	 }
-	 else return J;
- }
-	/*}}}*/
+
+	 return this->J;
+ }/*}}}*/
 IssmDouble Cflevelsetmisfit::Cflevelsetmisfit_Calculation(Element* element, int model_enum){/*{{{*/
 
 	int        domaintype,numcomponents;

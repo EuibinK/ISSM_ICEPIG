@@ -39,7 +39,7 @@ WRAPPER(BamgMesher_python){
 	WriteData(BAMGGEOMOUT,bamggeom_out);
 	WriteData(BAMGMESHOUT,bamgmesh_out);
 
-	/*Free ressources: */
+	/*Free resources: */
 	delete bamgopts;
 	delete bamggeom_in;
 	delete bamggeom_out;

@@ -1,8 +1,6 @@
 function imageNonUni(varargin)
 %imageNonUni - draw an image with non uniform grid
 %
-% Author: Cheng Gong
-% Last modified: 2020-08-24
 x = varargin{1};
 y = varargin{2};
 C = varargin{3};

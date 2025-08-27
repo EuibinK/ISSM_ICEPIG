@@ -65,7 +65,7 @@ function Triangle(md,domain,rifts, area){
 
 	var return_array=[index,x,y,segments,segmentmarkers];
 
-	/*Free ressources: */
+	/*Free resources: */
 	Module._free(pindex); 
 	Module._free(indexlinear); 
 	Module._free(px); 

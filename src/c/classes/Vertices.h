@@ -38,6 +38,7 @@ class Vertices: public DataSet{
 		int   NumberOfVerticesLocal(void);
 		int   NumberOfVerticesLocalAll(void);
 		void  LatLonList(IssmDouble** lat,IssmDouble** lon);
+		void  XYList(IssmDouble** pxcoords,IssmDouble** pycoords);
 };
 
 #endif //ifndef _VERTICES_H_

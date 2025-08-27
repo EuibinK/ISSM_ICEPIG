@@ -24,9 +24,18 @@ void ControlInputSetGradientx(Elements* elements,Nodes* nodes, Vertices* vertice
 
 	int offset = 0;
 	for(int i=0;i<num_controls;i++){
-		for(Object* & object : elements->objects){
-			Element* element=xDynamicCast<Element*>(object);
-			element->ControlInputSetGradient(gradient,control_type[i],i,offset,M_all[i],N_all[i],interp_all[i]);
+		/*Is the control a Param?*/
+		if(IsParamEnum(control_type[i])){
+			parameters->SetGradientFromVector(gradient, control_type[i], M_all[i], N_all[i], offset);
+		}
+		else if(IsInputEnum(control_type[i])){
+			for(Object* & object : elements->objects){
+				Element* element=xDynamicCast<Element*>(object);
+				element->ControlInputSetGradient(gradient,control_type[i],i,offset,M_all[i],N_all[i],interp_all[i]);
+			}
+		}
+		else{
+			_error_("not supported yet");
 		}
 		offset+=M_all[i]*N_all[i];
 	}

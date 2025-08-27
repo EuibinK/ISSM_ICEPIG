@@ -75,7 +75,7 @@ void* InterpFromMesh2dxt(void* vpthread_handle){
 				area_3=1-area_1-area_2;
 
 				/*is the current point in the current element?*/
-				if (area_1>=0 && area_2>=0 && area_3>=0){
+				if (area_1>=-1.e-8 && area_2>=-1.e-8 && area_3>=-1.e-8){
 
 					/*Yes ! compute the value on the point*/
 					if (interpolation_type==1){

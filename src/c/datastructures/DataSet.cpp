@@ -255,6 +255,11 @@ void  DataSet::Marshall(MarshallHandle* marshallhandle){ /*{{{*/
 				Cflevelset->Marshall(marshallhandle);
 				this->AddObject(Cflevelset);
 			}
+			else if(obj_enum==CfsurfacesquaretransientEnum){
+				Cfsurfacesquaretransient* cfsurf=new Cfsurfacesquaretransient();
+				cfsurf->Marshall(marshallhandle);
+				this->AddObject(cfsurf);
+			}
 			else if(obj_enum==CfsurfacesquareEnum){
 				Cfsurfacesquare* cfsurf=new Cfsurfacesquare();
 				cfsurf->Marshall(marshallhandle);
@@ -269,6 +274,16 @@ void  DataSet::Marshall(MarshallHandle* marshallhandle){ /*{{{*/
 				Cfdragcoeffabsgrad* cfdragcoeff=new Cfdragcoeffabsgrad();
 				cfdragcoeff->Marshall(marshallhandle);
 				this->AddObject(cfdragcoeff);
+			}
+			else if(obj_enum==CfdragcoeffabsgradtransientEnum){
+				Cfdragcoeffabsgradtransient* cfdragcoeff=new Cfdragcoeffabsgradtransient();
+				cfdragcoeff->Marshall(marshallhandle);
+				this->AddObject(cfdragcoeff);
+			}
+			else if(obj_enum==CfrheologybbarabsgradEnum){
+				Cfrheologybbarabsgrad* cfrheologybbarabsgrad=new Cfrheologybbarabsgrad();
+				cfrheologybbarabsgrad->Marshall(marshallhandle);
+				this->AddObject(cfrheologybbarabsgrad);
 			}
 			else if(obj_enum==NodalvalueEnum){
 				Nodalvalue* nodalvalue=new Nodalvalue();

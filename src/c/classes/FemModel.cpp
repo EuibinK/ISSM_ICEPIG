@@ -21,10 +21,7 @@
 #include "./Inputs/ElementInput.h"
 #include "./Inputs/TransientInput.h"
 
-#if _HAVE_CODIPACK_
-#include <sstream> // for output of the CoDiPack tape
-extern CoDi_global codi_global;
-#endif
+#include "../toolkits/codipack/CoDiPackGlobal.h"
 
 #if defined(_HAVE_NEOPZ_) && !defined(_HAVE_AD_)
 #include <TPZRefPatternDataBase.h>
@@ -297,8 +294,9 @@ void FemModel::CheckPointAD(int step){/*{{{*/
 	int step_length = (step    == 0 ? 1 : int(log10(static_cast<double>(step))   +1));
 
 	/*Create restart file*/
-	char* restartfilename  = xNew<char>(strlen("AD_step_")+step_length+strlen("_rank_")+rank_length+strlen(".ckpt")+1);
-	sprintf(restartfilename,"%s%i%s%i%s","AD_step_",step,"_rank_",my_rank,".ckpt");
+	int restartfilename_len = strlen("AD_step_")+step_length+strlen("_rank_")+rank_length+strlen(".ckpt")+1;
+	char* restartfilename = xNew<char>(restartfilename_len);
+	snprintf(restartfilename, restartfilename_len, "%s%i%s%i%s","AD_step_",step,"_rank_",my_rank,".ckpt");
 	this->parameters->AddObject(new StringParam(RestartFileNameEnum,restartfilename));
 
 	/*Write files*/
@@ -650,12 +648,17 @@ void FemModel::RestartAD(int step){ /*{{{*/
 	int step_length = (step    == 0 ? 1 : int(log10(static_cast<double>(step))   +1));
 
 	/*Create restart file*/
-	char* restartfilename  = xNew<char>(strlen("AD_step_")+step_length+strlen("_rank_")+rank_length+strlen(".ckpt")+1);
-	sprintf(restartfilename,"%s%i%s%i%s","AD_step_",step,"_rank_",my_rank,".ckpt");
+	int   restartfilename_len = strlen("AD_step_")+step_length+strlen("_rank_")+rank_length+strlen(".ckpt")+1;
+	char* restartfilename  = xNew<char>(restartfilename_len);
+	snprintf(restartfilename, restartfilename_len,"%s%i%s%i%s","AD_step_",step,"_rank_",my_rank,".ckpt");
 	this->parameters->AddObject(new StringParam(RestartFileNameEnum,restartfilename));
 
 	/*Read files*/
 	this->Restart(1);
+
+	/*Delete checkpoint file to save disk space*/
+	/*_printf0_("    == deleting  file  "<<restartfilename<<"\n");*/
+	std::remove(restartfilename);
 
 	/*Clean up and return*/
 	xDelete<char>(restartfilename);
@@ -859,16 +862,18 @@ void FemModel::SolutionAnalysesList(int** panalyses,int* pnumanalyses,IoModel* i
 
 		case TransientSolutionEnum:{
 			/*We have multiple analyses here, process one by one*/
-			bool isSIA,isFS,isthermal,isenthalpy,ismasstransport,isoceantransport,isgroundingline,isstressbalance,ismovingfront,ishydrology,isdamage,issmb,isslc,isesa,isdebris,issampling;
+			bool isSIA,isFS,isthermal,isenthalpy,ismasstransport,ismmemasstransport,isoceantransport,isgroundingline,isstressbalance,ismovingfront,ishydrology,isdamage,issmb,isslc,isesa,isdebris,issampling,isfreesurface;
 			iomodel->FindConstant(&isthermal,"md.transient.isthermal");
 			iomodel->FindConstant(&ismovingfront,"md.transient.ismovingfront");
 			iomodel->FindConstant(&ismasstransport,"md.transient.ismasstransport");
+			iomodel->FindConstant(&ismmemasstransport,"md.transient.ismmemasstransport");
 			iomodel->FindConstant(&isoceantransport,"md.transient.isoceantransport");
 			iomodel->FindConstant(&isstressbalance,"md.transient.isstressbalance");
 			iomodel->FindConstant(&isgroundingline,"md.transient.isgroundingline");
 			iomodel->FindConstant(&isdamage,"md.transient.isdamageevolution");
 			iomodel->FindConstant(&ishydrology,"md.transient.ishydrology");
 			iomodel->FindConstant(&issmb,"md.transient.issmb");
+			iomodel->FindConstant(&isfreesurface,"md.masstransport.isfreesurface");
 			iomodel->FindConstant(&isslc,"md.transient.isslc");
 			iomodel->FindConstant(&isesa,"md.transient.isesa");
 			iomodel->FindConstant(&isdebris,"md.transient.isdebris");
@@ -887,6 +892,10 @@ void FemModel::SolutionAnalysesList(int** panalyses,int* pnumanalyses,IoModel* i
 			}
 			if(ismasstransport || isgroundingline){
 				analyses_temp[numanalyses++]=MasstransportAnalysisEnum;
+				if(isfreesurface){
+					analyses_temp[numanalyses++]=FreeSurfaceBaseAnalysisEnum;
+					analyses_temp[numanalyses++]=FreeSurfaceTopAnalysisEnum;
+				}
 				int  basalforcing_model;
 				iomodel->FindConstant(&basalforcing_model,"md.basalforcings.model");
 				if(basalforcing_model==BasalforcingsPicoEnum){
@@ -913,6 +922,9 @@ void FemModel::SolutionAnalysesList(int** panalyses,int* pnumanalyses,IoModel* i
 			if(isoceantransport){
 				analyses_temp[numanalyses++]=OceantransportAnalysisEnum;
 			}
+			if(ismmemasstransport){
+				analyses_temp[numanalyses++]=MmemasstransportAnalysisEnum;
+			}
 			if(isslc){
 				analyses_temp[numanalyses++]=SealevelchangeAnalysisEnum;
 			}
@@ -932,8 +944,6 @@ void FemModel::SolutionAnalysesList(int** panalyses,int* pnumanalyses,IoModel* i
 			if(iomodel->domaintype==Domain2DverticalEnum || iomodel->domaintype==Domain3DEnum){
 				analyses_temp[numanalyses++]=ExtrudeFromBaseAnalysisEnum;
 				analyses_temp[numanalyses++]=ExtrudeFromTopAnalysisEnum;
-				analyses_temp[numanalyses++]=FreeSurfaceBaseAnalysisEnum;
-				analyses_temp[numanalyses++]=FreeSurfaceTopAnalysisEnum;
 			}
 			analyses_temp[numanalyses++]=L2ProjectionBaseAnalysisEnum;
 			}
@@ -1533,7 +1543,7 @@ void FemModel::SyncLocalVectorWithClonesVerticesAdd(IssmDouble* local_vector){/*
 
 	/*Wait until MPI is done*/
 	for(int rank=0;rank<num_procs;rank++){
-		if(this->vertices->common_send[rank]) ISSM_MPI_Wait(&send_requests[rank],&status);
+		if(this->vertices->common_recv[rank]) ISSM_MPI_Wait(&send_requests[rank],&status);
 	}
 
 	/*Now sync masters across partitions*/
@@ -1803,6 +1813,19 @@ void FemModel::IceVolumex(IssmDouble* pV, bool scaled){/*{{{*/
 	/*Assign output pointers: */
 	*pV=total_ice_volume;
 
+}/*}}}*/
+void FemModel::InputToP0(int inputenum,int outputenum){/*{{{*/
+
+	IssmDouble average;
+
+	/*Collapse input to P0, by doing the average. We need to have the elements 
+	 * to do so, so loop onto elements: */
+	for(Object* & object : this->elements->objects){
+		Element* element = xDynamicCast<Element*>(object);
+		Input*  input = element->GetInput(inputenum);
+		input->GetInputAverage(&average);
+		element->AddInput(outputenum,&average,P0Enum);
+	}
 }/*}}}*/
 void FemModel::MassFluxx(IssmDouble* pmass_flux){/*{{{*/
 
@@ -2158,7 +2181,7 @@ void FemModel::MinVzx(IssmDouble* pminvz){/*{{{*/
 }/*}}}*/
 void FemModel::MmeToInputFromId(int id, int rootenum, int interpolationenum){ /*{{{*/
 
-	MmeToInputFromIdx(this->inputs,this->elements,id,rootenum,interpolationenum);
+	MmeToInputFromIdx(this->inputs,this->elements,this->parameters,id,rootenum,interpolationenum);
 
 }	//}}}
 void FemModel::OmegaAbsGradientx( IssmDouble* pJ){/*{{{*/
@@ -2334,59 +2357,38 @@ void FemModel::OutputControlsx(Results **presults){/*{{{*/
 /*}}}*/
 void FemModel::RequestedDependentsx(void){/*{{{*/
 
-	bool        isautodiff      = false;
-	IssmDouble  output_value;
-
-	int         num_dependents;
-	IssmPDouble *dependents;
-	DataSet*    dependent_objects=NULL;
-	int my_rank=IssmComm::GetRank();
-
 	/*AD mode on?: */
+	bool isautodiff;
 	parameters->FindParam(&isautodiff,AutodiffIsautodiffEnum);
 
 	if(isautodiff){
 		#ifdef _HAVE_AD_
+		int      num_dependents;
+		DataSet* dependent_objects=NULL;
 		parameters->FindParam(&num_dependents,AutodiffNumDependentsEnum);
 		parameters->FindParam(&dependent_objects,AutodiffDependentObjectsEnum);
 		if(num_dependents){
-			dependents=xNew<IssmPDouble>(num_dependents);
-
-			#if defined(_HAVE_CODIPACK_)
-			#if _CODIPACK_MAJOR_==2
-			auto& tape_codi = IssmDouble::getTape();
-			#elif _CODIPACK_MAJOR_==1
-			auto& tape_codi = IssmDouble::getGlobalTape();
-			#else
-			#error "_CODIPACK_MAJOR_ not supported"
-			#endif
-			#endif
+			IssmPDouble* dependents=xNew<IssmPDouble>(num_dependents);
 
 			/*Go through our dependent variables, and compute the response:*/
+			int my_rank=IssmComm::GetRank();
 			int i = 0;
 			for(Object* & object : dependent_objects->objects){
 				DependentObject* dep=(DependentObject*)object;
-				dep->Responsex(&output_value,this);
+				dep->RecordResponsex(this);
+				IssmDouble output_value = dep->GetValue();
 				if (my_rank==0) {
 					#if defined(_HAVE_CODIPACK_)
-						tape_codi.registerOutput(output_value);
-						dependents[i] = output_value.getValue();
-						#if _CODIPACK_MAJOR_==2
-						codi_global.output_indices.push_back(output_value.getIdentifier());
-						#elif _CODIPACK_MAJOR_==1
-						codi_global.output_indices.push_back(output_value.getGradientData());
-						#else
-						#error "_CODIPACK_MAJOR_ not supported"
-						#endif
+						codi_global.registerOutput(output_value);
 					#else
 						output_value>>=dependents[i];
 					#endif
 				}
 				i++;
 			}
+			xDelete<IssmPDouble>(dependents);
 		}
 		delete dependent_objects;
-		if(num_dependents)xDelete<IssmPDouble>(dependents);
 		#else
 		_error_("Should not be requesting dependents when an AD library is not available!");
 		#endif
@@ -2397,7 +2399,7 @@ void FemModel::RequestedOutputsx(Results **presults,char** requested_outputs, in
 
 	/*Intermediaries*/
 	bool        isvec,results_on_nodes;
-	int         step,output_enum,numonnodes;
+	int         step,output_enum,numonnodes,ierr;
 	IssmDouble  time;
 	IssmDouble  double_result;
 	const char *output_string = NULL;
@@ -2421,18 +2423,22 @@ void FemModel::RequestedOutputsx(Results **presults,char** requested_outputs, in
 
 		/*If string is not an enum, it is defined in output definitions*/
 		if(output_enum<0){
-			double_result = OutputDefinitionsResponsex(this,output_string);
+			ierr = OutputDefinitionsResponsex(&double_result, this,output_string);
 			if(save_results){
-				results->AddResult(new GenericExternalResult<IssmPDouble>(results->Size()+1,output_string,reCast<IssmPDouble>(double_result),step,time));
+				if(!ierr){
+					results->AddResult(new GenericExternalResult<IssmPDouble>(results->Size()+1,output_string,reCast<IssmPDouble>(double_result),step,time));
+				}
 				continue;
 			}
 		}
 		else{
 			/*last chance for the output definition, if the enum is one of Outputdefinition[1-10]Enum:*/
 			if(output_enum>=Outputdefinition1Enum && output_enum <=Outputdefinition100Enum){
-				double_result = OutputDefinitionsResponsex(this,output_enum);
+				ierr = OutputDefinitionsResponsex(&double_result, this, output_enum);
 				if(save_results){
-					results->AddResult(new GenericExternalResult<IssmPDouble>(results->Size()+1,output_string,reCast<IssmPDouble>(double_result),step,time));
+					if(!ierr){
+						results->AddResult(new GenericExternalResult<IssmPDouble>(results->Size()+1,output_string,reCast<IssmPDouble>(double_result),step,time));
+					}
 					continue;
 				}
 			}
@@ -2474,6 +2480,8 @@ void FemModel::RequestedOutputsx(Results **presults,char** requested_outputs, in
 					case TotalGroundedBmbEnum:               this->TotalGroundedBmbx(&double_result,false);         break;
 					case TotalGroundedBmbScaledEnum:         this->TotalGroundedBmbx(&double_result,true);          break;
 					case TotalSmbEnum:                       this->TotalSmbx(&double_result,false);                 break;
+					case TotalSmbMeltEnum:                   this->TotalSmbMeltx(&double_result,false);             break;
+					case TotalSmbRefreezeEnum:               this->TotalSmbRefreezex(&double_result,false);         break;
 					case TotalSmbScaledEnum:                 this->TotalSmbx(&double_result,true);                  break;
 
 					/*Scalar control output*/
@@ -2546,6 +2554,13 @@ void FemModel::RequestedOutputsx(Results **presults,char** requested_outputs, in
 							InputDuplicatex(this,DamageDEnum,DamageDOldEnum);
 							InputDuplicatex(this,DamageDbarEnum,DamageDbarOldEnum);
 							this->ElementOperationx(&Element::ComputeNewDamage);
+						}
+						else if(output_enum==FrictionAlpha2Enum){
+							for(Object* & object : this->elements->objects){
+								Element* element=xDynamicCast<Element*>(object);
+								element->SetElementInput(FrictionAlpha2Enum,0.,P1Enum);
+							}
+							this->ElementOperationx(&Element::FrictionAlpha2CreateInput);
 						}
 
 						/*Vector layout*/
@@ -2739,14 +2754,16 @@ void FemModel::Responsex(IssmDouble* responses,int response_descriptor_enum){/*{
 		case TotalGroundedBmbEnum:			        this->TotalGroundedBmbx(responses, false); break;
 		case TotalGroundedBmbScaledEnum:			  this->TotalGroundedBmbx(responses, true); break;
 		case TotalSmbEnum:					        this->TotalSmbx(responses, false); break;
+		case TotalSmbMeltEnum:					     this->TotalSmbMeltx(responses, false); break;
+		case TotalSmbRefreezeEnum:					  this->TotalSmbRefreezex(responses, false); break;
 		case TotalSmbScaledEnum:					  this->TotalSmbx(responses, true); break;
 		case MaterialsRheologyBbarEnum:          this->ElementResponsex(responses,MaterialsRheologyBbarEnum); break;
 		case VelEnum:                            this->ElementResponsex(responses,VelEnum); break;
 		case FrictionCoefficientEnum:            NodalValuex(responses, FrictionCoefficientEnum,elements,nodes, vertices, loads, materials, parameters); break;
 		default:
 			if(response_descriptor_enum>=Outputdefinition1Enum && response_descriptor_enum <=Outputdefinition100Enum){
-				IssmDouble double_result = OutputDefinitionsResponsex(this,response_descriptor_enum);
-				*responses=double_result;
+				int ierr = OutputDefinitionsResponsex(responses, this,response_descriptor_enum);
+				if(ierr) _error_("could not evaluate response");
 			}
 			else _error_("response descriptor \"" << EnumToStringx(response_descriptor_enum) << "\" not supported yet!");
 			break;
@@ -3129,6 +3146,38 @@ void FemModel::TotalSmbx(IssmDouble* pSmb, bool scaled){/*{{{*/
 
 	/*Assign output pointers: */
 	*pSmb=total_smb;
+
+}/*}}}*/
+void FemModel::TotalSmbMeltx(IssmDouble* pSmbMelt, bool scaled){/*{{{*/
+
+	IssmDouble local_smbmelt = 0;
+	IssmDouble total_smbmelt;
+
+	for(Object* & object : this->elements->objects){
+		Element* element = xDynamicCast<Element*>(object);
+		local_smbmelt+=element->TotalSmbMelt(scaled);
+	}
+	ISSM_MPI_Reduce(&local_smbmelt,&total_smbmelt,1,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,0,IssmComm::GetComm() );
+	ISSM_MPI_Bcast(&total_smbmelt,1,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
+
+	/*Assign output pointers: */
+	*pSmbMelt=total_smbmelt;
+
+}/*}}}*/
+void FemModel::TotalSmbRefreezex(IssmDouble* pSmbRefreeze, bool scaled){/*{{{*/
+
+	IssmDouble local_smbrefreeze = 0;
+	IssmDouble total_smbrefreeze;
+
+	for(Object* & object : this->elements->objects){
+		Element* element = xDynamicCast<Element*>(object);
+		local_smbrefreeze+=element->TotalSmbRefreeze(scaled);
+	}
+	ISSM_MPI_Reduce(&local_smbrefreeze,&total_smbrefreeze,1,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,0,IssmComm::GetComm() );
+	ISSM_MPI_Bcast(&total_smbrefreeze,1,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
+
+	/*Assign output pointers: */
+	*pSmbRefreeze=total_smbrefreeze;
 
 }/*}}}*/
 void FemModel::UpdateConstraintsExtrudeFromBasex(void){ /*{{{*/
@@ -4607,10 +4656,8 @@ void FemModel::GetZeroLevelSetPoints(IssmDouble** pzerolevelset_points,int &numb
 #ifdef  _HAVE_DAKOTA_
 void FemModel::DakotaResponsesx(double* d_responses,char** responses_descriptors,int numresponsedescriptors,int d_numresponses){/*{{{*/
 
-	int        i,j;
-	int        my_rank;
-
 	/*intermediary: */
+	int    i,j;
 	char   root[50];
 	int    index;
 	double femmodel_response;
@@ -4630,7 +4677,7 @@ void FemModel::DakotaResponsesx(double* d_responses,char** responses_descriptors
 	this->parameters->FindParam(&response_partitions_npart,NULL,NULL,QmuResponsePartitionsNpartEnum);
 
 	/*retrieve my_rank: */
-	my_rank=IssmComm::GetRank();
+	int my_rank=IssmComm::GetRank();
 
 	/*save the d_responses pointer: */
 	responses_pointer=d_responses;
@@ -4725,7 +4772,7 @@ void FemModel::DakotaResponsesx(double* d_responses,char** responses_descriptors
 /*}}}*/
 #endif
 #ifdef _HAVE_ESA_
-void FemModel::EsaGeodetic2D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth, Vector<IssmDouble>* pEast, Vector<IssmDouble>* pX, Vector<IssmDouble>* pY, IssmDouble* xx, IssmDouble* yy){/*{{{*/
+void FemModel::EsaGeodetic2D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth, Vector<IssmDouble>* pEast, Vector<IssmDouble>* pGravity, Vector<IssmDouble>* pX, Vector<IssmDouble>* pY, IssmDouble* xx, IssmDouble* yy){/*{{{*/
 
 	int         ns,nsmax;
 
@@ -4740,12 +4787,13 @@ void FemModel::EsaGeodetic2D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth
 	for(int i=0;i<nsmax;i++){
 		if(i<ns){
 			Element* element=xDynamicCast<Element*>(elements->GetObjectByOffset(i));
-			element->EsaGeodetic2D(pUp,pNorth,pEast,pX,pY,xx,yy);
+			element->EsaGeodetic2D(pUp,pNorth,pEast,pGravity,pX,pY,xx,yy);
 		}
 		if(i%100==0){
 			pUp->Assemble();
 			pNorth->Assemble();
 			pEast->Assemble();
+			pGravity->Assemble();
 			pX->Assemble();
 			pY->Assemble();
 		}
@@ -4755,6 +4803,7 @@ void FemModel::EsaGeodetic2D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth
 	pUp->Assemble();
 	pNorth->Assemble();
 	pEast->Assemble();
+	pGravity->Assemble();
 	pX->Assemble();
 	pY->Assemble();
 
@@ -4763,7 +4812,7 @@ void FemModel::EsaGeodetic2D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth
 	xDelete<IssmDouble>(yy);
 }
 /*}}}*/
-void FemModel::EsaGeodetic3D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth, Vector<IssmDouble>* pEast, IssmDouble* latitude, IssmDouble* longitude, IssmDouble* radius, IssmDouble* xx, IssmDouble* yy, IssmDouble* zz){/*{{{*/
+void FemModel::EsaGeodetic3D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth, Vector<IssmDouble>* pEast, Vector<IssmDouble>* pGravity, IssmDouble* latitude, IssmDouble* longitude, IssmDouble* radius, IssmDouble* xx, IssmDouble* yy, IssmDouble* zz){/*{{{*/
 
 	int         ns,nsmax;
 
@@ -4778,12 +4827,13 @@ void FemModel::EsaGeodetic3D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth
 	for(int i=0;i<nsmax;i++){
 		if(i<ns){
 			Element* element=xDynamicCast<Element*>(elements->GetObjectByOffset(i));
-			element->EsaGeodetic3D(pUp,pNorth,pEast,latitude,longitude,radius,xx,yy,zz);
+			element->EsaGeodetic3D(pUp,pNorth,pEast,pGravity,latitude,longitude,radius,xx,yy,zz);
 		}
 		if(i%100==0){
 			pUp->Assemble();
 			pNorth->Assemble();
 			pEast->Assemble();
+			pGravity->Assemble();
 		}
 	}
 
@@ -4791,6 +4841,7 @@ void FemModel::EsaGeodetic3D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth
 	pUp->Assemble();
 	pNorth->Assemble();
 	pEast->Assemble();
+	pGravity->Assemble();
 
 	/*Free resources:*/
 	xDelete<IssmDouble>(latitude);

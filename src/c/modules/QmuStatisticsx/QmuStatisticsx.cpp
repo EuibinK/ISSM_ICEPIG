@@ -84,7 +84,7 @@ int readdata(IssmDouble** pdoublemat, int* pdoublematsize, IssmDouble* pdouble, 
 			else _error_("cannot read data of type " << type << "\n");
 		}
 	}
-	if(found==0)_error_("cound not find " << field << " at step " << step  << "\n");
+	if(found==0)_error_("could not find " << field << " at step " << step  << "\n");
 
 	/*assign output pointers:*/
 	*pdoublemat=dmatfield;
@@ -169,7 +169,7 @@ int ComputeHistogram(Parameters* parameters,Results* results,int color, ISSM_MPI
 		/*open file: */
 		_printf0_("    opening file: " << file << "\n");
 		FILE* fid=fopen(file,"rb");
-		if(fid==NULL)_error_("cound not open file: " << file << "\n");
+		if(fid==NULL)_error_("could not open file: " << file << "\n");
 
 		/*figure out size of file, and read the whole thing:*/
 		_printf0_("    reading file:\n");
@@ -402,7 +402,7 @@ int ComputeHistogram(Parameters* parameters,Results* results,int color, ISSM_MPI
 		/*open file: */
 		_printf0_("    opening file:\n");
 		FILE* fid=fopen(file,"rb");
-		if(fid==NULL)_error_("cound not open file: " << file << "\n");
+		if(fid==NULL)_error_("could not open file: " << file << "\n");
 
 		/*figure out size of file, and read the whole thing:*/
 		_printf0_("    reading file:\n");

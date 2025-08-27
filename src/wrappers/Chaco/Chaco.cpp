@@ -65,7 +65,7 @@ WRAPPER(Chaco_python){
     /*Output data: */
 	WriteData(ASSGN_OUT,assignment,nvtxs);
 
-	/*Free ressources:*/
+	/*Free resources:*/
 	xDelete<short>(assignment); 
 	xDelete<double>(goal);
 	//xDelete<int>(nparts);

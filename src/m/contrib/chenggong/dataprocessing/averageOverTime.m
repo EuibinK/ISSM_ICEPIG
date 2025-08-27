@@ -12,8 +12,6 @@ function averagedData = averageOverTime(data, time, startP, endP)
 % if out of the given time range, use constant extrapolation,
 % if within the range, do linear interpolation.
 %
-%   Author: Cheng Gong
-%   Last modified: 2020-09-09
 if nargin < 4
     endP = startP;
 end

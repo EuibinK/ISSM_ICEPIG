@@ -42,6 +42,7 @@ class materials(object):
                 self.thermal_exchange_velocity = 0
                 self.rheology_B = 0
                 self.rheology_n = 0
+                self.rheology_phi = 0
                 self.rheology_law = 0
             elif nat == 'litho':
                 self.numlayers = 0
@@ -89,7 +90,8 @@ class materials(object):
                 s += '{}\n'.format(fielddisplay(self, 'thermal_exchange_velocity', 'thermal exchange velocity [m/s]'))
                 s += '{}\n'.format(fielddisplay(self, 'rheology_B', 'flow law parameter [Pa s^(1/n)]'))
                 s += '{}\n'.format(fielddisplay(self, 'rheology_n', 'Glen\'s flow law exponent'))
-                s += '{}\n'.format(fielddisplay(self, 'rheology_law', 'law for the temperature dependance of the rheology: \'None\', \'BuddJacka\', \'Cuffey\', \'CuffeyTemperate\', \'Paterson\', \'Arrhenius\', \'LliboutryDuval\', \'NyeCO2\', or \'NyeH2O\''))
+                s += '{}\n'.format(fielddisplay(self, 'rheology_phi', 'rheology phi (dimensionless)'))
+                s += '{}\n'.format(fielddisplay(self, 'rheology_law', 'law for the temperature dependance of the rheology: \'None\', \'BuddJacka\', \'Cuffey\', \'CuffeyTemperate\', \'Paterson\', \'Arrhenius\', \'LliboutryDuval\', \'NyeCO2\', \'NyeH2O\', or \'GBSH2O\''))
             elif nat == 'litho':
                 s += '\n      Litho:\n'
                 s += '{}\n'.format(fielddisplay(self, 'numlayers', 'number of layers (default: 2)'))
@@ -170,6 +172,7 @@ class materials(object):
                 # Rheology fields default
                 self.rheology_B = 1 * 1e8
                 self.rheology_n = 3
+                self.rheology_phi = 0.01
             elif nat == 'litho':
                 # We default to a configuration that enables running GIA
                 # solutions using giacaron and/or giaivins
@@ -232,12 +235,16 @@ class materials(object):
                 md = checkfield(md, 'fieldname', 'materials.density', 'NaN', 1, 'Inf', 1, 'size', [md.materials.numlayers, 1], '>', 0)
                 md = checkfield(md, 'fieldname', 'materials.viscosity', 'NaN', 1, 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
                 md = checkfield(md, 'fieldname', 'materials.rheologymodel', 'NaN', 1, 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0, '<=', 2)
-                md = checkfield(md, 'fieldname', 'materials.burgers_viscosity', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
-                md = checkfield(md, 'fieldname', 'materials.burgers_mu', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
-                md = checkfield(md, 'fieldname', 'materials.ebm_alpha', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
-                md = checkfield(md, 'fieldname', 'materials.ebm_delta', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
-                md = checkfield(md, 'fieldname', 'materials.ebm_taul', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
-                md = checkfield(md, 'fieldname', 'materials.ebm_tauh', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
+
+                if np.any(self.rheologymodel == 1):
+                    md = checkfield(md, 'fieldname', 'materials.burgers_viscosity', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
+                    md = checkfield(md, 'fieldname', 'materials.burgers_mu', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
+
+                if np.any(self.rheologymodel == 2):
+                    md = checkfield(md, 'fieldname', 'materials.ebm_alpha', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
+                    md = checkfield(md, 'fieldname', 'materials.ebm_delta', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
+                    md = checkfield(md, 'fieldname', 'materials.ebm_taul', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
+                    md = checkfield(md, 'fieldname', 'materials.ebm_tauh', 'Inf', 1, 'size', [md.materials.numlayers, 1], '>=', 0)
 
                 for i in range(md.materials.numlayers):
                     if md.materials.rheologymodel[i] == 1 and (np.isnan(md.materials.burgers_viscosity[i] or np.isnan(md.materials.burgers_mu[i]))):
@@ -284,6 +291,7 @@ class materials(object):
                 WriteData(fid, prefix, 'object', self, 'class', 'materials', 'fieldname', 'thermal_exchange_velocity', 'format', 'Double')
                 WriteData(fid, prefix, 'object', self, 'class', 'materials', 'fieldname', 'rheology_B', 'format', 'DoubleMat', 'mattype', 1, 'timeserieslength', md.mesh.numberofvertices + 1, 'yts', md.constants.yts)
                 WriteData(fid, prefix, 'object', self, 'class', 'materials', 'fieldname', 'rheology_n', 'format', 'DoubleMat', 'mattype', 2)
+                WriteData(fid, prefix, 'object', self, 'class', 'materials', 'fieldname', 'rheology_phi', 'format', 'Double')
                 WriteData(fid, prefix, 'data', self.rheology_law, 'name', 'md.materials.rheology_law', 'format', 'String')
             elif nat == 'litho':
                 WriteData(fid, prefix, 'object', self, 'class', 'materials', 'fieldname', 'numlayers', 'format', 'Integer')

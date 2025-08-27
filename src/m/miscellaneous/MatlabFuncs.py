@@ -371,3 +371,11 @@ def strncmpi(s1, s2, n):  # {{{
     else:
         return False
 # }}}
+
+def tempname():  # {{{
+    import random
+    import string
+
+    alphanumlist = string.ascii_lowercase + string.digits
+    return '/tmp/tp' + ''.join(random.choices(alphanumlist, k=8)) + '_' + ''.join(random.choices(alphanumlist, k=4)) + '_' + ''.join(random.choices(alphanumlist, k=4)) + '_' + ''.join(random.choices(alphanumlist, k=4)) + '_' + ''.join(random.choices(alphanumlist, k=12))
+# }}}

@@ -17,7 +17,6 @@ void SetActiveNodesLSMx(FemModel* femmodel,bool ishydrology,bool isdebris){/*{{{
 	if(ishydrology) nodeactivationmask = HydrologyMaskNodeActivationEnum;
 	if(isdebris) nodeactivationmask = DebrisMaskNodeActivationEnum;
 
-
 	for(Object* & object : femmodel->elements->objects){
 		Element    *element  = xDynamicCast<Element*>(object);
 		int         numnodes = element->GetNumberOfNodes();
@@ -107,7 +106,7 @@ void GetMaskOfIceVerticesLSMx0(FemModel* femmodel,bool ishydrology,bool isdebris
 	}
 
 	/*Assemble vector and serialize */
-    vec_mask_ice->Assemble();
+	vec_mask_ice->Assemble();
 	InputUpdateFromVectorx(femmodel,vec_mask_ice,nodeactivationmask,VertexPIdEnum);
 	delete vec_mask_ice;
 }/*}}}*/

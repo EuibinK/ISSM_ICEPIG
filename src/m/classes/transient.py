@@ -14,6 +14,7 @@ class transient(object):
         self.isage = 0
         self.issmb = 0
         self.ismasstransport = 0
+        self.ismmemasstransport = 0
         self.isoceantransport = 0
         self.isstressbalance = 0
         self.isthermal = 0
@@ -40,6 +41,7 @@ class transient(object):
         s += '{}\n'.format(fielddisplay(self, 'isage', 'indicates if age model is requested in the transient'))
         s += '{}\n'.format(fielddisplay(self, 'issmb', 'indicates if a surface mass balance solution is used in the transient'))
         s += '{}\n'.format(fielddisplay(self, 'ismasstransport', 'indicates if a masstransport solution is used in the transient'))
+        s += '{}\n'.format(fielddisplay(self, 'ismmemasstransport', 'indicates whether an MME masstransport solution is used in the transient'))
         s += '{}\n'.format(fielddisplay(self, 'isoceantransport', 'indicates whether an ocean masstransport solution is used in the transient'))
         s += '{}\n'.format(fielddisplay(self, 'isstressbalance', 'indicates if a stressbalance solution is used in the transient'))
         s += '{}\n'.format(fielddisplay(self, 'isthermal', 'indicates if a thermal solution is used in the transient'))
@@ -51,7 +53,7 @@ class transient(object):
         s += '{}\n'.format(fielddisplay(self, 'isdebris', 'indicates whether a debris model is used'))
         s += '{}\n'.format(fielddisplay(self, 'issampling', 'indicates whether sampling is used in the transient'))
         s += '{}\n'.format(fielddisplay(self, 'isslc', 'indicates if a sea level change solution is used in the transient'))
-        s += '{}\n'.format(fielddisplay(self, 'isoceancoupling', 'indicates whether coupling with an ocean model is used in the transient'))
+        s += '{}\n'.format(fielddisplay(self, 'isoceancoupling', 'indicates whether coupling with an ocean model is used in the transient (1 for cartesian coordinates, 2 for lat/long coordinates'))
         s += '{}\n'.format(fielddisplay(self, 'amr_frequency', 'frequency at which mesh is refined in simulations with multiple time_steps'))
         s += '{}\n'.format(fielddisplay(self, 'requested_outputs', 'list of additional outputs requested'))
         return s
@@ -65,6 +67,7 @@ class transient(object):
         self.isage = 0
         self.issmb = 0
         self.ismasstransport = 0
+        self.ismmemasstransport = 0
         self.isoceantransport = 0
         self.isstressbalance = 0
         self.isthermal = 0
@@ -90,6 +93,7 @@ class transient(object):
         self.isage = 0
         self.issmb = 1
         self.ismasstransport = 1
+        self.ismmemasstransport = 0
         self.isoceantransport = 0
         self.isstressbalance = 1
         self.isthermal = 1
@@ -117,6 +121,7 @@ class transient(object):
         md = checkfield(md, 'fieldname', 'transient.isage', 'numel', [1], 'values', [0, 1])
         md = checkfield(md, 'fieldname', 'transient.issmb', 'numel', [1], 'values', [0, 1])
         md = checkfield(md, 'fieldname', 'transient.ismasstransport', 'numel', [1], 'values', [0, 1])
+        md = checkfield(md, 'fieldname', 'transient.ismmemasstransport', 'numel', [1], 'values', [0, 1])
         md = checkfield(md, 'fieldname', 'transient.isoceantransport', 'numel', [1], 'values', [0, 1])
         md = checkfield(md, 'fieldname', 'transient.isstressbalance', 'numel', [1], 'values', [0, 1])
         md = checkfield(md, 'fieldname', 'transient.isthermal', 'numel', [1], 'values', [0, 1])
@@ -128,7 +133,7 @@ class transient(object):
         md = checkfield(md, 'fieldname', 'transient.issampling', 'numel', [1], 'values', [0, 1])
         md = checkfield(md, 'fieldname', 'transient.ismovingfront', 'numel', [1], 'values', [0, 1])
         md = checkfield(md, 'fieldname', 'transient.isslc', 'numel', [1], 'values', [0, 1])
-        md = checkfield(md, 'fieldname', 'transient.isoceancoupling', 'numel', [1], 'values', [0, 1])
+        md = checkfield(md, 'fieldname', 'transient.isoceancoupling', 'numel', [1], 'values', [0, 1, 2])
         md = checkfield(md, 'fieldname', 'transient.amr_frequency', 'numel', [1], '>=', 0, 'NaN', 1, 'Inf', 1)
 
         if solution != 'TransientSolution' and md.transient.iscoupling:
@@ -142,6 +147,7 @@ class transient(object):
         WriteData(fid, prefix, 'object', self, 'fieldname', 'isage', 'format', 'Boolean')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'issmb', 'format', 'Boolean')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'ismasstransport', 'format', 'Boolean')
+        WriteData(fid, prefix, 'object', self, 'fieldname', 'ismmemasstransport', 'format', 'Boolean')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'isoceantransport', 'format', 'Boolean')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'isstressbalance', 'format', 'Boolean')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'isthermal', 'format', 'Boolean')
@@ -153,7 +159,7 @@ class transient(object):
         WriteData(fid, prefix, 'object', self, 'fieldname', 'isdebris', 'format', 'Boolean')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'issampling', 'format', 'Boolean')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'isslc', 'format', 'Boolean')
-        WriteData(fid, prefix, 'object', self, 'fieldname', 'isoceancoupling', 'format', 'Boolean')
+        WriteData(fid, prefix, 'object', self, 'fieldname', 'isoceancoupling', 'format', 'Integer')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'amr_frequency', 'format', 'Integer')
 
         # Process requested outputs

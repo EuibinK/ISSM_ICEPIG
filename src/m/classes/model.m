@@ -36,6 +36,7 @@ classdef model
 		hydrology        = 0;
 		debris           = 0;
 		masstransport    = 0;
+		mmemasstransport = 0;
 		thermal          = 0;
 		steadystate      = 0;
 		transient        = 0;
@@ -196,6 +197,8 @@ classdef model
 			if ~isa(md.stochasticforcing,'stochasticforcing'); md.stochasticforcing=stochasticforcing(); end
 			%2022 Oct 28
 			if ~isa(md.debris,'debris'); md.debris=debris(); end
+			%Mmetransport: Jun 2022:
+			if ~isa(md.mmemasstransport,'mmemasstransport'); md.mmemasstransport=mmemasstransport(); end;
 		end% }}}
 	end
 	methods
@@ -239,6 +242,7 @@ classdef model
 			disp(sprintf('%19s: %-23s -- %s','hydrology'       ,['[1x1 ' class(self.hydrology) ']'],'parameters for hydrology solution'));
 			disp(sprintf('%19s: %-23s -- %s','debris' 	   ,['[1x1 ' class(self.debris) ']'],'parameters for debris solution'));
 			disp(sprintf('%19s: %-23s -- %s','masstransport'   ,['[1x1 ' class(self.masstransport) ']'],'parameters for masstransport solution'));
+			disp(sprintf('%19s: %-23s -- %s','mmemasstransport',['[1x1 ' class(self.mmemasstransport) ']'],'parameters for mmemasstransport solution'));
 			disp(sprintf('%19s: %-23s -- %s','thermal'         ,['[1x1 ' class(self.thermal) ']'],'parameters for thermal solution'));
 			disp(sprintf('%19s: %-23s -- %s','steadystate'     ,['[1x1 ' class(self.steadystate) ']'],'parameters for steadystate solution'));
 			disp(sprintf('%19s: %-23s -- %s','transient'       ,['[1x1 ' class(self.transient) ']'],'parameters for transient solution'));
@@ -287,6 +291,7 @@ classdef model
 			md.hydrology        = hydrologyshreve();
 			md.debris           = debris();
 			md.masstransport    = masstransport();
+			md.mmemasstransport = mmemasstransport();
 			md.thermal          = thermal();
 			md.steadystate      = steadystate();
 			md.transient        = transient();
@@ -324,7 +329,7 @@ classdef model
 			%   Usage:
 			%      md=collapse(md)
 			%
-			%   See also: EXTRUDE, MODELEXTRACT
+			%   See also: EXTRUDE, EXTRACT
 
 			%Check that the model is really a 3d model
 			if ~strcmp(md.mesh.elementtype(),'Penta'),
@@ -810,14 +815,27 @@ classdef model
 			nodestoflag2=Pnode(nodestoflag1);
 			if numel(md1.stressbalance.spcvx)>1 & numel(md1.stressbalance.spcvy)>1 & numel(md1.stressbalance.spcvz)>1,
 				if isprop(md1.inversion,'vx_obs') & numel(md1.inversion.vx_obs)>1 & numel(md1.inversion.vy_obs)>1
+					disp('NOTE: using observed velocities to create constraints along new boundary');
 					md2.stressbalance.spcvx(nodestoflag2)=md2.inversion.vx_obs(nodestoflag2); 
 					md2.stressbalance.spcvy(nodestoflag2)=md2.inversion.vy_obs(nodestoflag2);
+					%MOLHO
+					md2.stressbalance.spcvx_base(nodestoflag2)=md2.inversion.vx_obs(nodestoflag2); 
+					md2.stressbalance.spcvy_base(nodestoflag2)=md2.inversion.vy_obs(nodestoflag2);
+					md2.stressbalance.spcvx_shear(nodestoflag2)=0.;
+					md2.stressbalance.spcvy_shear(nodestoflag2)=0.;
+				elseif isprop(md1.initialization,'vx') & numel(md1.initialization.vx)>1 & numel(md1.initialization.vy)>1
+					disp('NOTE: using initial velocities to create constraints along new boundary');
+					md2.stressbalance.spcvx(nodestoflag2)=md2.initialization.vx(nodestoflag2); 
+					md2.stressbalance.spcvy(nodestoflag2)=md2.initialization.vy(nodestoflag2);
+					%MOLHO
+					md2.stressbalance.spcvx_base(nodestoflag2)=md2.initialization.vx(nodestoflag2); 
+					md2.stressbalance.spcvy_base(nodestoflag2)=md2.initialization.vy(nodestoflag2);
+					md2.stressbalance.spcvx_shear(nodestoflag2)=0.;
+					md2.stressbalance.spcvy_shear(nodestoflag2)=0.;
 				else
 					md2.stressbalance.spcvx(nodestoflag2)=NaN;
 					md2.stressbalance.spcvy(nodestoflag2)=NaN;
-					disp(' ')
-					disp('!! extract warning: spc values should be checked !!')
-					disp(' ')
+					warning('Could not set boundary conditions automatically, please set them manually before solve');
 				end
 				%put 0 for vz
 				md2.stressbalance.spcvz(nodestoflag2)=0;
@@ -872,7 +890,22 @@ classdef model
 							md2.outputdefinition.definitions{i}.(solutionsubfields{j})=field(pos_node);
 						elseif length(field)==numberofelements1,
 							md2.outputdefinition.definitions{i}.(solutionsubfields{j})=field(pos_elem);
+						elseif size(field,1)==numberofvertices1+1
+							md2.outputdefinition.definitions{i}.(solutionsubfields{j})=[field(pos_node,:); field(end,:)];
 						end
+					end
+				end
+			end
+			
+			%independents
+			for i=1:length(md1.autodiff.independents)
+				independentfield=fields(md1.autodiff.independents{i});
+				for j=1:length(independentfield)
+					field=md1.autodiff.independents{i}.(independentfield{j});
+					if length(field)==numberofvertices1
+						md2.autodiff.independents{i}.(independentfield{j})=field(pos_node);
+					elseif length(field)==numberofelements1
+						md2.autodiff.independents{i}.(independentfield{j})=field(pos_elem);
 					end
 				end
 			end
@@ -911,7 +944,7 @@ classdef model
 			[edges,I,J]=unique(sort(edges,2),'rows');
 			%3: unique edge numbers
 			vec=J;
-			%4: unique edges numbers in each triangle (2 triangles sharing the same edge will have the same edge number)
+			%4: unique edge numbers in each triangle (2 triangles sharing the same edge will have the same edge number)
 			edges_tria=[vec(elementslist+nbe) vec(elementslist+2*nbe) vec(elementslist)];
 
 			% We divide each element as follows
@@ -956,7 +989,8 @@ classdef model
 			md2.mesh.numberofelements = size(md2.mesh.elements,1);
 			md2.mesh.numberofvertices = length(md2.mesh.x);
 			md2.mesh.numberofedges    = size(md2.mesh.edges,1);
-			md2.mesh.vertexonboundary = zeros(md2.mesh.numberofvertices,1); md2.mesh.vertexonboundary(md2.mesh.segments(:,1:2)) = 1;
+			md2.mesh.vertexonboundary = zeros(md2.mesh.numberofvertices,1);
+			md2.mesh.vertexonboundary(md2.mesh.segments(:,1:2)) = 1;
 
 			%Deal with boundary
 			md2.mesh.vertexonboundary = [md.mesh.vertexonboundary;sum(md.mesh.vertexonboundary(edges),2)==2];
@@ -972,17 +1006,30 @@ classdef model
 
 			%Create transformation vectors
 			nbedges = size(edges,1);
-			Pelem = sparse(1:4*nbe,repmat([1:nbe],1,4),ones(4*nbe,1),4*nbe,nbe);
-			Pnode = sparse([1:nbv,repmat([nbv+1:nbv+nbedges],1,2)],[1:nbv edges(:)'],[ones(nbv,1);1/2*ones(2*nbedges,1)],md2.mesh.numberofvertices,nbv);
+			i = 1:4*nbe;
+			j = repmat([1:nbe],1,4);
+			v = ones(4*nbe,1);
+			m = 4*nbe;
+			n = nbe;
+			Pelem = sparse(i,j,v,m,n);
+			i = [1:nbv,repmat([nbv+1:nbv+nbedges],1,2)];
+			j = [1:nbv edges(:)'];
+			v = [ones(nbv,1);1/2*ones(2*nbedges,1)];
+			m = md2.mesh.numberofvertices;
+			n = nbv;
+			Pnode = sparse(i,j,v,m,n);
 
 			%Deal with mesh
+			if numel(md.mesh.lat)==md.mesh.numberofvertices
+				md2.mesh.lat  = Pnode*md.mesh.lat;
+				md2.mesh.long = Pnode*md.mesh.long;
+			end
 			if numel(md.mesh.scale_factor)==md.mesh.numberofvertices
 				md2.mesh.scale_factor=Pnode*md.mesh.scale_factor;
 			end
 
-			%loop over model fields
+			%loop over model fields (except mesh)
 			model_fields=setxor(fields(md),{'mesh'});
-			%remove mesh from this field
 			for i=1:length(model_fields),
 				%get field
 				field=md.(model_fields{i});
@@ -1011,7 +1058,7 @@ classdef model
 						md2.(model_fields{i})=Pnode*field;
 					elseif (fieldsize(1)==numberofvertices1+1)
 						md2.(model_fields{i})=[Pnode*field(1:end-1,:); field(end,:)];
-						%size = number of elements * n
+					%size = number of elements * n
 					elseif fieldsize(1)==numberofelements1
 						md2.(model_fields{i})=Pelem*field;
 					elseif (fieldsize(1)==numberofelements1+1)
@@ -1019,6 +1066,39 @@ classdef model
 					end
 				end
 			end
+
+			%special case: outputdefinitions
+			if ~isempty(md.outputdefinition.definitions)
+				for i=1:numel(md.outputdefinition.definitions)
+					if isa(md.outputdefinition.definitions{i}, 'cfsurfacesquaretransient')
+						field = md.outputdefinition.definitions{i}.observations;
+						assert(size(field,1)==md.mesh.numberofvertices+1);
+						md2.outputdefinition.definitions{i}.observations = [Pnode*field(1:end-1,:); field(end,:)];
+						field = md.outputdefinition.definitions{i}.weights;
+						assert(size(field,1)==md.mesh.numberofvertices+1);
+						md2.outputdefinition.definitions{i}.weights = [Pnode*field(1:end-1,:); field(end,:)];
+					elseif isa(md.outputdefinition.definitions{i}, 'cfdragcoeffabsgrad')
+						md2.outputdefinition.definitions{i}.weights = Pnode*md.outputdefinition.definitions{i}.weights;
+					else
+						disp(['skipping md.outputdefinition.definitions{' num2str(i) '} as its class is not yet supported by model.refine']);
+						disp('make sure to amend model manually after refinement if this definition is important');
+					end
+				end
+			end
+
+			%special case: independents
+			if ~isempty(md.autodiff.independents)
+				for i=1:numel(md.autodiff.independents)
+					if md.autodiff.independents{i}.nods == md.mesh.numberofvertices
+						md2.autodiff.independents{i}.nods = md2.mesh.numberofvertices;
+					end
+					if numel(md.autodiff.independents{i}.min_parameters)==md.mesh.numberofvertices;
+						md2.autodiff.independents{i}.min_parameters = Pnode*md.autodiff.independents{i}.min_parameters;
+						md2.autodiff.independents{i}.max_parameters = Pnode*md.autodiff.independents{i}.max_parameters;
+					end
+				end
+			end
+
 
 		end % }}}
 		function md = extrude(md,varargin) % {{{
@@ -1041,7 +1121,7 @@ classdef model
 			%      md=extrude(md,15,1.3,1.2);
 			%      md=extrude(md,[0 0.2 0.5 0.7 0.9 0.95 1]);
 			%
-			%   See also: MODELEXTRACT, COLLAPSE
+			%   See also: EXTRACT, COLLAPSE
 
 			%some checks on list of arguments
 			if ((nargin>4) | (nargin<2) | (nargout~=1)),
@@ -1190,6 +1270,7 @@ classdef model
 			md.stressbalance=extrude(md.stressbalance,md);
 			md.thermal=md.thermal.extrude(md);
 			md.masstransport=md.masstransport.extrude(md);
+			md.mmemasstransport=md.mmemasstransport.extrude(md);
 			md.levelset=extrude(md.levelset,md);
 			md.calving=extrude(md.calving,md);
 			md.frontalforcings=extrude(md.frontalforcings,md);
@@ -1288,10 +1369,14 @@ classdef model
 			if isfield(structmd,'time_adapt'), md.timestepping.time_adapt=structmd.time_adapt; end
 			if isfield(structmd,'cfl_coefficient'), md.timestepping.cfl_coefficient=structmd.cfl_coefficient; end
 			if isfield(structmd,'spcthickness'), md.masstransport.spcthickness=structmd.spcthickness; end
+			if isfield(structmd,'spcthickness'), md.debris.spcthickness=structmd.spcthickness; end
 			if isfield(structmd,'artificial_diffusivity'), md.masstransport.stabilization=structmd.artificial_diffusivity; end
 			if isfield(structmd,'hydrostatic_adjustment'), md.masstransport.hydrostatic_adjustment=structmd.hydrostatic_adjustment; end
 			if isfield(structmd,'penalties'), md.masstransport.vertex_pairing=structmd.penalties; end
 			if isfield(structmd,'penalty_offset'), md.masstransport.penalty_factor=structmd.penalty_offset; end
+			if isfield(structmd,'deltathickness'), md.mmemasstransport.deltathickness=structmd.deltathickness; end
+			if isfield(structmd,'partition'), md.mmemasstransport.partition=structmd.partition; end
+			if isfield(structmd,'ids'), md.mmemasstransport.ids=structmd.ids; end
 			if isfield(structmd,'B'), md.materials.rheology_B=structmd.B; end
 			if isfield(structmd,'n'), md.materials.rheology_n=structmd.n; end
 			if isfield(structmd,'rheology_B'), md.materials.rheology_B=structmd.rheology_B; end
@@ -1731,7 +1816,7 @@ classdef model
 			%So first, save the model with a unique name and upload the file to the server: 
 			random_part=fix(rand(1)*10000);
 			id=[md.miscellaneous.name '-' regexprep(datestr(now),'[^\w'']','') '-' num2str(random_part)  '-' getenv('USER') '-' oshostname() '.upload']; 
-			eval(['save ' id ' md']);
+			save('id','md');
 
 			%Now, upload the file: 
 			issmscpout(md.settings.upload_server,md.settings.upload_path,md.settings.upload_login,md.settings.upload_port,{id},1);
@@ -1743,7 +1828,7 @@ classdef model
 			md.settings.upload_filename=id;
 
 			%get locally rid of file that was uploaded
-			eval(['delete ' id]);
+			delete(id);
 
 		end % }}}
 		function md=download(md) % {{{
@@ -1760,71 +1845,92 @@ classdef model
 			md=loadmodel(md.settings.upload_filename);
 
 			%get locally rid of file that was downloaded
-			eval(['delete ' name]);
+			delete(name);
 
 		end % }}}
 		function saveasstruct(md,filename) % {{{
 
-			fields=sort(properties('model')); %sort fields so that comparison of binary files is easier
+			%Get all model fields
+			mdfields=properties('model');
+
 			disp('Converting all model fields to struct...');
 			warning off MATLAB:structOnObject
-			for i=1:length(fields),
-				field=fields{i};
-				md.(field) = struct(md.(field));
+			for i=1:length(mdfields),
+
+				%convert md field to struct
+				field=mdfields{i};
+				field_struct = struct(md.(field));
+
+				%Check that there is no class remaining in the field
+				subfields = fields(field_struct);
+				for i=1:numel(subfields)
+					if isobject(field_struct.(subfields{i}))
+						disp(['skipping ' subfields{i} ' because it is an object'])
+						field_struct = rmfield(field_struct, subfields{i});
+					end
+				end
+				md.(field) = field_struct;
 			end
+
 			disp('Converting model to struct...');
 			md=struct(md);
-			warning on MATLAB:structOnObject
+
 			disp(['Saving as ' filename '...']);
+			warning on MATLAB:structOnObject
 			save(filename,'md','-v7.3')
+
 		end % }}}
-function savemodeljs(md,modelname,websiteroot,varargin) % {{{
+		function savemodeljs(md,modelname,websiteroot,varargin) % {{{
 
-	%the goal of this routine is to save the model as a javascript array that can be included in any html 
-	%file: 
+			%the goal of this routine is to save the model as a javascript array that can be included in any html 
+			%file: 
 
-	options=pairoptions(varargin{:});
-	optimization=getfieldvalue(options,'optimize',0);
+			options=pairoptions(varargin{:});
+			optimization=getfieldvalue(options,'optimize',0);
 
 
-	%disp: 
-	disp(['saving model ''' modelname ''' in file ' websiteroot '/js/' modelname '.js']);
+			%disp: 
+			disp(['saving model ''' modelname ''' in file ' websiteroot '/js/' modelname '.js']);
 
-	%open file for writing and declare the model:
-	fid=fopen([websiteroot '/js/' modelname '.js'],'w');
-	fprintf(fid,'var %s=new model();\n',modelname);
+			%open file for writing and declare the model:
+			fid=fopen([websiteroot '/js/' modelname '.js'],'w');
+			fprintf(fid,'var %s=new model();\n',modelname);
 
-	%now go through all the classes and fwrite all the corresponding fields: 
+			%now go through all the classes and fwrite all the corresponding fields: 
 
-	fields=properties('model');
-	for i=1:length(fields),
-		field=fields{i};
+			fields=properties('model');
+			for i=1:length(fields),
+				field=fields{i};
 
-		%Some properties do not need to be saved
-		if ismember(field,{'results','cluster' }),
-			continue;
-		end
+				%Some properties do not need to be saved
+				if ismember(field,{'results','cluster'}),
+					continue;
+				end
 
-		%some optimization: 
-		if optimization==1,
-			%optimize for plotting only:
-			if ~ismember(field,{'geometry','mesh','mask'}),
-				continue;
+				%some optimization: 
+				if optimization==1,
+					%optimize for plotting only:
+					if ~ismember(field,{'geometry','mesh','mask'}),
+						continue;
+					end
+				end
+
+				%Check that current field is an object
+				if ~isobject(md.(field))
+					error(['field ''' char(field) ''' is not an object']);
+				end
+
+				if ~ismethod(md.(field),'savemodeljs')
+					disp(['Note: Method ''savemodeljs'' not yet implemented for class ' field])
+				else
+					%savemodeljs for current object
+					%disp(['javascript saving ' field '...']);
+					savemodeljs(md.(field),fid,modelname);
+				end
 			end
+
+			%done, close file:
+			fclose(fid);
 		end
-
-		%Check that current field is an object
-		if ~isobject(md.(field))
-			error(['field ''' char(field) ''' is not an object']);
-		end
-
-		%savemodeljs for current object
-		%disp(['javascript saving ' field '...']);
-		savemodeljs(md.(field),fid,modelname);
-	end
-
-	%done, close file:
-	fclose(fid);
-end
 	end
 end

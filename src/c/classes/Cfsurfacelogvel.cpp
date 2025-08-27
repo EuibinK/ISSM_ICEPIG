@@ -30,10 +30,25 @@ Cfsurfacelogvel::Cfsurfacelogvel(){/*{{{*/
 	this->name = NULL;
 	this->datatime=0.;
 	this->timepassedflag = false;
+	this->J = 0.;
 
 }
 /*}}}*/
-Cfsurfacelogvel::Cfsurfacelogvel(char* in_name, int in_definitionenum, IssmDouble in_datatime, bool in_timepassedflag){/*{{{*/
+Cfsurfacelogvel::Cfsurfacelogvel(char* in_name, int in_definitionenum, IssmDouble in_datatime){/*{{{*/
+
+	this->definitionenum=in_definitionenum;
+
+	this->name		= xNew<char>(strlen(in_name)+1);
+	xMemCpy<char>(this->name,in_name,strlen(in_name)+1);
+
+	this->datatime=in_datatime;
+
+	this->timepassedflag=false;
+	this->J=0.;
+
+}
+/*}}}*/
+Cfsurfacelogvel::Cfsurfacelogvel(char* in_name, int in_definitionenum, IssmDouble in_datatime, bool in_timepassedflag,IssmDouble in_J){/*{{{*/
 
 	this->definitionenum=in_definitionenum;
 
@@ -42,6 +57,7 @@ Cfsurfacelogvel::Cfsurfacelogvel(char* in_name, int in_definitionenum, IssmDoubl
 
 	this->datatime=in_datatime;
 	this->timepassedflag=in_timepassedflag;
+	this->J=in_J;
 
 }
 /*}}}*/
@@ -51,7 +67,7 @@ Cfsurfacelogvel::~Cfsurfacelogvel(){/*{{{*/
 /*}}}*/
 /*Object virtual function resolutoin: */
 Object* Cfsurfacelogvel::copy() {/*{{{*/
-	Cfsurfacelogvel* mf = new Cfsurfacelogvel(this->name,this->definitionenum,this->datatime,this->timepassedflag);
+	Cfsurfacelogvel* mf = new Cfsurfacelogvel(this->name,this->definitionenum,this->datatime,this->timepassedflag, this->J);
 	return (Object*) mf;
 }
 /*}}}*/
@@ -63,6 +79,7 @@ void Cfsurfacelogvel::Echo(void){/*{{{*/
 	_printf_(" Cfsurfacelogvel: " << name << " " << this->definitionenum << "\n");
 	_printf_("    datatime: " << datatime << "\n");
 	_printf_("	  timepassedflag: "<<timepassedflag<<"\n");
+	_printf_("	  J: "<<J<<"\n");
 }
 /*}}}*/
 int Cfsurfacelogvel::Id(void){/*{{{*/
@@ -77,6 +94,7 @@ void Cfsurfacelogvel::Marshall(MarshallHandle* marshallhandle){/*{{{*/
 	marshallhandle->call(this->name);
 	marshallhandle->call(this->datatime);
 	marshallhandle->call(this->timepassedflag);
+	marshallhandle->call(this->J);
 } 
 /*}}}*/
 int Cfsurfacelogvel::ObjectEnum(void){/*{{{*/
@@ -103,24 +121,22 @@ IssmDouble Cfsurfacelogvel::Response(FemModel* femmodel){/*{{{*/
 
 	if(this->datatime<=time && !this->timepassedflag){
 
-		IssmDouble J=0.;
+		IssmDouble J_part=0.;
 		IssmDouble J_sum=0.;
 
 		for(Object* & object : femmodel->elements->objects){
 			Element* element=xDynamicCast<Element*>(object);
-			J+=this->Cfsurfacelogvel_Calculation(element,definitionenum);
+			J_part+=this->Cfsurfacelogvel_Calculation(element,definitionenum);
 		}
 
-		ISSM_MPI_Allreduce ( (void*)&J,(void*)&J_sum,1,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,IssmComm::GetComm());
+		ISSM_MPI_Allreduce ( (void*)&J_part,(void*)&J_sum,1,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,IssmComm::GetComm());
 		ISSM_MPI_Bcast(&J_sum,1,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
-		J=J_sum;
 
 		this->timepassedflag = true;
-		return J_sum;
+		this->J = J_sum;
 	}
-	else{
-		return 0.;
-	}
+
+	return this->J;
 }/*}}}*/
 IssmDouble Cfsurfacelogvel::Cfsurfacelogvel_Calculation(Element* element, int definitionenum){/*{{{*/
 

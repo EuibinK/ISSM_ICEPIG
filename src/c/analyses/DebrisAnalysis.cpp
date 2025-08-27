@@ -52,7 +52,7 @@ void DebrisAnalysis::CreateLoads(Loads* loads, IoModel* iomodel){/*{{{*/
 		}
 	}
 
-	/*free ressources: */
+	/*free resources: */
 	iomodel->DeleteData(vertex_pairing,"md.debris.vertex_pairing");
 	iomodel->DeleteData(nodeonsurface,"md.mesh.vertexonsurface");
 }/*}}}*/
@@ -325,7 +325,6 @@ ElementMatrix* DebrisAnalysis::CreateKMatrix(Element* element){/*{{{*/
 						Ke->values[i*numnodes+j]+=dt*gauss->weight*Jdet*tau*(vx*dbasis[0*numnodes+j])*(basis[i]*dvxdx);
 					}
 				}
-
 
 				/*Advection matrix - part 2, B*/
 				for(int i=0;i<numnodes;i++){

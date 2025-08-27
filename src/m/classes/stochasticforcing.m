@@ -10,6 +10,7 @@ classdef stochasticforcing
 		defaultdimension		= 0;
 		default_id				= NaN;
 		covariance				= NaN;
+		timecovariance			= NaN;
 		stochastictimestep   = 0;
 		randomflag				= 1;
 	end
@@ -39,11 +40,28 @@ classdef stochasticforcing
 				md.stochasticforcing.stochastictimestep = md.timestepping.time_step; %by default: stochastictimestep set to ISSM time step
 			end
 
-			%Check that covariance matrix is positive definite
-			try
-				chol(self.covariance);
-			catch
-				error('md.stochasticforcing.covariance is not positive definite');
+
+			if(numel(size(self.covariance)==3))
+				numtcovmat = numel(self.covariance(1,1,:)); %number of covariance matrices in time
+				lsCovmats = {};
+				for ii=[1:numtcovmat] %loop over 3rd dimension
+					lsCovmats{ii} = self.covariance(:,:,ii);
+      			%Check that covariance matrix is positive definite
+      			try
+      				chol(self.covariance(:,:,ii));
+      			catch
+      				error('an entry in md.stochasticforcing.covariance is not positive definite');
+					end
+				end
+			elseif(numel(size(self.covariance)==2))
+				numtcovmat = 1; %number of covariance matrices in time
+				lsCovmats = {self.covariance};
+   			%Check that covariance matrix is positive definite
+   			try
+   				chol(self.covariance);
+   			catch
+   				error('md.stochasticforcing.covariance is not positive definite');
+   			end
 			end
 
 			%Check that all fields agree with the corresponding md class and if any field needs the default params
@@ -175,78 +193,108 @@ classdef stochasticforcing
 			if(indBDWarma~=-1)
 				if(indPwarma~=-1)
 					if(md.basalforcings.arma_timestep~=md.hydrology.arma_timestep)
-						crossentries = reshape(self.covariance(1+sum(dimensions(1:indBDWarma-1)):sum(dimensions(1:indBDWarma)),1+sum(dimensions(1:indPwarma-1)):sum(dimensions(1:indPwarma))),1,[]);
-						if any(crossentries~=0)
-							error('BasalforcingsDeepwaterMeltingRatearma and hydrologyarmapw have different arma_timestep and non-zero covariance');
+						for(ii=[1:numel(lsCovmats)])
+							covm = lsCovmats{ii};
+							crossentries = reshape(covm(1+sum(dimensions(1:indBDWarma-1)):sum(dimensions(1:indBDWarma)),1+sum(dimensions(1:indPwarma-1)):sum(dimensions(1:indPwarma))),1,[]);
+							if any(crossentries~=0)
+								error('BasalforcingsDeepwaterMeltingRatearma and hydrologyarmapw have different arma_timestep and non-zero covariance');
+							end
 						end
 					end
 				elseif(indSdarma~=-1)
 					if(md.frontalforcings.sd_arma_timestep~=md.basalforcings.arma_timestep)
-						crossentries = reshape(self.covariance(1+sum(dimensions(1:indSdarma-1)):sum(dimensions(1:indSdarma)),1+sum(dimensions(1:indBDWarma-1)):sum(dimensions(1:indBDWarma))),1,[]);
-						if any(crossentries~=0)
-							error('FrontalForcingsSubglacialDischargearma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance');
+						for(ii=[1:numel(lsCovmats)])
+							covm = lsCovmats{ii};
+							crossentries = reshape(covm(1+sum(dimensions(1:indSdarma-1)):sum(dimensions(1:indSdarma)),1+sum(dimensions(1:indBDWarma-1)):sum(dimensions(1:indBDWarma))),1,[]);
+							if any(crossentries~=0)
+								error('FrontalForcingsSubglacialDischargearma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance');
+							end
 						end
 					end
 				elseif(indSMBarma~=-1)
 					if(md.smb.arma_timestep~=md.basalforcings.arma_timestep)
-						crossentries = reshape(self.covariance(1+sum(dimensions(1:indSMBarma-1)):sum(dimensions(1:indSMBarma)),1+sum(dimensions(1:indBDWarma-1)):sum(dimensions(1:indBDWarma))),1,[]);
-						if any(crossentries~=0)
-							error('SMBarma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance');
+						for(ii=[1:numel(lsCovmats)])
+							covm = lsCovmats{ii};
+							crossentries = reshape(covm(1+sum(dimensions(1:indSMBarma-1)):sum(dimensions(1:indSMBarma)),1+sum(dimensions(1:indBDWarma-1)):sum(dimensions(1:indBDWarma))),1,[]);
+							if any(crossentries~=0)
+								error('SMBarma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance');
+							end
 						end
 					end
 				elseif(indTFarma~=-1)
 					if(md.frontalforcings.arma_timestep~=md.basalforcings.arma_timestep)
-						crossentries = reshape(self.covariance(1+sum(dimensions(1:indTFarma-1)):sum(dimensions(1:indTFarma)),1+sum(dimensions(1:indBDWarma-1)):sum(dimensions(1:indBDWarma))),1,[]);
-						if any(crossentries~=0)
-							error('FrontalForcingsRignotarma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance');
+						for(ii=[1:numel(lsCovmats)])
+							covm = lsCovmats{ii};
+							crossentries = reshape(covm(1+sum(dimensions(1:indTFarma-1)):sum(dimensions(1:indTFarma)),1+sum(dimensions(1:indBDWarma-1)):sum(dimensions(1:indBDWarma))),1,[]);
+							if any(crossentries~=0)
+								error('FrontalForcingsRignotarma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance');
+							end
 						end
 					end
 				end
 			elseif(indPwarma~=-1)
 				if(indSdarma~=-1)
 					if(md.frontalforcings.sd_arma_timestep~=md.hydrology.arma_timestep)
-						crossentries = reshape(self.covariance(1+sum(dimensions(1:indSdarma-1)):sum(dimensions(1:indSdarma)),1+sum(dimensions(1:indPwarma-1)):sum(dimensions(1:indPwarma))),1,[]);
-						if any(crossentries~=0)
-							error('FrontalForcingsSubglacialDischargearma and hydrologyarmapw have different arma_timestep and non-zero covariance');
+						for(ii=[1:numel(lsCovmats)])
+							covm = lsCovmats{ii};
+							crossentries = reshape(covm(1+sum(dimensions(1:indSdarma-1)):sum(dimensions(1:indSdarma)),1+sum(dimensions(1:indPwarma-1)):sum(dimensions(1:indPwarma))),1,[]);
+							if any(crossentries~=0)
+								error('FrontalForcingsSubglacialDischargearma and hydrologyarmapw have different arma_timestep and non-zero covariance');
+							end
 						end
 					end
 				elseif(indSMBarma~=-1)
 					if(md.smb.arma_timestep~=md.hydrology.arma_timestep)
-						crossentries = reshape(self.covariance(1+sum(dimensions(1:indSMBarma-1)):sum(dimensions(1:indSMBarma)),1+sum(dimensions(1:indPwarma-1)):sum(dimensions(1:indPwarma))),1,[]);
-						if any(crossentries~=0)
-							error('SMBarma and hydrologyarmapw have different arma_timestep and non-zero covariance');
+						for(ii=[1:numel(lsCovmats)])
+							covm = lsCovmats{ii};
+							crossentries = reshape(covm(1+sum(dimensions(1:indSMBarma-1)):sum(dimensions(1:indSMBarma)),1+sum(dimensions(1:indPwarma-1)):sum(dimensions(1:indPwarma))),1,[]);
+							if any(crossentries~=0)
+								error('SMBarma and hydrologyarmapw have different arma_timestep and non-zero covariance');
+							end
 						end
 					end
 				elseif(indTFarma~=-1)
 					if(md.frontalforcings.arma_timestep~=md.hydrology.arma_timestep)
-						crossentries = reshape(self.covariance(1+sum(dimensions(1:indTFarma-1)):sum(dimensions(1:indTFarma)),1+sum(dimensions(1:indPwarma-1)):sum(dimensions(1:indPwarma))),1,[]);
-						if any(crossentries~=0)
-							error('FrontalForcingsRignotarma and hydrologyarmapw have different arma_timestep and non-zero covariance');
+						for(ii=[1:numel(lsCovmats)])
+							covm = lsCovmats{ii};
+							crossentries = reshape(covm(1+sum(dimensions(1:indTFarma-1)):sum(dimensions(1:indTFarma)),1+sum(dimensions(1:indPwarma-1)):sum(dimensions(1:indPwarma))),1,[]);
+							if any(crossentries~=0)
+								error('FrontalForcingsRignotarma and hydrologyarmapw have different arma_timestep and non-zero covariance');
+							end
 						end
 					end
 				end
 			elseif(indSdarma~=-1)
 				if(indSMBarma~=-1)
 					if(md.smb.arma_timestep~=md.frontalforcings.sd_arma_timestep)
-						crossentries = reshape(self.covariance(1+sum(dimensions(1:indSMBarma-1)):sum(dimensions(1:indSMBarma)),1+sum(dimensions(1:indSdarma-1)):sum(dimensions(1:indSdarma))),1,[]);
-						if any(crossentries~=0)
-							error('SMBarma and FrontalForcingsSubglacialDischargearma have different arma_timestep and non-zero covariance');
+						for(ii=[1:numel(lsCovmats)])
+							covm = lsCovmats{ii};
+							crossentries = reshape(covm(1+sum(dimensions(1:indSMBarma-1)):sum(dimensions(1:indSMBarma)),1+sum(dimensions(1:indSdarma-1)):sum(dimensions(1:indSdarma))),1,[]);
+							if any(crossentries~=0)
+								error('SMBarma and FrontalForcingsSubglacialDischargearma have different arma_timestep and non-zero covariance');
+							end
 						end
 					end
 				elseif(indTFarma~=-1)
 					if(md.frontalforcings.sd_arma_timestep~=md.frontalforcings.arma_timestep)
-						crossentries = reshape(self.covariance(1+sum(dimensions(1:indSdarma-1)):sum(dimensions(1:indSdarma)),1+sum(dimensions(1:indTFarma-1)):sum(dimensions(1:indTFarma))),1,[]);
-						if any(crossentries~=0)
-							error('FrontalForcingsRignotarma and FrontalForcingsSubglacialDischargearma have different arma_timestep and non-zero covariance');
+						for(ii=[1:numel(lsCovmats)])
+							covm = lsCovmats{ii};
+							crossentries = reshape(covm(1+sum(dimensions(1:indSdarma-1)):sum(dimensions(1:indSdarma)),1+sum(dimensions(1:indTFarma-1)):sum(dimensions(1:indTFarma))),1,[]);
+							if any(crossentries~=0)
+								error('FrontalForcingsRignotarma and FrontalForcingsSubglacialDischargearma have different arma_timestep and non-zero covariance');
+							end
 						end
 					end
 				end
 			elseif(indSMBarma~=-1)
 				if(indTFarma~=-1)
 					if(md.smb.arma_timestep~=md.frontalforcings.arma_timestep)
-						crossentries = reshape(self.covariance(1+sum(dimensions(1:indSMBarma-1)):sum(dimensions(1:indSMBarma)),1+sum(dimensions(1:indTFarma-1)):sum(dimensions(1:indTFarma))),1,[]);
-						if any(crossentries~=0)
-							error('SMBarma and FrontalForcingsRignotarma have different arma_timestep and non-zero covariance');
+						for(ii=[1:numel(lsCovmats)])
+							covm = lsCovmats{ii};
+							crossentries = reshape(covm(1+sum(dimensions(1:indSMBarma-1)):sum(dimensions(1:indSMBarma)),1+sum(dimensions(1:indTFarma-1)):sum(dimensions(1:indTFarma))),1,[]);
+							if any(crossentries~=0)
+								error('SMBarma and FrontalForcingsRignotarma have different arma_timestep and non-zero covariance');
+							end
 						end
 					end
 				end
@@ -255,9 +303,12 @@ classdef stochasticforcing
 
 			md = checkfield(md,'fieldname','stochasticforcing.isstochasticforcing','values',[0 1]);
 			md = checkfield(md,'fieldname','stochasticforcing.fields','numel',num_fields,'cell',1,'values',supportedstochforcings());
-			md = checkfield(md,'fieldname','stochasticforcing.covariance','NaN',1,'Inf',1,'size',[size_tot,size_tot]); %global covariance matrix
+			md = checkfield(md,'fieldname','stochasticforcing.covariance','NaN',1,'Inf',1,'size',[size_tot,size_tot,numtcovmat]); %global covariance matrix
 			md = checkfield(md,'fieldname','stochasticforcing.stochastictimestep','NaN',1,'Inf',1,'>=',md.timestepping.time_step);
 			md = checkfield(md,'fieldname','stochasticforcing.randomflag','numel',[1],'values',[0 1]);
+			if(numtcovmat>1) %check the time steps at which each covariance matrix starts to be applied
+				md = checkfield(md,'fieldname','stochasticforcing.timecovariance','NaN',1,'Inf',1,'>=',md.timestepping.start_time,'<=',md.timestepping.final_time,'size',[1,numtcovmat]);
+			end
 			if(checkdefaults) %need to check the defaults
 				md = checkfield(md,'fieldname','stochasticforcing.defaultdimension','numel',1,'NaN',1,'Inf',1,'>',0);
 				md = checkfield(md,'fieldname','stochasticforcing.default_id','Inf',1,'>=',0,'<=',self.defaultdimension,'size',[md.mesh.numberofelements,1]);
@@ -269,7 +320,8 @@ classdef stochasticforcing
 			fielddisplay(self,'fields','fields with stochasticity applied, ex: [{''SMBarma''}], or [{''SMBforcing''},{''DefaultCalving''}]');
 			fielddisplay(self,'defaultdimension','dimensionality of the noise terms (does not apply to fields with their specific dimension)');
 			fielddisplay(self,'default_id','id of each element for partitioning of the noise terms (does not apply to fields with their specific partition)');
-			fielddisplay(self,'covariance','covariance matrix for within- and between-fields covariance (units must be squared field units)');
+			fielddisplay(self,'covariance',{'covariance matrix for within- and between-fields covariance (units must be squared field units)','multiple matrices can be concatenated along 3rd dimension to apply different covariances in time'}); 
+			fielddisplay(self,'timecovariance','starting dates at which covariances apply (only applicabe if multiple covariance matrices are prescribed)'); 
 			fielddisplay(self,'stochastictimestep','timestep at which new stochastic noise terms are generated (default: md.timestepping.time_step)');
 			fielddisplay(self,'randomflag','whether to apply real randomness (true) or pseudo-randomness with fixed seed (false)');
 			disp('Available fields:');
@@ -324,23 +376,53 @@ classdef stochasticforcing
 					ind = ind+1;
 				end
 
+   			if(numel(size(self.covariance))==3)
+   				[nrow,ncol,numtcovmat] = size(self.covariance);
+   				lsCovmats = {};
+   				for ii=[1:numtcovmat] %loop over 3rd dimension
+   					lsCovmats{ii} = self.covariance(:,:,ii);
+   				end
+					if(md.timestepping.interp_forcing==1)
+					   disp('WARNING: md.timestepping.interp_forcing is 1, but be aware that there is no interpolation between covariance matrices');
+					   disp('         the changes between covariance matrices occur at the time steps specified in md.stochasticforcing.timecovariance');
+					end
+				elseif(numel(size(self.covariance)==2))
+   				[nrow,ncol] = size(self.covariance);
+   				numtcovmat = 1; %number of covariance matrices in time
+   				lsCovmats = {self.covariance};
+   			end
+   
 				%Scaling covariance matrix (scale column-by-column and row-by-row)
 				scaledfields = {'BasalforcingsDeepwaterMeltingRatearma','BasalforcingsSpatialDeepwaterMeltingRate','DefaultCalving','FloatingMeltRate','SMBarma','SMBforcing'}; %list of fields that need scaling *1/yts
-				tempcovariance = self.covariance; %copy of covariance to avoid writing back in member variable
-				for i=1:num_fields
-					if any(strcmp(scaledfields,self.fields(i)))
-						inds = [1+sum(dimensions(1:i-1)):1:sum(dimensions(1:i))];
-						for row=inds %scale rows corresponding to scaled field
-							tempcovariance(row,:) = 1./yts*tempcovariance(row,:);
+				tempcovariance2d = zeros(numtcovmat,sum(nrow*ncol)); %covariance matrices in 2d array
+				% Loop over covariance matrices %
+				for kk=[1:numtcovmat]
+					kkcov = self.covariance(:,:,kk); %extract covariance at index kk
+					% Loop over the fields %
+					for i=1:num_fields
+						if any(strcmp(scaledfields,self.fields(i)))
+							inds = [1+sum(dimensions(1:i-1)):1:sum(dimensions(1:i))];
+							for row=inds %scale rows corresponding to scaled field
+								kkcov(row,:) = 1./yts*kkcov(row,:);
+							end
+							for col=inds %scale columns corresponding to scaled field
+								kkcov(:,col) = 1./yts*kkcov(:,col);
+							end
 						end
-						for col=inds %scale columns corresponding to scaled field
-							tempcovariance(:,col) = 1./yts*tempcovariance(:,col);
-						end
+					end
+					% Save scaled covariance %
+					for rr=[1:nrow]
+						ind0 = 1+(rr-1)*ncol;
+						tempcovariance2d(kk,ind0:ind0+ncol-1) = kkcov(rr,:);
 					end
 				end
 				%Set dummy default_id vector if defaults not used
 				if isnan(self.default_id)
 					self.default_id = zeros(md.mesh.numberofelements,1);
+				end
+				%Set dummy timecovariance vector if a single covariance matrix is used
+				if(numtcovmat==1)
+					self.timecovariance = [md.timestepping.start_time];
 				end
 
 				WriteData(fid,prefix,'data',num_fields,'name','md.stochasticforcing.num_fields','format','Integer');
@@ -348,7 +430,9 @@ classdef stochasticforcing
 				WriteData(fid,prefix,'data',dimensions,'name','md.stochasticforcing.dimensions','format','IntMat');
 				WriteData(fid,prefix,'object',self,'fieldname','default_id','data',self.default_id-1,'format','IntMat','mattype',2); %0-indexed
 				WriteData(fid,prefix,'object',self,'fieldname','defaultdimension','format','Integer');
-				WriteData(fid,prefix,'data',tempcovariance,'name','md.stochasticforcing.covariance','format','DoubleMat');
+				WriteData(fid,prefix,'data',numtcovmat,'name','md.stochasticforcing.num_timescovariance','format','Integer');
+				WriteData(fid,prefix,'data',tempcovariance2d,'name','md.stochasticforcing.covariance','format','DoubleMat');
+				WriteData(fid,prefix,'object',self,'fieldname','timecovariance','format','DoubleMat','scale',yts);
 				WriteData(fid,prefix,'object',self,'fieldname','stochastictimestep','format','Double','scale',yts);
 				WriteData(fid,prefix,'object',self,'fieldname','randomflag','format','Boolean');
 			end

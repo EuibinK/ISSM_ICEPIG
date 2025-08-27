@@ -6,6 +6,35 @@
 
 /*Model processing*/
 void FreeSurfaceTopAnalysis::CreateConstraints(Constraints* constraints,IoModel* iomodel){/*{{{*/
+
+	/*Use spcthickness for now*/
+	IssmDouble* spcthickness = NULL;
+	int         M,N;
+	iomodel->FetchData(&spcthickness,&M,&N,"md.masstransport.spcthickness");
+	if(M!=iomodel->numberofvertices || N!=1) _error_("Size of constraints not supported yet");
+
+	/*Check if there is any NaN*/
+	bool isconstraints = false;
+	for(int i=0;i<M;i++) if(!xIsNan<IssmDouble>(spcthickness[i])) isconstraints = true;
+	if(!isconstraints){
+		iomodel->DeleteData(spcthickness,"md.masstransport.spcthickness");
+		return;
+	}
+
+	_printf0_("   WARNING: using md.geometry to constrain free surface solver\n");
+
+	/*Use spcthickness for now*/
+	IssmDouble* surface= NULL;
+	iomodel->FetchData(&surface,&M,&N,"md.geometry.surface");
+	if(M!=iomodel->numberofvertices || N!=1) _error_("Size of constraints not supported yet");
+	for(int i=0;i<M;i++) if(xIsNan<IssmDouble>(spcthickness[i])) surface[i] = NAN;
+
+	/*Create Constraints based on this new vector*/
+	IoModelToConstraintsx(constraints,iomodel,surface,M, N, FreeSurfaceTopAnalysisEnum,P1Enum,0);
+
+	/*Cleanup and return*/
+	iomodel->DeleteData(spcthickness,"md.masstransport.spcthickness");
+	iomodel->DeleteData(surface,"md.geometry.surface");
 }/*}}}*/
 void FreeSurfaceTopAnalysis::CreateLoads(Loads* loads, IoModel* iomodel){/*{{{*/
 
@@ -119,7 +148,7 @@ ElementMatrix* FreeSurfaceTopAnalysis::CreateKMatrix(Element* element){/*{{{*/
 	int         domaintype,dim,stabilization;
 	Element*    topelement = NULL;
 	IssmDouble *xyz_list  = NULL;
-	IssmDouble  Jdet,D_scalar,dt,h;
+	IssmDouble  Jdet,D_scalar,dt,h,factor;
 	IssmDouble  vel,vx,vy,tau;
 
 	/*Get top element*/
@@ -253,17 +282,18 @@ ElementMatrix* FreeSurfaceTopAnalysis::CreateKMatrix(Element* element){/*{{{*/
 		}
 		else if(stabilization==5){
 			D_scalar=gauss->weight*Jdet*dt;
+			factor = tau*D_scalar;
 			if(dim==2){
 				for(int i=0;i<numnodes;i++){
 					for(int j=0;j<numnodes;j++){
-						Ke->values[i*numnodes+j]+=tau*D_scalar*
+						Ke->values[i*numnodes+j]+=factor*
 							(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i])*
 							(vx*dbasis[0*numnodes+j]+vy*dbasis[1*numnodes+j]);
 					}
 				}
 			}
 			else{
-				for(int i=0;i<numnodes;i++) for(int j=0;j<numnodes;j++) Ke->values[i*numnodes+j]+=tau*D_scalar*(vx*dbasis[0*numnodes+i])*(vx*dbasis[0*numnodes+j]);
+				for(int i=0;i<numnodes;i++) for(int j=0;j<numnodes;j++) Ke->values[i*numnodes+j]+=factor*(vx*dbasis[0*numnodes+i])*(vx*dbasis[0*numnodes+j]);
 			}
 		}
 	}
@@ -281,7 +311,7 @@ ElementVector* FreeSurfaceTopAnalysis::CreatePVector(Element* element){/*{{{*/
 
 	/*Intermediaries*/
 	int         domaintype,dim,stabilization;
-	IssmDouble  Jdet,dt;
+	IssmDouble  Jdet,dt,factor;
 	IssmDouble  ms,surface,vx,vy,vz,tau;
 	Element*    topelement = NULL;
 	IssmDouble *xyz_list  = NULL;
@@ -348,7 +378,8 @@ ElementVector* FreeSurfaceTopAnalysis::CreatePVector(Element* element){/*{{{*/
 		vz_input->GetInputValue(&vz,gauss);
 		surface_input->GetInputValue(&surface,gauss);
 
-		for(int i=0;i<numnodes;i++) pe->values[i]+=Jdet*gauss->weight*(surface + dt*ms + dt*vz)*basis[i];
+		factor = Jdet*gauss->weight*(surface + dt*ms + dt*vz);
+		for(int i=0;i<numnodes;i++) pe->values[i]+=factor*basis[i];
 	}
 
 	if(stabilization==5){
@@ -357,13 +388,15 @@ ElementVector* FreeSurfaceTopAnalysis::CreatePVector(Element* element){/*{{{*/
 		if(dim==1){
 			vx_input->GetInputAverage(&vx);
 			tau=h/(2.*fabs(vx)+1e-10);
-			for(int i=0;i<numnodes;i++) pe->values[i]+=Jdet*gauss->weight*(dt*ms+dt*vz)*tau*(vx*dbasis[0*numnodes+i]);
+			factor = Jdet*gauss->weight*(dt*ms+dt*vz)*tau;
+			for(int i=0;i<numnodes;i++) pe->values[i]+=factor*(vx*dbasis[0*numnodes+i]);
 		}
 		else{
 			vx_input->GetInputAverage(&vx);
 			vy_input->GetInputAverage(&vy);
 			tau=h/(2.*pow(vx*vx+vy*vy,0.5)+1e-10);
-			for(int i=0;i<numnodes;i++) pe->values[i]+=Jdet*gauss->weight*(dt*ms+dt*vz)*tau*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
+			factor = Jdet*gauss->weight*(dt*ms+dt*vz)*tau;
+			for(int i=0;i<numnodes;i++) pe->values[i]+=factor*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
 		}
 	}
 

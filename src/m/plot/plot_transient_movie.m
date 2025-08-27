@@ -73,13 +73,15 @@ function plot_transient_movie(md,options,width,i)
 	if ~exist(options,'caxis'),
 		range = [Inf -Inf];
 		for i=steps
-			[data datatype]=processdata(md,results(i).(field),options);
+			if isfield(results(i), 'MeshElements')
+				options=changefieldvalue(options,'amr', i);
+			end
+			[data datatype]=processdata(md,results(i).(field), options);
 			range(1) = min(range(1),min(data));
 			range(2) = max(range(2),max(data));
 		end
 		options=addfielddefault(options,'caxis',range);
 	end
-
 
 	%Process mesh once for all
 	[x y z elements is2d isplanet]=processmesh(md,results(i).(field),options);
@@ -90,6 +92,12 @@ function plot_transient_movie(md,options,width,i)
 	for i=steps
 
 		if ~isempty(results(i).(field)),
+			%Process mesh if necessary
+			if isfield(results(i), 'MeshElements')
+				options=changefieldvalue(options,'amr', i);
+				[x y z elements is2d isplanet]=processmesh(md,results(i).(field),options);
+			end
+
 			%process data
 			[data datatype]=processdata(md,results(i).(field),options);
 
@@ -113,7 +121,11 @@ function plot_transient_movie(md,options,width,i)
 			%Add ice front
 			if exist(options,'icefront')
 				if dimension(md.mesh)==2
-					contours=isoline(md, results(i).MaskIceLevelset,'output','matrix');
+					if exist(options, 'amr')
+						contours=isoline(md, results(i).MaskIceLevelset,'output','matrix', 'amr', results(i));
+					else
+						contours=isoline(md, results(i).MaskIceLevelset,'output','matrix');
+					end
 				else
 					ice = project2d(md, results(i).MaskIceLevelset, 1);
 					contours=isoline(md, ice,'output','matrix');

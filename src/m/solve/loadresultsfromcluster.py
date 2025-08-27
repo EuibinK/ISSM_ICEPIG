@@ -16,7 +16,7 @@ def remove(filename):  #{{{
 
 
 def loadresultsfromcluster(md, *args):  #{{{
-    """LOADRESULTSFROMCLUSTER - load results of solution sequence from cluster
+    """loadresultsfromcluster - load results of solution sequence from cluster
 
     Usage:
         md = loadresultsfromcluster(md)

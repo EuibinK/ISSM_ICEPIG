@@ -31,9 +31,23 @@ Cfsurfacesquare::Cfsurfacesquare(){/*{{{*/
 	this->model_enum       = UNDEF;
 	this->datatime         = 0.;
 	this->timepassedflag   = false;
+	this->J                = 0.;
 }
 /*}}}*/
-Cfsurfacesquare::Cfsurfacesquare(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime, bool in_timepassedflag){/*{{{*/
+Cfsurfacesquare::Cfsurfacesquare(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime){/*{{{*/
+
+	this->definitionenum=in_definitionenum;
+
+	this->name		= xNew<char>(strlen(in_name)+1);
+	xMemCpy<char>(this->name,in_name,strlen(in_name)+1);
+
+	this->model_enum=in_model_enum;
+	this->datatime=in_datatime;
+	this->timepassedflag=false;
+	this->J=0.;
+}
+/*}}}*/
+Cfsurfacesquare::Cfsurfacesquare(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime, bool in_timepassedflag, IssmDouble in_J){/*{{{*/
 
 	this->definitionenum=in_definitionenum;
 
@@ -43,6 +57,7 @@ Cfsurfacesquare::Cfsurfacesquare(char* in_name, int in_definitionenum, int in_mo
 	this->model_enum=in_model_enum;
 	this->datatime=in_datatime;
 	this->timepassedflag=in_timepassedflag;
+	this->J=in_J;
 }
 /*}}}*/
 Cfsurfacesquare::~Cfsurfacesquare(){/*{{{*/
@@ -52,7 +67,7 @@ Cfsurfacesquare::~Cfsurfacesquare(){/*{{{*/
 
 /*Object virtual function resolutoin: */
 Object* Cfsurfacesquare::copy() {/*{{{*/
-	Cfsurfacesquare* mf = new Cfsurfacesquare(this->name,this->definitionenum, this->model_enum,this->datatime,this->timepassedflag);
+	Cfsurfacesquare* mf = new Cfsurfacesquare(this->name,this->definitionenum, this->model_enum,this->datatime,this->timepassedflag,this->J);
 	return (Object*) mf;
 }
 /*}}}*/
@@ -65,6 +80,7 @@ void Cfsurfacesquare::Echo(void){/*{{{*/
 	_printf_("    model_enum: " << model_enum << " " << EnumToStringx(model_enum) << "\n");
 	_printf_("    datatime: " << datatime << "\n");
 	_printf_("	  timepassedflag: "<<timepassedflag<<"\n");
+	_printf_("	  J: "<<J<<"\n");
 }
 /*}}}*/
 int Cfsurfacesquare::Id(void){/*{{{*/
@@ -81,6 +97,7 @@ void Cfsurfacesquare::Marshall(MarshallHandle* marshallhandle){/*{{{*/
 	marshallhandle->call(this->name);
 	marshallhandle->call(this->datatime);
 	marshallhandle->call(this->timepassedflag);
+	marshallhandle->call(this->J);
 } 
 /*}}}*/
 int Cfsurfacesquare::ObjectEnum(void){/*{{{*/
@@ -109,23 +126,22 @@ IssmDouble Cfsurfacesquare::Response(FemModel* femmodel){/*{{{*/
 	/*Do the calculation only if this is the first time we are passed datatime*/
 	if(this->datatime<=time && !this->timepassedflag){
 
-		IssmDouble J=0.;
+		IssmDouble J_part=0.;
 		IssmDouble J_sum=0.;
 
 		for(Object* & object : femmodel->elements->objects){
 			Element* element=xDynamicCast<Element*>(object);
-			J+=this->Cfsurfacesquare_Calculation(element,model_enum);
+			J_part+=this->Cfsurfacesquare_Calculation(element,model_enum);
 		}
 
-		ISSM_MPI_Allreduce ( (void*)&J,(void*)&J_sum,1,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,IssmComm::GetComm());
+		ISSM_MPI_Allreduce ( (void*)&J_part,(void*)&J_sum,1,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,IssmComm::GetComm());
 		ISSM_MPI_Bcast(&J_sum,1,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
 
 		this->timepassedflag = true;
-		return J_sum;
+		this->J = J_sum;
 	}
-	else{
-		return 0.;
-	}
+
+	return this->J;
 }
 /*}}}*/
 IssmDouble Cfsurfacesquare::Cfsurfacesquare_Calculation(Element* element, int model_enum){/*{{{*/

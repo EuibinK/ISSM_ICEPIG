@@ -26,6 +26,27 @@ void InputUpdateFromConstantx(FemModel* femmodel,int constant, int name){
 		element->InputUpdateFromConstant(constant,name);
 	}
 }
+void InputUpdateFromConstantx(FemModel* femmodel,int constant, int name, int type){
+
+	if(type==P0Enum) InputUpdateFromConstantx(femmodel, constant,name);
+	else if(type==P1Enum){
+
+		if(VerboseModule()) _printf0_("   Input updates from constant (P1 version)\n");
+
+		/*Elements and loads drive the update: */
+		if(IsInputEnum(name)){
+			for(Object* & object : femmodel->elements->objects){
+				Element* element = xDynamicCast<Element*>(object);
+				element->InputUpdateFromConstant(constant,name,P1Enum);
+			}
+		}
+		else{
+			_error_("not supported yet");
+		}
+	}
+	else _error_("InputUpdateFromConstantx error message: type not supported yet!");
+
+}
 
 void InputUpdateFromConstantx(FemModel* femmodel,IssmDouble constant, int name){
 

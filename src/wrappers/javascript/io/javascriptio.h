@@ -1,5 +1,5 @@
-/*\file matlabio.h
- *\brief: I/O for ISSM in matlab mode
+/*\file javascriptio.h
+ *s\brief: I/O for ISSM in javascript mode
  */
 
 #ifndef _JAVASCRIPT_IO_H_
@@ -31,13 +31,16 @@ void WriteData(int** VerticesSize, double** Vertices, int** EdgesSize, double** 
 void WriteData(int** VerticesSize, double** Vertices, int** EdgesSize, double** Edges, int** TrianglesSize, double** Triangles, int** IssmEdgesSize, double** IssmEdges, int** IssmSegmentsSize, double** IssmSegments, int** VerticesOnGeomVertexSize, double** VerticesOnGeomVertex, int** VerticesOnGeomEdgeSize, double** VerticesOnGeomEdge, int** EdgesOnGeomEdgeSize, double** EdgesOnGeomEdge, int** SubDomainsSize, double** SubDomains, int** SubDomainsFromGeomSize, double** SubDomainsFromGeom, int** ElementConnectivitySize, double** ElementConnectivity, int** NodalConnectivitySize, double** NodalConnectivity, int** NodalElementConnectivitySize, double** NodalElementConnectivity, int** CrackedVerticesSize, double** CrackedVertices, int** CrackedEdgesSize, double** CrackedEdges, int** PreviousNumberingSize, double** PreviousNumbering, BamgMesh* bamgmesh);
 
 void FetchData(char** pstring, char* stringin);
-void FetchData(double* pscalar,double scalar);
+void FetchData(double* pscalar, double scalar);
 void FetchData(int* pinteger,int integer);
 void FetchData(double** pvector, double* vectorin, int nods);
 void FetchData(double** pvector, int* pnods, double* vectorin, int nods);
-void FetchData(double **pmatrix, int* pM, int* pN, int* matrixin, int M, int N);
-void FetchData(double **pmatrix, int* pM, int* pN, double* matrixin, int M, int N);
-void FetchData(int **pmatrix, int* pM, int* pN, int* matrixin, int M, int N);
+void FetchData(double** pmatrix, int* pM, int* matrixin, int M, int N);
+void FetchData(double** pmatrix, int* pM, int* pN, int* matrixin, int M, int N);
+void FetchData(double** pmatrix, int* pM, double* matrixin, int M, int N);
+void FetchData(double** pmatrix, int* pM, int* pN, double* matrixin, int M, int N);
+void FetchData(int** pmatrix, int* pM, int* matrixin, int M, int N);
+void FetchData(int** pmatrix, int* pM, int* pN, int* matrixin, int M, int N);
 void FetchData(Contours** pcontours,double* x, double* y, int nods);
 void FetchData(BamgGeom** pbamggeom, int* VerticesSize, double* Vertices, int* EdgesSize, double* Edges, int* CornersSize, double* Corners, int* RequiredVerticesSize, double* RequiredVertices, int* RequiredEdgesSize, double* RequiredEdges, int* CrackedEdgesSize, double* CrackedEdges, int* SubDomainsSize, double* SubDomains);
 void FetchData(BamgMesh** pbamgmesh, int* VerticesSize, double* Vertices, int* EdgesSize, double* Edges, int* TrianglesSize, double* Triangles, int* CrackedEdgesSize, double* CrackedEdges, int* VerticesOnGeomEdgeSize, double* VerticesOnGeomEdge, int* VerticesOnGeomVertexSize, double* VerticesOnGeomVertex, int* EdgesOnGeomEdgeSize, double* EdgesOnGeomEdge, int* IssmSegmentsSize, double* IssmSegments);

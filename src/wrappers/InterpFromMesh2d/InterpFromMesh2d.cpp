@@ -143,6 +143,7 @@ WRAPPER(InterpFromMesh2d_python){
 	xDelete<double>(x_prime);
 	xDelete<double>(y_prime);
 	xDelete<double>(default_values);
+	delete data_prime;
 
 	/*end module: */
 	MODULEEND();

@@ -9,10 +9,10 @@ from waitonlock import waitonlock
 
 
 def solveslm(slm, solutionstringi, *args):
-    """SOLVESLM - apply solution sequence for this sealevel model
+    """solveslm - apply solution sequence for this sealevel model
 
     Usage:
-        slm=solveslm(slm,solutionstring,varargin)
+        slm = solveslm(slm,solutionstring,varargin)
         where varargin is a lit of paired arguments of string OR enums
 
     solution types available comprise:

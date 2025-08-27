@@ -5,8 +5,6 @@
 %	fx			-	x coordinates of the flowline
 %	fy			-	y coordinates of the flowline
 %
-% Author: Cheng Gong
-% Last modified: 2021-01-27
 
 function valueC = projectToFlowlines(md, pValue, fx, fy)
     temp = InterpFromMeshToMesh2d(md.mesh.elements, md.mesh.x, md.mesh.y,...

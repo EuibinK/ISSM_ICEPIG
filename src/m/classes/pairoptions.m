@@ -6,19 +6,10 @@
 
 classdef pairoptions < matlab.mixin.Copyable
 	properties (SetAccess = private,GetAccess = private) 
-		functionname = '';
-		list         = cell(0,3);
+		list = cell(0,3);
 	end
 	methods
 		function self = pairoptions(varargin) % {{{
-
-			%get calling function name
-			a=dbstack;
-			if length(a)>1,
-				self.functionname=a(2).file(1:end-2);
-			else
-				self.functionname='';
-			end
 
 			%initialize list
 			if nargin==0,
@@ -31,7 +22,7 @@ classdef pairoptions < matlab.mixin.Copyable
 		%BUILDLIST - build list of obj from input
 
 			%check length of input
-			if mod((nargin-1),2),
+			if mod((nargin-1),2)
 				error('Invalid parameter/value pair arguments') 
 			end
 			numoptions = (nargin-1)/2;
@@ -40,8 +31,8 @@ classdef pairoptions < matlab.mixin.Copyable
 			self.list=cell(numoptions,3);
 
 			%go through varargin and build list of obj
-			for i=1:numoptions,
-				if ischar(varargin{2*i-1}),
+			for i=1:numoptions
+				if ischar(varargin{2*i-1})
 					self.list{i,1}=varargin{2*i-1};
 					self.list{i,2}=varargin{2*i};
 					self.list{i,3}=false; %used?
@@ -131,7 +122,6 @@ classdef pairoptions < matlab.mixin.Copyable
 			end
 		end % }}}
 		function disp(self) % {{{
-			disp(sprintf('   functionname: %s',self.functionname));
 			if ~isempty(self.list),
 				disp(sprintf('   list: (%ix%i)\n',size(self.list,1),size(self.list,2)));
 				for i=1:size(self.list,1),

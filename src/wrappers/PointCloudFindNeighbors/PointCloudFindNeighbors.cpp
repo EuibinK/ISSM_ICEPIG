@@ -49,6 +49,7 @@ WRAPPER(PointCloudFindNeighbors_python){
 	/*end module: */
 	xDelete<double>(x);
 	xDelete<double>(y);
+	delete flags;
 
 	/*end module: */
 	MODULEEND();

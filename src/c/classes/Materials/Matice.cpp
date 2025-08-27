@@ -1,7 +1,6 @@
 /*!\file Matice.c
  * \brief: implementation of the Matice object
  */
-#define _IS_MULTI_ICE_
 
 #ifdef HAVE_CONFIG_H
 	#include <config.h>
@@ -65,9 +64,6 @@ void Matice::Init(int matice_mid,int index,int materialtype){/*{{{*/
 			this->isdamaged = true;
 			this->isenhanced = false;
 			break;
-		#ifdef _IS_MULTI_ICE_
-		case MatMultiIceEnum:
-		#endif
 		case MaticeEnum:
 			this->isdamaged = false;
 			this->isenhanced = false;
@@ -815,7 +811,7 @@ void  Matice::ViscosityMOLHOAdjoint(IssmDouble* pviscosity,int dim,IssmDouble* x
 	GaussSeg* gauss_seg=new GaussSeg(order);
 	//IssmDouble eps_eff_averaged=0;
 	while(gauss_seg->next()){
-		
+
 		/*Compute zeta for gauss_seg point (0=surface, 1=base)*/
 		zeta=0.5*(gauss_seg->coord1+1);	
 
@@ -843,7 +839,6 @@ void  Matice::ViscosityMOLHOAdjoint(IssmDouble* pviscosity,int dim,IssmDouble* x
 		f[7]=(1-pow(zeta,n+1))*(1-pow(zeta,n+1))*pow(zeta,2*n);
 		f[8]=pow(zeta,4*n);
 
-	
 		F[0]=H;
 		F[1]=H*(n+1)/(n+2);
 		F[2]=2*H*(n+1)*(n+1)/( (2*n+3)*(n+2) );

@@ -7,7 +7,7 @@
 #include "../../classes/classes.h"
 
 /* local prototypes: */
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,const char* output_string);
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,int output_enum);
+int OutputDefinitionsResponsex(IssmDouble* presponse, FemModel* femmodel,const char* output_string);
+int OutputDefinitionsResponsex(IssmDouble* presponse, FemModel* femmodel,int output_enum);
 
 #endif  /* _OUTPUTDEFINITIONSRESPONSEXX_H */

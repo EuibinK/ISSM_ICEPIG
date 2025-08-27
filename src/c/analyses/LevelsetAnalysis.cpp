@@ -12,7 +12,7 @@
 #include <math.h>
 
 void LevelsetAnalysis::CreateConstraints(Constraints* constraints,IoModel* iomodel){/*{{{*/
-	
+
 	/*intermediary: */
 	int finiteelement;
 	int         code,vector_layout;
@@ -106,6 +106,10 @@ void LevelsetAnalysis::UpdateElements(Elements* elements,Inputs* inputs,IoModel*
 			iomodel->FetchDataToInput(inputs,elements,"md.calving.stress_threshold_floatingice",CalvingStressThresholdFloatingiceEnum);
 			iomodel->FetchDataToInput(inputs,elements,"md.geometry.bed",BedEnum);
 			break;
+		case CalvingVonmisesADEnum:
+			iomodel->FetchDataToInput(inputs,elements,"md.calving.basin_id",CalvingBasinIdEnum);
+			iomodel->FetchDataToInput(inputs,elements,"md.geometry.bed",BedEnum);
+			break;
 		case CalvingDev2Enum:
 			iomodel->FetchDataToInput(inputs,elements,"md.calving.stress_threshold_groundedice",CalvingStressThresholdGroundediceEnum);
 			iomodel->FetchDataToInput(inputs,elements,"md.calving.stress_threshold_floatingice",CalvingStressThresholdFloatingiceEnum);
@@ -114,6 +118,8 @@ void LevelsetAnalysis::UpdateElements(Elements* elements,Inputs* inputs,IoModel*
 			break;
 		case CalvingParameterizationEnum:
 			iomodel->FetchDataToInput(inputs,elements,"md.geometry.bed",BedEnum);
+			break;
+		case CalvingCalvingMIPEnum:
 			break;
 
 		/*"Discrete" calving laws (need to specify rate as 0 so that we can still solve the level set equation)*/
@@ -145,7 +151,7 @@ void LevelsetAnalysis::UpdateElements(Elements* elements,Inputs* inputs,IoModel*
 	switch(melt_parameterization){
 		case FrontalForcingsDefaultEnum:
 			iomodel->FetchDataToInput(inputs,elements,"md.frontalforcings.meltingrate",CalvingMeltingrateEnum);
-			if (calvinglaw == CalvingParameterizationEnum) {
+			if ((calvinglaw == CalvingParameterizationEnum) || (calvinglaw == CalvingCalvingMIPEnum)) {
 				iomodel->FetchDataToInput(inputs,elements,"md.frontalforcings.ablationrate",CalvingAblationrateEnum);
 			}
 			break;
@@ -186,6 +192,21 @@ void LevelsetAnalysis::UpdateParameters(Parameters* parameters,IoModel* iomodel,
 			break;
 		case CalvingVonmisesEnum:
 			parameters->AddObject(iomodel->CopyConstantObject("md.calving.min_thickness",CalvingMinthicknessEnum));
+			break;
+		case CalvingVonmisesADEnum:
+			parameters->AddObject(iomodel->CopyConstantObject("md.calving.min_thickness",CalvingMinthicknessEnum));
+			parameters->AddObject(iomodel->CopyConstantObject("md.calving.num_basins",CalvingNumberofBasinsEnum));
+
+			iomodel->FetchData(&transparam,&M,&N,"md.calving.stress_threshold_groundedice");
+         _assert_(M>=1 && N>=1);
+         parameters->AddObject(new DoubleVecParam(CalvingADStressThresholdGroundediceEnum,transparam,M));
+         xDelete<IssmDouble>(transparam);
+
+         iomodel->FetchData(&transparam,&M,&N,"md.calving.stress_threshold_floatingice");
+         _assert_(M>=1 && N>=1);
+         parameters->AddObject(new DoubleVecParam(CalvingADStressThresholdFloatingiceEnum,transparam,M));
+         xDelete<IssmDouble>(transparam);
+
 			break;
 		case CalvingMinthicknessEnum:
 			parameters->AddObject(iomodel->CopyConstantObject("md.calving.min_thickness",CalvingMinthicknessEnum));
@@ -236,6 +257,10 @@ void LevelsetAnalysis::UpdateParameters(Parameters* parameters,IoModel* iomodel,
 			break;
 		case CalvingPollardEnum:
 			parameters->AddObject(iomodel->CopyConstantObject("md.calving.rc",CalvingRcEnum));
+			break;
+		case CalvingCalvingMIPEnum:
+			parameters->AddObject(iomodel->CopyConstantObject("md.calving.experiment",CalvingUseParamEnum));
+			parameters->AddObject(iomodel->CopyConstantObject("md.calving.min_thickness",CalvingMinthicknessEnum));
 			break;
 		default:
 			_error_("Calving law "<<EnumToStringx(calvinglaw)<<" not supported yet");
@@ -350,7 +375,7 @@ ElementMatrix* LevelsetAnalysis::CreateKMatrix(Element* element){/*{{{*/
 	/*Intermediaries */
 	int  stabilization,dim,domaintype;
 	int i,j,k,row, col;
-	IssmDouble kappa;
+	IssmDouble kappa,factor;
 	IssmDouble Jdet, dt, D_scalar;
 	IssmDouble h,hx,hy,hz;
 	IssmDouble vel,w[3];
@@ -469,9 +494,10 @@ ElementMatrix* LevelsetAnalysis::CreateKMatrix(Element* element){/*{{{*/
 					mf_vy_input->GetInputAverage(&w[1]);
 					vel=sqrt(w[0]*w[0]+w[1]*w[1])+1.e-8;
 					IssmDouble tau=h/(2*vel);
+					factor = dt*gauss->weight*Jdet*tau;
 					for(int i=0;i<numnodes;i++){
 						for(int j=0;j<numnodes;j++){
-							Ke->values[i*numnodes+j]+=dt*gauss->weight*Jdet*tau*(
+							Ke->values[i*numnodes+j]+=factor*(
 										w[0]*dbasis[0*numnodes+i]+w[1]*dbasis[1*numnodes+i])*(w[0]*dbasis[0*numnodes+j]+w[1]*dbasis[1*numnodes+j]);
 						}
 					}
@@ -487,16 +513,18 @@ ElementMatrix* LevelsetAnalysis::CreateKMatrix(Element* element){/*{{{*/
 				IssmDouble  tau=xi*h/(2*vel);
 
 				/*Mass matrix - part 2*/
+				factor = gauss->weight*Jdet*tau;
 				for(int i=0;i<numnodes;i++){
 					for(int j=0;j<numnodes;j++){
-						Ke->values[i*numnodes+j]+=gauss->weight*Jdet*tau*basis[j]*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
+						Ke->values[i*numnodes+j]+=factor*basis[j]*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
 					}
 				}
 
 				/*Advection matrix - part 2, A*/
+				factor = dt*gauss->weight*Jdet*tau;
 				for(int i=0;i<numnodes;i++){
 					for(int j=0;j<numnodes;j++){
-						Ke->values[i*numnodes+j]+=dt*gauss->weight*Jdet*tau*(vx*dbasis[0*numnodes+j]+vy*dbasis[1*numnodes+j])*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
+						Ke->values[i*numnodes+j]+=factor*(vx*dbasis[0*numnodes+j]+vy*dbasis[1*numnodes+j])*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
 					}
 				}
 
@@ -519,7 +547,6 @@ ElementMatrix* LevelsetAnalysis::CreateKMatrix(Element* element){/*{{{*/
 				IssmDouble  tau=xi*h/(2*vel);
 				Input* levelset_input = NULL;
 
-
 				IssmDouble kappa;
 				IssmDouble p=4, q=4;
 				IssmDouble phi[3];
@@ -535,7 +562,7 @@ ElementMatrix* LevelsetAnalysis::CreateKMatrix(Element* element){/*{{{*/
 					dphidy += phi[i]*dbasis[1*numnodes+i];
 				}
 				nphi = sqrt(dphidx*dphidx+dphidy*dphidy);
-			
+
 				if (nphi >= 1) {
 					kappa = 1 - 1.0/nphi;
 				}
@@ -546,23 +573,26 @@ ElementMatrix* LevelsetAnalysis::CreateKMatrix(Element* element){/*{{{*/
 				kappa = kappa * vel / h;
 
 				/*Mass matrix - part 2*/
+				factor = gauss->weight*Jdet*tau;
 				for(int i=0;i<numnodes;i++){
 					for(int j=0;j<numnodes;j++){
-						Ke->values[i*numnodes+j]+=gauss->weight*Jdet*tau*basis[j]*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
+						Ke->values[i*numnodes+j]+=factor*basis[j]*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
 					}
 				}
 
 				/*Advection matrix - part 2, A*/
+				factor = dt*gauss->weight*Jdet*tau;
 				for(int i=0;i<numnodes;i++){
 					for(int j=0;j<numnodes;j++){
-						Ke->values[i*numnodes+j]+=dt*gauss->weight*Jdet*tau*(vx*dbasis[0*numnodes+j]+vy*dbasis[1*numnodes+j])*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
+						Ke->values[i*numnodes+j]+=factor*(vx*dbasis[0*numnodes+j]+vy*dbasis[1*numnodes+j])*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
 					}
 				}
 				/*Add the pertubation term \nabla\cdot(\kappa*\nabla\phi)*/
+				factor = dt*gauss->weight*Jdet*kappa;
 				for(int i=0;i<numnodes;i++){
 					for(int j=0;j<numnodes;j++){
 						for(int k=0;k<dim;k++){
-								Ke->values[i*numnodes+j]+= dt*gauss->weight*Jdet*kappa*dbasis[k*numnodes+j]*dbasis[k*numnodes+i];
+								Ke->values[i*numnodes+j]+= factor*dbasis[k*numnodes+j]*dbasis[k*numnodes+i];
 						}
 					}
 				}
@@ -622,7 +652,8 @@ ElementVector* LevelsetAnalysis::CreatePVector(Element* element){/*{{{*/
 
 		/* old function value */
 		levelset_input->GetInputValue(&lsf,gauss);
-		for(int i=0;i<numnodes;i++) pe->values[i]+=Jdet*gauss->weight*lsf*basis[i];
+		IssmDouble factor = Jdet*gauss->weight*lsf;
+		for(int i=0;i<numnodes;i++) pe->values[i]+=factor*basis[i];
 
 		if(stabilization==5){ /*SUPG*/
 			IssmDouble vx,vy,vel;
@@ -634,8 +665,9 @@ ElementVector* LevelsetAnalysis::CreatePVector(Element* element){/*{{{*/
 			IssmDouble  tau=xi*h/(2*vel);
 
 			/*Force vector - part 2*/
+			factor = Jdet*gauss->weight*lsf;
 			for(int i=0;i<numnodes;i++){
-				pe->values[i]+=Jdet*gauss->weight*lsf*(tau*vx*dbasis[0*numnodes+i]+tau*vy*dbasis[1*numnodes+i]);
+				pe->values[i]+=factor*(tau*vx*dbasis[0*numnodes+i]+tau*vy*dbasis[1*numnodes+i]);
 			}
 		}
 		else if (stabilization ==6) {
@@ -656,8 +688,9 @@ ElementVector* LevelsetAnalysis::CreatePVector(Element* element){/*{{{*/
 			IssmDouble  tau=xi*h/(2*vel);
 
 			/*Force vector - part 2*/
+			factor = Jdet*gauss->weight*lsf*tau;
 			for(int i=0;i<numnodes;i++){
-				pe->values[i]+=Jdet*gauss->weight*lsf*tau*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
+				pe->values[i]+=factor*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
 			}
 		}
 	}
@@ -728,7 +761,7 @@ void           LevelsetAnalysis::PostProcess(FemModel* femmodel){/*{{{*/
 	femmodel->parameters->FindParam(&calvinglaw,CalvingLawEnum);
 
 	/*Apply minimum thickness criterion*/
-	if(calvinglaw==CalvingMinthicknessEnum || calvinglaw==CalvingVonmisesEnum || calvinglaw==CalvingParameterizationEnum){
+	if(calvinglaw==CalvingMinthicknessEnum || calvinglaw==CalvingVonmisesEnum || calvinglaw==CalvingParameterizationEnum || calvinglaw==CalvingVonmisesADEnum || calvinglaw==CalvingCalvingMIPEnum){
 
 		IssmDouble mig_max = femmodel->parameters->FindParam(MigrationMaxEnum);
 		IssmDouble dt      = femmodel->parameters->FindParam(TimesteppingTimeStepEnum);
@@ -786,9 +819,26 @@ void           LevelsetAnalysis::UpdateConstraints(FemModel* femmodel){/*{{{*/
 	IssmDouble mig_max = femmodel->parameters->FindParam(MigrationMaxEnum);
 	IssmDouble dt      = femmodel->parameters->FindParam(TimesteppingTimeStepEnum);
 
-   /*Get current distance to terminus*/
-   InputDuplicatex(femmodel,MaskIceLevelsetEnum,DistanceToCalvingfrontEnum);
-   femmodel->DistanceToFieldValue(MaskIceLevelsetEnum,0,DistanceToCalvingfrontEnum);
+   /* Get current distance to terminus
+	 * Only do this if necessary, PostProcess is already doing it for a few calving law
+	 * Do not repeat the process is this function is particularly slow*/
+	bool computedistance = true;
+	if(
+				calvinglaw==CalvingMinthicknessEnum ||
+				calvinglaw==CalvingVonmisesEnum ||
+				calvinglaw==CalvingParameterizationEnum ||
+				calvinglaw==CalvingVonmisesADEnum ||
+				calvinglaw==CalvingCalvingMIPEnum){
+		int step;
+		femmodel->parameters->FindParam(&step,StepEnum);
+		if(step>1){
+			computedistance = false;
+		}
+	}
+	if(computedistance){
+		InputDuplicatex(femmodel,MaskIceLevelsetEnum,DistanceToCalvingfrontEnum);
+		femmodel->DistanceToFieldValue(MaskIceLevelsetEnum,0,DistanceToCalvingfrontEnum);
+	}
 
    if(calvinglaw==CalvingHabEnum){
 
@@ -847,7 +897,6 @@ void           LevelsetAnalysis::UpdateConstraints(FemModel* femmodel){/*{{{*/
       Vector<IssmDouble>* vec_constraint_nodes = vec_constraint_nodes=new Vector<IssmDouble>(localmasters,numnodes);
 
 		IssmDouble crevasse_threshold = femmodel->parameters->FindParam(CalvingCrevasseThresholdEnum);
-
 
 		for(Object* & object : femmodel->elements->objects){
 			Element* element   = xDynamicCast<Element*>(object);

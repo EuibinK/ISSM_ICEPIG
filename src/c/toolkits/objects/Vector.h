@@ -140,6 +140,7 @@ class Vector{
 		}
 		/*}}}*/
 		void Assemble(void){_assert_(this);/*{{{*/
+
 			if(type==PetscVecType){
 				#ifdef _HAVE_PETSC_
 				this->pvector->Assemble();
@@ -297,6 +298,8 @@ class Vector{
 			if(type==PetscVecType){
 				#ifdef _HAVE_PETSC_
 				vec_serial=this->pvector->ToMPISerial0();
+				#else
+				_error_("Cannot serialize PETSc Vec without PETSc");
 				#endif
 			}
 			else vec_serial=this->ivector->ToMPISerial0();

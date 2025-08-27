@@ -70,7 +70,7 @@ WRAPPER(MeshPartition_python){
 	WriteData(ELEMENTPARTITIONING,element_partitioning,numberofelements);
 	WriteData(NODEPARTITIONING,node_partitioning,numberofvertices);
 
-	/*Free ressources:*/
+	/*Free resources:*/
 	xDelete<int>(elements);
 	xDelete<int>(elements2d);
 	xDelete<int>(int_element_partitioning);

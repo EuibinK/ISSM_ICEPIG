@@ -4,8 +4,6 @@
 
 /*Headers:*/
 /*{{{*/
-#define _IS_MULTI_ICE_
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #else
@@ -287,7 +285,7 @@ void       Penta::CalvingRateVonmises(){/*{{{*/
 	IssmDouble  sigma_vm,sigma_max,sigma_max_floating,sigma_max_grounded;
 	IssmDouble  groundedice,bed,sealevel;
 
-	/*Depth average B for stress calculation*/
+	/*Depth average velocity for stress calculation*/
 	this->InputDepthAverageAtBase(VxEnum,VxAverageEnum);
 	this->InputDepthAverageAtBase(VyEnum,VyAverageEnum);
 
@@ -626,6 +624,92 @@ void       Penta::CalvingMeltingFluxLevelset(){/*{{{*/
 		/*Clean up and return*/
 		delete gauss;
 	}
+}
+/*}}}*/
+void       Penta::CalvingRateCalvingMIP(){/*{{{*/
+
+	if(!this->IsOnBase()) return;
+
+	IssmDouble  calvingrate[NUMVERTICES];
+	int			experiment = 1;  /* exp:1 by default */
+	int         dim, domaintype;
+	IssmDouble	vx, vy, vel, c, wrate;
+	IssmDouble  time, groundedice, yts;
+
+	/*Get problem dimension and whether there is moving front or not*/
+	this->FindParam(&domaintype,DomainTypeEnum);
+	this->FindParam(&time,TimeEnum);
+	this->FindParam(&yts,ConstantsYtsEnum);
+
+	switch(domaintype){
+		case Domain2DverticalEnum:   dim = 1; break;
+		case Domain2DhorizontalEnum: dim = 2; break;
+		case Domain3DEnum:           dim = 2; break;
+		default: _error_("mesh "<<EnumToStringx(domaintype)<<" not supported yet");
+	}
+	if(dim==1) _error_("not implemented in 1D...");
+
+	/*Depth average velocity for stress calculation*/
+	this->InputDepthAverageAtBase(VxEnum,VxAverageEnum);
+	this->InputDepthAverageAtBase(VyEnum,VyAverageEnum);
+
+	/*Retrieve all inputs and parameters we will need*/
+	Input *vx_input      = this->GetInput(VxAverageEnum);                                _assert_(vx_input);
+	Input *vy_input      = this->GetInput(VyAverageEnum);                                _assert_(vy_input);
+	Input *wrate_input   = this->GetInput(CalvingAblationrateEnum);               _assert_(wrate_input); 
+	Input* gr_input      = this->GetInput(MaskOceanLevelsetEnum);						_assert_(gr_input);
+
+	/* Use which experiment: use existing Enum */
+	this->FindParam(&experiment, CalvingUseParamEnum);
+
+	/* Start looping on the number of vertices: */
+	GaussPenta gauss;
+	for(int iv=0;iv<3;iv++){
+		gauss.GaussVertex(iv);
+
+		/*Get velocity components */
+		vx_input->GetInputValue(&vx,&gauss);
+		vy_input->GetInputValue(&vy,&gauss);
+		vel=sqrt(vx*vx+vy*vy)+1.e-14;
+
+		/* no calving for grounded ice in EXP4 */
+		gr_input->GetInputValue(&groundedice,&gauss);
+
+		switch (experiment) { 
+			case 1:
+			case 3:
+				/* Exp 1 and 3: set c=v-wrate, wrate=0, so that w=0 */
+				wrate = 0.0;
+				break;
+			case 2:
+				/* Exp 2: set c=v-wrate*/
+				wrate = -300*sin(2.0*M_PI*time/yts/1000)/yts;  // m/a -> m/s
+				break;
+			case 4:
+				/* Exp 4: set c=v-wrate(given), for the first 500 years, then c=0 for the second 500 years*/
+				if((groundedice<0) && (time<=500.0*yts)) {
+				//	wrate_input->GetInputValue(&wrate,&gauss);
+					wrate = -750*sin(2.0*M_PI*time/yts/1000)/yts;  // m/a -> m/s
+				}
+				else {
+					/* no calving on the grounded ice*/
+					wrate = vel;
+				}
+				break;
+			default:
+				_error_("The experiment is not supported yet!");
+		}
+
+		calvingrate[iv] = vel - wrate;
+	}
+	/*Add input*/
+	this->AddBasalInput(CalvingCalvingrateEnum,&calvingrate[0],P1DGEnum);
+	this->CalvingRateToVector();
+
+	/*Extrude*/
+	this->InputExtrude(CalvingCalvingrateEnum,-1);
+	this->InputExtrude(CalvingratexEnum,-1);
+	this->InputExtrude(CalvingrateyEnum,-1);
 }
 /*}}}*/
 void       Penta::ComputeBasalStress(void){/*{{{*/
@@ -1319,7 +1403,7 @@ void       Penta::GetFractionGeometry2D(IssmDouble* weights, IssmDouble* pphi, i
 	}
 	if(trapezeisnegative) phi = 1.-f1*f2;
 	else                  phi = f1*f2;
-	
+
 	/*Compute weights*/
 	Gauss* gauss = this->NewGauss(point,f1,f2,1-trapezeisnegative,2);
 
@@ -1335,7 +1419,7 @@ void       Penta::GetFractionGeometry2D(IssmDouble* weights, IssmDouble* pphi, i
 	/*Normalizing to phi such that weights provide coefficients for integration over subelement (for averaging:phi*weights)*/
    if(total_weight>0.) for(int i=0;i<NUMVERTICES2D;i++) weights[i] = weights[i]*phi/total_weight;
 	else for(int i=0;i<NUMVERTICES2D;i++) weights[i] = 0.0;
-	
+
 	/*Assign output pointers*/
 	*pphi               = phi;
 	*ppoint1            = point;
@@ -1344,7 +1428,7 @@ void       Penta::GetFractionGeometry2D(IssmDouble* weights, IssmDouble* pphi, i
 	*ptrapezeisnegative = trapezeisnegative;
 }
 /*}}}*/
-void       Penta::GetGroundedPart(int* point1,IssmDouble* fraction1,IssmDouble* fraction2, bool* mainlyfloating){/*{{{*/
+void       Penta::GetGroundedPart(int* point1,IssmDouble* fraction1,IssmDouble* fraction2, bool* mainlyfloating, int distance_enum, IssmDouble intrusion_distance){/*{{{*/
 	/*Computeportion of the element that is grounded*/
 
 	bool               floating=true;
@@ -1354,7 +1438,12 @@ void       Penta::GetGroundedPart(int* point1,IssmDouble* fraction1,IssmDouble* 
 	IssmDouble         f1,f2;
 
 	/*Recover parameters and values*/
-	Element::GetInputListOnVertices(&gl[0],MaskOceanLevelsetEnum);
+	Element::GetInputListOnVertices(&gl[0],distance_enum);
+
+	/*Determine where to apply sub-element melt using intrusion distance*/
+	for(int i=0; i<NUMVERTICES; i++){
+		gl[i] -= intrusion_distance;
+	}
 
 	/*Be sure that values are not zero*/
 	if(gl[0]==0.) gl[0]=gl[0]+epsilon;
@@ -1452,105 +1541,17 @@ IssmDouble Penta::GetGroundedPortion(IssmDouble* xyz_list){/*{{{*/
 /*}}}*/
 IssmDouble Penta::GetIcefrontArea(){/*{{{*/
 
-	IssmDouble  bed[NUMVERTICES]; //basinId[NUMVERTICES];
-	IssmDouble	Haverage,frontarea;
-	IssmDouble  x1,y1,x2,y2,distance;
-	IssmDouble lsf[NUMVERTICES], Haux[NUMVERTICES], surfaces[NUMVERTICES], bases[NUMVERTICES];
-	int* indices=NULL;
-	IssmDouble* H=NULL;;
-	int nrfrontbed,numiceverts;
-
-	if(!this->IsOnBase()) return 0;
+	/*We need to be on base and cross the levelset*/
 	if(!IsZeroLevelset(MaskIceLevelsetEnum)) return 0;
+	if(!this->IsOnBase()) return 0;
 
-	/*Retrieve all inputs and parameters*/
-	Element::GetInputListOnVertices(&bed[0],BedEnum);
-	Element::GetInputListOnVertices(&surfaces[0],SurfaceEnum);
-	Element::GetInputListOnVertices(&bases[0],BaseEnum);
-	Element::GetInputListOnVertices(&lsf[0],MaskIceLevelsetEnum);
+	/*Spawn Tria element from the base of the Penta: */
+	Tria* tria=(Tria*)SpawnTria(0,1,2);
+	IssmDouble frontarea = tria->GetIcefrontArea();
+	delete tria->material; delete tria;
 
-	nrfrontbed=0;
-	for(int i=0;i<NUMVERTICES2D;i++){
-		/*Find if bed<0*/
-		if(bed[i]<0.) nrfrontbed++;
-	}
-
-	if(nrfrontbed==3){
-		/*2. Find coordinates of where levelset crosses 0*/
-		int         numiceverts;
-		IssmDouble  s[2],x[2],y[2];
-		this->GetLevelsetIntersectionBase(&indices, &numiceverts,&s[0],MaskIceLevelsetEnum,0.);
-		_assert_(numiceverts);
-
-		/*3 Write coordinates*/
-		IssmDouble  xyz_list[NUMVERTICES][3];
-		::GetVerticesCoordinates(&xyz_list[0][0],this->vertices,NUMVERTICES);
-		int counter = 0;
-		if((numiceverts>0) && (numiceverts<NUMVERTICES2D)){
-			for(int i=0;i<numiceverts;i++){
-				for(int n=numiceverts;n<NUMVERTICES2D;n++){ // iterate over no-ice vertices
-					x[counter] = xyz_list[indices[i]][0]+s[counter]*(xyz_list[indices[n]][0]-xyz_list[indices[i]][0]);
-					y[counter] = xyz_list[indices[i]][1]+s[counter]*(xyz_list[indices[n]][1]-xyz_list[indices[i]][1]);
-					counter++;
-				}
-			}
-		}
-		else if(numiceverts==NUMVERTICES2D){ //NUMVERTICES ice vertices: calving front lies on element edge
-
-			for(int i=0;i<NUMVERTICES2D;i++){
-				if(lsf[indices[i]]==0.){
-					x[counter]=xyz_list[indices[i]][0];
-					y[counter]=xyz_list[indices[i]][1];
-					counter++;
-				}
-				if(counter==2) break;
-			}
-			if(counter==1){
-				/*We actually have only 1 vertex on levelset, write a single point as a segment*/
-				x[counter]=x[0];
-				y[counter]=y[0];
-				counter++;
-			}
-		}
-		else{
-			_error_("not sure what's going on here...");
-		}
-		x1=x[0]; y1=y[0]; x2=x[1]; y2=y[1];
-		distance=sqrt(pow((x1-x2),2)+pow((y1-y2),2));
-
-		int numthk=numiceverts+2;
-		H=xNew<IssmDouble>(numthk);
-		for(int iv=0;iv<NUMVERTICES2D;iv++) Haux[iv]=-bed[indices[iv]]; //sort bed in ice/noice
-
-		switch(numiceverts){
-			case 1: // average over triangle
-				H[0]=Haux[0];
-				H[1]=Haux[0]+s[0]*(Haux[1]-Haux[0]);
-				H[2]=Haux[0]+s[1]*(Haux[2]-Haux[0]);
-				Haverage=(H[1]+H[2])/2;
-				break;
-			case 2: // average over quadrangle
-				H[0]=Haux[0];
-				H[1]=Haux[1];
-				H[2]=Haux[0]+s[0]*(Haux[2]-Haux[0]);
-				H[3]=Haux[1]+s[1]*(Haux[2]-Haux[1]);
-				Haverage=(H[2]+H[3])/2;
-				break;
-			default:
-				_error_("Number of ice covered vertices wrong in Tria::GetIceFrontArea(void)");
-				break;
-		}
-		frontarea=distance*Haverage;
-	}
-	else return 0;
-
-	xDelete<int>(indices);
-	xDelete<IssmDouble>(H);
-
-	_assert_(frontarea>0);
 	return frontarea;
-}
-/*}}}*/
+}/*}}}*/
 void       Penta::GetIcefrontCoordinates(IssmDouble** pxyz_front,IssmDouble* xyz_list,int levelsetenum){/*{{{*/
 
 	/* Intermediaries */
@@ -2225,13 +2226,13 @@ IssmDouble Penta::IceVolume(bool scaled){/*{{{*/
 			lsf2d[i]   = lsf[i];
 		}
 		GetFractionGeometry2D(&weights[0],&phi,&point,&f1,&f2,&istrapneg,lsf2d);
-		
+
 		IssmDouble basetot;
 		height = 0.0;
 		for(int i=0;i<NUMVERTICES2D;i++) height += weights[i]/phi*heights[i];
 		basetot = 1./2.*fabs((xyz_list[0][0]-xyz_list[2][0])*(xyz_list[1][1]-xyz_list[0][1]) - (xyz_list[0][0]-xyz_list[1][0])*(xyz_list[2][1]-xyz_list[0][1]));
 		base    = basetot*phi;	
-	
+
 		/*Account for scaling factor averaged over subelement 2D area*/
 		if(scaled==true){
 			IssmDouble scalefactor_vertices[NUMVERTICES];
@@ -2248,13 +2249,13 @@ IssmDouble Penta::IceVolume(bool scaled){/*{{{*/
 		 * http://en.wikipedia.org/wiki/Pentangle
 		 * base = 1/2 abs((xA-xC)(yB-yA)-(xA-xB)(yC-yA))*/
 		base = 1./2.*fabs((xyz_list[0][0]-xyz_list[2][0])*(xyz_list[1][1]-xyz_list[0][1]) - (xyz_list[0][0]-xyz_list[1][0])*(xyz_list[2][1]-xyz_list[0][1]));
-	
+
 		if(scaled==true){ //scale for area projection correction
 			Input* scalefactor_input = this->GetInput(MeshScaleFactorEnum); _assert_(scalefactor_input);
 			scalefactor_input->GetInputAverage(&scalefactor);
 			base=base*scalefactor;
 		}
-	
+
 		/*Now get the average height*/
 		height = 1./3.*((xyz_list[3][2]-xyz_list[0][2])+(xyz_list[4][2]-xyz_list[1][2])+(xyz_list[5][2]-xyz_list[2][2]));
 	}
@@ -2899,6 +2900,7 @@ void	      Penta::MovingFrontalVelocity(void){/*{{{*/
 		case DefaultCalvingEnum:
 		case CalvingVonmisesEnum:
 		case CalvingLevermannEnum:
+		case CalvingCalvingMIPEnum:
 			calvingratex_input=this->GetInput(CalvingratexEnum); _assert_(calvingratex_input);
 			calvingratey_input=this->GetInput(CalvingrateyEnum); _assert_(calvingratey_input);
 			meltingrate_input = this->GetInput(CalvingMeltingrateEnum);     _assert_(meltingrate_input);
@@ -2936,6 +2938,7 @@ void	      Penta::MovingFrontalVelocity(void){/*{{{*/
 			case DefaultCalvingEnum:
 			case CalvingVonmisesEnum:
 			case CalvingLevermannEnum:
+			case CalvingCalvingMIPEnum:
 				calvingratex_input->GetInputValue(&c[0],&gauss);
 				calvingratey_input->GetInputValue(&c[1],&gauss);
 				meltingrate_input->GetInputValue(&meltingrate,&gauss);
@@ -3161,82 +3164,22 @@ int        Penta::NodalValue(IssmDouble* pvalue, int index, int natureofdataenum
 }
 /*}}}*/
 void       Penta::NormalBase(IssmDouble* bed_normal,IssmDouble* xyz_list){/*{{{*/
-
-	IssmDouble v13[3],v23[3];
-	IssmDouble normal[3];
-	IssmDouble normal_norm;
-
-	for(int i=0;i<3;i++){
-		v13[i]=xyz_list[0*3+i]-xyz_list[2*3+i];
-		v23[i]=xyz_list[1*3+i]-xyz_list[2*3+i];
-	}
-
-	normal[0]=v13[1]*v23[2]-v13[2]*v23[1];
-	normal[1]=v13[2]*v23[0]-v13[0]*v23[2];
-	normal[2]=v13[0]*v23[1]-v13[1]*v23[0];
-	normal_norm=sqrt(normal[0]*normal[0]+ normal[1]*normal[1]+ normal[2]*normal[2]);
-
+	TriangleFacetNormal(bed_normal, xyz_list);
 	/*Bed normal is opposite to surface normal*/
-	bed_normal[0]=-normal[0]/normal_norm;
-	bed_normal[1]=-normal[1]/normal_norm;
-	bed_normal[2]=-normal[2]/normal_norm;
+	for (int i = 0; i < 3; ++i) bed_normal[i] *= (-1);
 }
 /*}}}*/
 void       Penta::NormalSection(IssmDouble* normal,IssmDouble* xyz_list){/*{{{*/
 
-	/*Build unit outward pointing vector*/
-	IssmDouble AB[3];
-	IssmDouble AC[3];
-	IssmDouble norm;
-
-	AB[0]=xyz_list[1*3+0] - xyz_list[0*3+0];
-	AB[1]=xyz_list[1*3+1] - xyz_list[0*3+1];
-	AB[2]=xyz_list[1*3+2] - xyz_list[0*3+2];
-	AC[0]=xyz_list[2*3+0] - xyz_list[0*3+0];
-	AC[1]=xyz_list[2*3+1] - xyz_list[0*3+1];
-	AC[2]=xyz_list[2*3+2] - xyz_list[0*3+2];
-
-	cross(normal,AB,AC);
-	norm=sqrt(normal[0]*normal[0]+normal[1]*normal[1]+normal[2]*normal[2]);
-
-	for(int i=0;i<3;i++) normal[i]=normal[i]/(norm+1e-10);
+	TriangleFacetNormal(normal, xyz_list);
 }
 /*}}}*/
 void       Penta::NormalSectionBase(IssmDouble* normal,IssmDouble* xyz_list){/*{{{*/
-
-	/*Build unit outward pointing vector*/
-	IssmDouble vector[2];
-	IssmDouble norm;
-
-	vector[0]=xyz_list[1*3+0] - xyz_list[0*3+0];
-	vector[1]=xyz_list[1*3+1] - xyz_list[0*3+1];
-
-	norm=sqrt(vector[0]*vector[0] + vector[1]*vector[1]);
-
-	normal[0]= + vector[1]/norm;
-	normal[1]= - vector[0]/norm;
+	LineSectionNormal(normal, xyz_list);
 }
 /*}}}*/
 void       Penta::NormalTop(IssmDouble* top_normal,IssmDouble* xyz_list){/*{{{*/
-
-	int i;
-	IssmDouble v13[3],v23[3];
-	IssmDouble normal[3];
-	IssmDouble normal_norm;
-
-	for (i=0;i<3;i++){
-		v13[i]=xyz_list[0*3+i]-xyz_list[2*3+i];
-		v23[i]=xyz_list[1*3+i]-xyz_list[2*3+i];
-	}
-
-	normal[0]=v13[1]*v23[2]-v13[2]*v23[1];
-	normal[1]=v13[2]*v23[0]-v13[0]*v23[2];
-	normal[2]=v13[0]*v23[1]-v13[1]*v23[0];
-	normal_norm=sqrt(normal[0]*normal[0] + normal[1]*normal[1] + normal[2]*normal[2]);
-
-	top_normal[0]=normal[0]/normal_norm;
-	top_normal[1]=normal[1]/normal_norm;
-	top_normal[2]=normal[2]/normal_norm;
+	TriangleFacetNormal(top_normal, xyz_list);
 }
 /*}}}*/
 int        Penta::NumberofNodesPressure(void){/*{{{*/
@@ -3440,6 +3383,7 @@ void       Penta::ResetFSBasalBoundaryCondition(void){/*{{{*/
 			}
 		}
 		XZvectorsToCoordinateSystem(&this->nodes[indices[i]]->coord_system[0][0],&xz_plane[0]);
+		this->nodes[indices[i]]->isrotated = true;
 	}
 
 	/*cleanup*/
@@ -3483,6 +3427,21 @@ void       Penta::SetElementInput(Inputs* inputs,int numindices,int* indices,Iss
 
 }
 /*}}}*/
+void       Penta::SetElementInput(int enum_in,IssmDouble value,int type){/*{{{*/
+
+	if(type==P0Enum){
+		this->inputs->SetPentaInput(enum_in,P0Enum,this->lid,value);
+	}
+	else if(type==P1Enum){
+		IssmDouble values[6]; 
+		for(int i=0;i<6;i++)values[i]=value;
+		int lidlist[6];
+		this->GetVerticesLidList(&lidlist[0]);
+		this->inputs->SetPentaInput(enum_in,P1Enum,6,&lidlist[0],&values[0]);
+	}
+	else _error_("interpolation type not supported yet");
+}
+/*}}}*/
 void       Penta::SetControlInputsFromVector(IssmDouble* vector,int control_enum,int control_index,int offset, int M, int N){/*{{{*/
 
 	IssmDouble  values[NUMVERTICES];
@@ -3499,9 +3458,6 @@ void       Penta::SetControlInputsFromVector(IssmDouble* vector,int control_enum
 		control_enum=DamageDEnum;
 		if(!IsOnBase()) return;
 	}
-
-	/*Get out if this is not an element input*/
-	if(!IsInputEnum(control_enum)) return;
 
 	/*Prepare index list*/
 	ElementInput* input=this->inputs->GetControlInputData(control_enum,"value");   _assert_(input);
@@ -3564,9 +3520,6 @@ Element*   Penta::SpawnBasalElement(bool depthaverage_materials){/*{{{*/
 
 	if(depthaverage_materials){
 		switch(this->material->ObjectEnum()){
-			#ifdef _IS_MULTI_ICE_
-			case MatMultiIceEnum:
-			#endif
 			case MaticeEnum:
 				this->InputDepthAverageAtBase(MaterialsRheologyBEnum,MaterialsRheologyBbarEnum);
 				if(this->material->IsDamage())this->InputDepthAverageAtBase(DamageDEnum,DamageDbarEnum);
@@ -4236,7 +4189,7 @@ IssmDouble Penta::TotalFloatingBmb(bool scaled){/*{{{*/
 	}
 	::GetVerticesCoordinates(&xyz_list[0][0],vertices,NUMVERTICES);
 
-	this->GetGroundedPart(&point1,&fraction1,&fraction2,&mainlyfloating);
+	this->GetGroundedPart(&point1,&fraction1,&fraction2,&mainlyfloating,MaskOceanLevelsetEnum,0);
 	/* Start  looping on the number of gaussian points: */
 	gauss = this->NewGauss(point1,fraction1,fraction2,1-mainlyfloating,3);
 	while(gauss->next()){
@@ -4279,7 +4232,7 @@ IssmDouble Penta::TotalGroundedBmb(bool scaled){/*{{{*/
 	}
 	::GetVerticesCoordinates(&xyz_list[0][0],vertices,NUMVERTICES);
 
-	this->GetGroundedPart(&point1,&fraction1,&fraction2,&mainlyfloating);
+	this->GetGroundedPart(&point1,&fraction1,&fraction2,&mainlyfloating,MaskOceanLevelsetEnum,0);
 	/* Start  looping on the number of gaussian points: */
 	gauss = this->NewGauss(point1,fraction1,fraction2,mainlyfloating,3);
 	while(gauss->next()){
@@ -4365,6 +4318,142 @@ IssmDouble Penta::TotalSmb(bool scaled){/*{{{*/
 
 	/*Return: */
 	return Total_Smb;
+}
+/*}}}*/
+IssmDouble Penta::TotalSmbMelt(bool scaled){/*{{{*/
+
+	/*The smbmelt[Gt yr-1] of one element is area[m2] * smb [ m ice yr^-1] * rho_ice [kg m-3] / 1e+10^12 */
+	IssmDouble base,smbmelt,rho_ice,scalefactor;
+	IssmDouble Total_SmbMelt=0;
+	IssmDouble lsf[NUMVERTICES];
+	IssmDouble xyz_list[NUMVERTICES][3];
+
+	/*Get material parameters :*/
+	rho_ice=FindParam(MaterialsRhoIceEnum);
+
+	if(!IsIceInElement() || !IsOnSurface()) return 0.;
+
+	::GetVerticesCoordinates(&xyz_list[0][0],vertices,NUMVERTICES);
+
+	/*First calculate the area of the base (cross section triangle)
+	 * http://en.wikipedia.org/wiki/Triangle
+	 * base = 1/2 abs((xA-xC)(yB-yA)-(xA-xB)(yC-yA))*/
+	base = 1./2. * fabs((xyz_list[0][0]-xyz_list[2][0])*(xyz_list[1][1]-xyz_list[0][1]) - (xyz_list[0][0]-xyz_list[1][0])*(xyz_list[2][1]-xyz_list[0][1]));
+
+	/*Now get the average SMB over the element*/
+	Element::GetInputListOnVertices(&lsf[0],MaskIceLevelsetEnum);
+   if(lsf[0]*lsf[1]<=0 || lsf[0]*lsf[2]<=0 || lsf[1]*lsf[2]<=0){
+		/*Partially ice-covered element*/
+		bool mainlyice;
+      int point;
+      IssmDouble* smbmelt_vertices = xNew<IssmDouble>(NUMVERTICES);
+		IssmDouble  weights[NUMVERTICES2D];
+		IssmDouble  lsf2d[NUMVERTICES2D];
+      IssmDouble f1,f2,phi;
+      Element::GetInputListOnVertices(&smbmelt_vertices[0],SmbMeltEnum);
+		for(int i=0;i<NUMVERTICES2D;i++) lsf2d[i] = lsf[i];
+		GetFractionGeometry2D(weights,&phi,&point,&f1,&f2,&mainlyice,lsf2d);
+		smbmelt = 0.0;
+		for(int i=0;i<NUMVERTICES2D;i++) smbmelt += weights[i]*smbmelt_vertices[i];
+
+		if(scaled==true){
+         IssmDouble* scalefactor_vertices   = xNew<IssmDouble>(NUMVERTICES);
+         Element::GetInputListOnVertices(&scalefactor_vertices[0],MeshScaleFactorEnum);
+         /*Compute loop only over lower vertices: i<NUMVERTICES2D*/
+         scalefactor = 0.0;
+         for(int i=0;i<NUMVERTICES2D;i++) scalefactor += weights[i]/phi*scalefactor_vertices[i];
+         xDelete<IssmDouble>(scalefactor_vertices);
+		}
+		else scalefactor = 1.0;
+
+		/*Cleanup*/
+      xDelete<IssmDouble>(smbmelt_vertices);
+	}
+
+	else{
+		/*Fully ice-covered element*/
+		Input* smbmelt_input = this->GetInput(SmbMeltEnum); _assert_(smbmelt_input);
+		smbmelt_input->GetInputAverage(&smbmelt);
+
+		if(scaled==true){
+			Input* scalefactor_input = this->GetInput(MeshScaleFactorEnum); _assert_(scalefactor_input);
+			scalefactor_input->GetInputAverage(&scalefactor);// average scalefactor on element
+		}
+		else scalefactor=1.0;
+	}
+
+	Total_SmbMelt=rho_ice*base*smbmelt*scalefactor;// smbmelt on element in kg s-1
+
+	/*Return: */
+	return Total_SmbMelt;
+}
+/*}}}*/
+IssmDouble Penta::TotalSmbRefreeze(bool scaled){/*{{{*/
+
+	/*The smbrefreeze[Gt yr-1] of one element is area[m2] * smb [ m ice yr^-1] * rho_ice [kg m-3] / 1e+10^12 */
+	IssmDouble base,smbrefreeze,rho_ice,scalefactor;
+	IssmDouble Total_SmbRefreeze=0;
+	IssmDouble lsf[NUMVERTICES];
+	IssmDouble xyz_list[NUMVERTICES][3];
+
+	/*Get material parameters :*/
+	rho_ice=FindParam(MaterialsRhoIceEnum);
+
+	if(!IsIceInElement() || !IsOnSurface()) return 0.;
+
+	::GetVerticesCoordinates(&xyz_list[0][0],vertices,NUMVERTICES);
+
+	/*First calculate the area of the base (cross section triangle)
+	 * http://en.wikipedia.org/wiki/Triangle
+	 * base = 1/2 abs((xA-xC)(yB-yA)-(xA-xB)(yC-yA))*/
+	base = 1./2. * fabs((xyz_list[0][0]-xyz_list[2][0])*(xyz_list[1][1]-xyz_list[0][1]) - (xyz_list[0][0]-xyz_list[1][0])*(xyz_list[2][1]-xyz_list[0][1]));
+
+	/*Now get the average SMB over the element*/
+	Element::GetInputListOnVertices(&lsf[0],MaskIceLevelsetEnum);
+   if(lsf[0]*lsf[1]<=0 || lsf[0]*lsf[2]<=0 || lsf[1]*lsf[2]<=0){
+		/*Partially ice-covered element*/
+		bool mainlyice;
+      int point;
+      IssmDouble* smbrefreeze_vertices = xNew<IssmDouble>(NUMVERTICES);
+		IssmDouble  weights[NUMVERTICES2D];
+		IssmDouble  lsf2d[NUMVERTICES2D];
+      IssmDouble f1,f2,phi;
+      Element::GetInputListOnVertices(&smbrefreeze_vertices[0],SmbRefreezeEnum);
+		for(int i=0;i<NUMVERTICES2D;i++) lsf2d[i] = lsf[i];
+		GetFractionGeometry2D(weights,&phi,&point,&f1,&f2,&mainlyice,lsf2d);
+		smbrefreeze = 0.0;
+		for(int i=0;i<NUMVERTICES2D;i++) smbrefreeze += weights[i]*smbrefreeze_vertices[i];
+
+		if(scaled==true){
+         IssmDouble* scalefactor_vertices   = xNew<IssmDouble>(NUMVERTICES);
+         Element::GetInputListOnVertices(&scalefactor_vertices[0],MeshScaleFactorEnum);
+         /*Compute loop only over lower vertices: i<NUMVERTICES2D*/
+         scalefactor = 0.0;
+         for(int i=0;i<NUMVERTICES2D;i++) scalefactor += weights[i]/phi*scalefactor_vertices[i];
+         xDelete<IssmDouble>(scalefactor_vertices);
+		}
+		else scalefactor = 1.0;
+
+		/*Cleanup*/
+      xDelete<IssmDouble>(smbrefreeze_vertices);
+	}
+
+	else{
+		/*Fully ice-covered element*/
+		Input* smbrefreeze_input = this->GetInput(SmbRefreezeEnum); _assert_(smbrefreeze_input);
+		smbrefreeze_input->GetInputAverage(&smbrefreeze);
+
+		if(scaled==true){
+			Input* scalefactor_input = this->GetInput(MeshScaleFactorEnum); _assert_(scalefactor_input);
+			scalefactor_input->GetInputAverage(&scalefactor);// average scalefactor on element
+		}
+		else scalefactor=1.0;
+	}
+
+	Total_SmbRefreeze=rho_ice*base*smbrefreeze*scalefactor;// smbrefreeze on element in kg s-1
+
+	/*Return: */
+	return Total_SmbRefreeze;
 }
 /*}}}*/
 void       Penta::Update(Inputs* inputs,int index,IoModel* iomodel,int analysis_counter,int analysis_type,int finiteelement_type){ /*{{{*/

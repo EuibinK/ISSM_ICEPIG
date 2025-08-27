@@ -11,6 +11,7 @@ class Inputs;
 /* local prototypes: */
 void InputUpdateFromConstantx(FemModel* femmodel,bool       constant,int name);
 void InputUpdateFromConstantx(FemModel* femmodel,int        constant,int name);
+void InputUpdateFromConstantx(FemModel* femmodel,int        constant,int name, int type);
 void InputUpdateFromConstantx(FemModel* femmodel,IssmDouble constant,int name);
 #ifdef _HAVE_AD_
 void InputUpdateFromConstantx(Inputs* inputs,Elements* elements,IssmPDouble constant,int name);

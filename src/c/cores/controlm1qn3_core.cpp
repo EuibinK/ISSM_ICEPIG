@@ -39,7 +39,7 @@ void controlm1qn3_core(FemModel* femmodel){/*{{{*/
 
 	/*Intermediaries*/
 	long    omode;
-	double  f,dxmin,gttol; 
+	double  f,dxmin,dfmin_frac,gttol; 
 	int     maxsteps,maxiter;
 	int     intn,num_controls,num_cost_functions,solution_type;
 	double *scaling_factors = NULL;
@@ -59,6 +59,7 @@ void controlm1qn3_core(FemModel* femmodel){/*{{{*/
 	femmodel->parameters->FindParam(&maxsteps,InversionMaxstepsEnum);
 	femmodel->parameters->FindParam(&maxiter,InversionMaxiterEnum);
 	femmodel->parameters->FindParamAndMakePassive(&dxmin,InversionDxminEnum);
+	femmodel->parameters->FindParamAndMakePassive(&dfmin_frac,InversionDfminFracEnum);
 	femmodel->parameters->FindParamAndMakePassive(&gttol,InversionGttolEnum);
 	femmodel->parameters->FindParamAndMakePassive(&scaling_factors,NULL,InversionControlScalingFactorsEnum);
 	femmodel->parameters->SetParam(false,SaveResultsEnum);
@@ -104,9 +105,7 @@ void controlm1qn3_core(FemModel* femmodel){/*{{{*/
 	double*   dz  = xNew<double>(ndz);
 
 	if(VerboseControl())_printf0_("   Computing initial solution\n");
-	_printf0_("\n");
-	_printf0_("Cost function f(x)   | Gradient norm |g(x)| |  List of contributions\n");
-	_printf0_("____________________________________________________________________\n");
+	InversionStatsHeader(num_cost_functions);
 
 	/*Prepare structure for m1qn3*/
 	m1qn3_struct mystruct;
@@ -121,7 +120,8 @@ void controlm1qn3_core(FemModel* femmodel){/*{{{*/
 	simul(&indic,&n,X,&f,G,izs,rzs,(void*)&mystruct);
 
 	/*Estimation of the expected decrease in f during the first iteration*/
-	double df1=f;
+	if(dfmin_frac==0.) dfmin_frac=1.;
+	double df1=dfmin_frac*f;
 
 	/*Call M1QN3 solver*/
 	m1qn3_(costfuncion,prosca,&ctonbe_,&ctcabe_,
@@ -130,6 +130,7 @@ void controlm1qn3_core(FemModel* femmodel){/*{{{*/
 				&reverse,&indic,izs,rzs,(void*)&mystruct);
 
 	/*Print exit flag*/
+	InversionStatsFooter(num_cost_functions);
 	switch(int(omode)){
 		case 0:  _printf0_("   Stop requested (indic = 0)\n"); break;
 		case 1:  _printf0_("   Convergence reached (gradient satisfies stopping criterion)\n"); break;
@@ -262,7 +263,6 @@ void simul(long* indic,long* n,double* X,double* pf,double* G,long izs[1],float 
 	IssmDouble  J;
 	femmodel->CostFunctionx(&J,&Jtemp,NULL);
 	*pf = reCast<double>(J);
-	_printf0_("f(x) = "<<setw(12)<<setprecision(7)<<*pf<<"  |  ");
 
 	/*Record cost function values and delete Jtemp*/
 	for(int i=0;i<num_responses;i++) Jlist[(*Jlisti)*JlistN+i] = reCast<double>(Jtemp[i]);
@@ -271,11 +271,7 @@ void simul(long* indic,long* n,double* X,double* pf,double* G,long izs[1],float 
 
 	if(*indic==0){
 		/*dry run, no gradient required*/
-
-		/*Retrieve objective functions independently*/
-		_printf0_("            N/A |\n");
-		for(int i=0;i<num_responses;i++) _printf0_(" "<<setw(12)<<setprecision(7)<<Jlist[(*Jlisti)*JlistN+i]);
-		_printf0_("\n");
+		InversionStatsIter( (*Jlisti)+1, *pf, NAN, &Jlist[(*Jlisti)*JlistN], num_responses);
 
 		*Jlisti = (*Jlisti) +1;
 		xDelete<double>(XU);
@@ -310,9 +306,7 @@ void simul(long* indic,long* n,double* X,double* pf,double* G,long izs[1],float 
 	Gnorm = sqrt(Gnorm);
 
 	/*Print info*/
-	_printf0_("       "<<setw(12)<<setprecision(7)<<Gnorm<<" |");
-	for(int i=0;i<num_responses;i++) _printf0_(" "<<setw(12)<<setprecision(7)<<Jlist[(*Jlisti)*JlistN+i]);
-	_printf0_("\n");
+	InversionStatsIter( (*Jlisti)+1, *pf, reCast<double>(Gnorm), &Jlist[(*Jlisti)*JlistN], num_responses);
 
 	/*Clean-up and return*/
 	*Jlisti = (*Jlisti) +1;

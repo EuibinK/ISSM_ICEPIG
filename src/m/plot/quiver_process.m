@@ -65,6 +65,6 @@ elseif numcolors==3,
 	%blue yellow and red
 	palette=colormap([0 0 1;1 1 0;1 0 0]);
 else
-	%let jet choose
-	palette=colormap(jet(numcolors));
+	%use turbo
+	palette=colormap(turbo(numcolors));
 end

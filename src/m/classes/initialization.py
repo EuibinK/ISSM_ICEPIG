@@ -7,7 +7,7 @@ from WriteData import WriteData
 
 
 class initialization(object):
-    """INITIALIZATION class definition
+    """initialization class definition
 
     Usage:
         initialization = initialization()
@@ -57,7 +57,7 @@ class initialization(object):
         s += '{}\n'.format(fielddisplay(self, 'channelarea', 'subglaciale water channel area (for GlaDS) [m2]'))
         s += '{}\n'.format(fielddisplay(self, 'sample', 'Realization of a Gaussian random field'))
         s += '{}\n'.format(fielddisplay(self, 'debris', 'Surface debris layer [m]'))
-        s += '{}\n'.format(fielddisplay(self, 'age', 'initial ice age [yr]'))
+        s += '{}\n'.format(fielddisplay(self, 'age', 'Initial age [yr]'))
         return s
     # }}}
 

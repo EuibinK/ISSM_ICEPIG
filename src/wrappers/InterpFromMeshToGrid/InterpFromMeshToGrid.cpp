@@ -61,7 +61,7 @@ WRAPPER(InterpFromMeshToGrid_python){
 	/*Write results: */
 	WriteData(GRIDDATA,griddata,nlines,ncols);
 
-	/*Free ressources: */
+	/*Free resources: */
 	xDelete<int>(index);
 	xDelete<double>(x);
 	xDelete<double>(y);

@@ -132,6 +132,7 @@ class IoModel {
 		void        FetchData(bool* pboolean,const char* data_name);
 		void        FetchData(int* pinteger,const char* data_name);
 		void        FetchData(IssmDouble* pscalar,const char* data_name);
+		void        FetchData(IssmDouble** pscalar, const char* data_name);	
 		void        FetchData(char** pstring,const char* data_name);
 		void        FetchData(char*** pstrings,int* pnumstrings,const char* data_name);
 		void        FetchData(int** pmatrix,int* pM,int* pN,const char* data_name);
@@ -139,8 +140,10 @@ class IoModel {
 		void        FetchData(IssmDouble**  pscalarmatrix,int* pM,int* pN,const char* data_name);
 #if _HAVE_AD_  && !defined(_WRAPPERS_)
 		void        FetchData(IssmPDouble**  pscalarmatrix,int* pM,int* pN,const char* data_name);
+		void        FetchData(IssmPDouble** pscalar,const char* data_name);
 #endif
 		void        FetchData(IssmDouble*** pmatrixarray,int** pmdims,int** pndims, int* pnumrecords,const char* data_name);
+		void        FetchData(IssmDouble** pmatrix,int* pM,int* pN, int layer_number,const char* data_name);
 		void        FetchData(Options *options,const char* data_name);
 		void        FetchData(int num,...);
 		void        FetchDataToInput(Inputs* inputs,Elements* elements,const char* vector_name,int input_enum);
@@ -151,7 +154,7 @@ class IoModel {
 		void        FetchMultipleData(IssmDouble*** pmatrixarray,int** pmdims,int** pndims, int* pnumrecords,const char* data_name);
 		void        FetchMultipleData(int*** pmatrices,int** pmdims,int** pndims, int* pnumrecords,const char* data_name);
 		void        FetchMultipleData(int** pvector, int* pnum_instances,const char* data_name);
-		void        FetchMultipleData(IssmDouble** pvector, int* pnum_instances,const char* data_name);
+		void        FetchMultipleData(IssmDouble** pvector, int* pM,const char* data_name);
 		fpos_t*     SetFilePointersToData(int** pcodes,int** pvector_types, int* pnum_instances, const char* data_name);
 		FILE*       SetFilePointerToData(int* pcode,int* pvector_type, const char* data_name);
 		void        StartTrace(bool trace);

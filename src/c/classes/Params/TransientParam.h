@@ -41,17 +41,19 @@ class TransientParam: public Param{
 		void Marshall(MarshallHandle* marshallhandle);
 		int   ObjectEnum();
 		/*}}}*/
-		/*Param vritual function definitions: {{{*/
+		/*Param virtual function definitions: {{{*/
 		void  GetParameterValue(bool* pbool){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return a bool");}
 		void  GetParameterValue(int* pinteger){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return an integer");}
 		void  GetParameterValue(int** pintarray,int* pM){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return an array of integers");}
 		void  GetParameterValue(int** pintarray,int* pM,int* pN){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return a array of integers");}
 		void  GetParameterValue(IssmDouble* pIssmDouble){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return a IssmDouble");}
 		void  GetParameterValue(IssmDouble* pdouble,IssmDouble time);
+		void  GetParameterValue(IssmDouble* pdouble,IssmDouble time,int timestepping,IssmDouble dt);
 		void  GetParameterValue(char** pstring){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return a string");}
 		void  GetParameterValue(char*** pstringarray,int* pM){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return a string array");}
 		void  GetParameterValue(IssmDouble** pIssmDoublearray,int* pM){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return a IssmDouble array");}
 		void  GetParameterValue(IssmDouble** pIssmDoublearray,int* pM,int* pN){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return a IssmDouble array");}
+		void  GetParameterValue(IssmDouble** pIssmDoublearray,int* pM, const char* data){_error_("Param "<< EnumToStringx(enum_type) << " cannot return a IssmDouble array");}
 		void  GetParameterValue(IssmDouble*** parray, int* pM,int** pmdims, int** pndims){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return a matrix array");}
 		void  GetParameterValue(Vector<IssmDouble>** pvec){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return a Vec");}
 		void  GetParameterValue(Matrix<IssmDouble>** pmat){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot return a Mat");}
@@ -65,6 +67,7 @@ class TransientParam: public Param{
 		void  SetValue(IssmDouble scalar){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot hold a scalar");}
 		void  SetValue(char* string){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot hold a string");}
 		void  SetValue(char** stringarray,int M){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot hold a string array");}
+		void  SetValue(IssmDouble* IssmDoublearray){_error_("Param "<< EnumToStringx(enum_type) << " cannot hold a IssmDouble array");}
 		void  SetValue(IssmDouble* IssmDoublearray,int M){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot hold a IssmDouble vec array");}
 		void  SetValue(IssmDouble* IssmDoublearray,int M,int N){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot hold a IssmDouble array");}
 		void  SetValue(int* intarray,int M){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot hold a int vec array");}
@@ -73,6 +76,7 @@ class TransientParam: public Param{
 		void  SetValue(Matrix<IssmDouble>* mat){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot hold a Mat");}
 		void  SetValue(FILE* fid){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot hold a FILE");}
 		void  SetValue(IssmDouble** array, int M, int* mdim_array, int* ndim_array){_error_("Parameter " <<EnumToStringx(enum_type) << " cannot hold an array of matrices");}
+		void  SetGradient(IssmDouble* poutput, int M, int N){_error_("Param "<< EnumToStringx(enum_type) << " cannot hold an IssmDouble");};
 		/*}}}*/
 };
 #endif  /* _TRANSIENTPARAM_H */

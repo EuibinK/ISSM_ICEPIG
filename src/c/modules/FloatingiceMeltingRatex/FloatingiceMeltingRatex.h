@@ -10,6 +10,7 @@
 
 /* local prototypes: */
 void FloatingiceMeltingRatex(FemModel* femmodel);
+
 void LinearFloatingiceMeltingRatex(FemModel* femmodel);
 void SpatialLinearFloatingiceMeltingRatex(FemModel* femmodel);
 void MismipFloatingiceMeltingRatex(FemModel* femmodel);

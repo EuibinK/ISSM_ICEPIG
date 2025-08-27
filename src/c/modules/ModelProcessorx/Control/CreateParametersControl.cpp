@@ -129,6 +129,7 @@ void CreateParametersControl(Parameters* parameters,IoModel* iomodel,int solutio
 			case 2:/*M1QN3*/
 				parameters->AddObject(iomodel->CopyConstantObject("md.inversion.incomplete_adjoint",InversionIncompleteAdjointEnum));
 				parameters->AddObject(iomodel->CopyConstantObject("md.inversion.dxmin",InversionDxminEnum));
+				parameters->AddObject(iomodel->CopyConstantObject("md.inversion.dfmin_frac",InversionDfminFracEnum));
 				parameters->AddObject(iomodel->CopyConstantObject("md.inversion.gttol",InversionGttolEnum));
 				parameters->AddObject(iomodel->CopyConstantObject("md.inversion.maxsteps",InversionMaxstepsEnum));
 				parameters->AddObject(iomodel->CopyConstantObject("md.inversion.maxiter",InversionMaxiterEnum));
@@ -142,6 +143,7 @@ void CreateParametersControl(Parameters* parameters,IoModel* iomodel,int solutio
 				break;
 			case 4:/*AD M1QN3*/
 				parameters->AddObject(iomodel->CopyConstantObject("md.inversion.dxmin",InversionDxminEnum));
+				parameters->AddObject(iomodel->CopyConstantObject("md.inversion.dfmin_frac",InversionDfminFracEnum));
 				parameters->AddObject(iomodel->CopyConstantObject("md.inversion.gttol",InversionGttolEnum));
 				parameters->AddObject(iomodel->CopyConstantObject("md.inversion.maxsteps",InversionMaxstepsEnum));
 				parameters->AddObject(iomodel->CopyConstantObject("md.inversion.maxiter",InversionMaxiterEnum));

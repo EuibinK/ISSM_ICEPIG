@@ -18,6 +18,7 @@ class stochasticforcing(object):
         self.defaultdimension = 0
         self.default_id = np.nan
         self.covariance = np.nan
+        self.timecovariance = np.nan
         self.stochastictimestep = 0
         self.randomflag = 1
 
@@ -32,7 +33,8 @@ class stochasticforcing(object):
         s += '{}\n'.format(fielddisplay(self, 'fields', 'fields with stochasticity applied, ex: [\'SMBautoregression\'], or [\'SMBforcing\',\'DefaultCalving\']'))
         s += '{}\n'.format(fielddisplay(self, 'defaultdimension', 'dimensionality of the noise terms (does not apply to fields with their specific dimension)'))
         s += '{}\n'.format(fielddisplay(self, 'default_id', 'id of each element for partitioning of the noise terms (does not apply to fields with their specific partition)'))
-        s += '{}\n'.format(fielddisplay(self, 'covariance', 'covariance matrix for within- and between-fields covariance (units must be squared field units)'))
+        s += '{}\n'.format(fielddisplay(self, 'covariance', 'covariance matrix for within- and between-fields covariance (units must be squared field units),multiple matrices can be concatenated along 3rd dimension to apply different covariances in time'))
+        s += '{}\n'.format(fielddisplay(self, 'timecovariance', 'starting dates at which covariances apply (only applicabe if multiple covariance matrices are prescribed)'))
         s += '{}\n'.format(fielddisplay(self, 'stochastictimestep', 'timestep at which new stochastic noise terms are generated (default: md.timestepping.time_step)'))
         s += '{}\n'.format(fielddisplay(self, 'randomflag', 'whether to apply real randomness (true) or pseudo-randomness with fixed seed (false)'))
         s += 'Available fields:\n'
@@ -68,11 +70,23 @@ class stochasticforcing(object):
             md.stochasticforcing.stochastictimestep = md.timestepping.time_step #by default: stochastictimestep set to ISSM time step
             print('      stochasticforcing.stocahstictimestep not specified: set to md.timestepping.time_step')
 
-        # Check that covariance matrix is positive definite (this is done internally by linalg)
-        try:
-            np.linalg.cholesky(self.covariance)
-        except:
-            raise TypeError('md.stochasticforcing.covariance is not positive definite')
+        if(len(np.shape(self.covariance))==3):
+           numtcovmat = np.shape(self.covariance)[2] #number of covariance matrices in time
+           lsCovmats = []
+           for ii in range(numtcovmat):
+               lsCovmats.append(self.covariance[:,:,ii])
+               try:
+                   np.linalg.cholesky(self.covariance[:,:,ii])
+               except:
+                   raise TypeError('an entry in md.stochasticforcing.covariance is not positive definite')
+        elif(len(np.shape(self.covariance))==2):
+            numtcovmat = 1
+            lsCovmats = [self.covariance]
+            # Check that covariance matrix is positive definite (this is done internally by linalg)
+            try:
+                np.linalg.cholesky(self.covariance)
+            except:
+                raise TypeError('md.stochasticforcing.covariance is not positive definite')
 
         # Check that all fields agree with the corresponding md class and if any field needs the default params
         checkdefaults = False  # Need to check defaults only if one of the fields does not have its own dimensionality
@@ -170,54 +184,76 @@ class stochasticforcing(object):
 
         if indBDWarma != -1:
             if indPwarma != -1:
-                covsum = self.covariance[np.sum(dimensions[0:indBDWarma]).astype(int):np.sum(dimensions[0:indBDWarma + 1]).astype(int), np.sum(dimensions[0:indPwarma]).astype(int):np.sum(dimensions[0:indPwarma + 1]).astype(int)]
-                if md.smb.arma_timestep != md.hydrology.arma_timestep and np.any(covsum != 0):
-                    raise IOError('BasalforcingsDeepwaterMeltingRatarma and hydrologyarmapw have different arma_timestep and non-zero covariance')
+                for ii in range(len(lsCovmats)):
+                    covm = lsCovmats[ii]
+                    covsum = covm[np.sum(dimensions[0:indBDWarma]).astype(int):np.sum(dimensions[0:indBDWarma + 1]).astype(int), np.sum(dimensions[0:indPwarma]).astype(int):np.sum(dimensions[0:indPwarma + 1]).astype(int)]
+                    if md.smb.arma_timestep != md.hydrology.arma_timestep and np.any(covsum != 0):
+                        raise IOError('BasalforcingsDeepwaterMeltingRatarma and hydrologyarmapw have different arma_timestep and non-zero covariance')
             elif indSdarma != -1:
-                covsum = self.covariance[np.sum(dimensions[0:indSdarma]).astype(int):np.sum(dimensions[0:indSdarma + 1]).astype(int), np.sum(dimensions[0:indBDWarma]).astype(int):np.sum(dimensions[0:indBDWarma + 1]).astype(int)]
-                if md.frontalforcings.sd_arma_timestep != md.basalforcings.arma_timestep and np.any(covsum != 0):
-                    raise IOError('FrontalForcingsSubglacialDischargearma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance')
+                for ii in range(len(lsCovmats)):
+                    covm = lsCovmats[ii]
+                    covsum = covm[np.sum(dimensions[0:indSdarma]).astype(int):np.sum(dimensions[0:indSdarma + 1]).astype(int), np.sum(dimensions[0:indBDWarma]).astype(int):np.sum(dimensions[0:indBDWarma + 1]).astype(int)]
+                    if md.frontalforcings.sd_arma_timestep != md.basalforcings.arma_timestep and np.any(covsum != 0):
+                        raise IOError('FrontalForcingsSubglacialDischargearma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance')
             elif indSMBarma != -1:
-                covsum = self.covariance[np.sum(dimensions[0:indSMBarma]).astype(int):np.sum(dimensions[0:indSMBarma + 1]).astype(int), np.sum(dimensions[0:indBDWarma]).astype(int):np.sum(dimensions[0:indBDWarma + 1]).astype(int)]
-                if md.smb.arma_timestep != md.basalforcings.arma_timestep and np.any(covsum != 0):
-                    raise IOError('SMBarma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance')
+                for ii in range(len(lsCovmats)):
+                    covm = lsCovmats[ii]
+                    covsum = covm[np.sum(dimensions[0:indSMBarma]).astype(int):np.sum(dimensions[0:indSMBarma + 1]).astype(int), np.sum(dimensions[0:indBDWarma]).astype(int):np.sum(dimensions[0:indBDWarma + 1]).astype(int)]
+                    if md.smb.arma_timestep != md.basalforcings.arma_timestep and np.any(covsum != 0):
+                        raise IOError('SMBarma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance')
             elif indTFarma != -1:
-                covsum = self.covariance[np.sum(dimensions[0:indTFarma]).astype(int):np.sum(dimensions[0:indTFarma + 1]).astype(int), np.sum(dimensions[0:indBDWarma]).astype(int):np.sum(dimensions[0:indBDWarma + 1]).astype(int)]
-                if md.frontalforcings.arma_timestep != md.basalforcings.arma_timestep and np.any(covsum != 0):
-                    raise IOError('FrontalForcingsRignotarma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance')
+                for ii in range(len(lsCovmats)):
+                    covm = lsCovmats[ii]
+                    covsum = covm[np.sum(dimensions[0:indTFarma]).astype(int):np.sum(dimensions[0:indTFarma + 1]).astype(int), np.sum(dimensions[0:indBDWarma]).astype(int):np.sum(dimensions[0:indBDWarma + 1]).astype(int)]
+                    if md.frontalforcings.arma_timestep != md.basalforcings.arma_timestep and np.any(covsum != 0):
+                        raise IOError('FrontalForcingsRignotarma and BasalforcingsDeepwaterMeltingRatearma have different arma_timestep and non-zero covariance')
         elif indPwarma != -1:
             if indSdarma != -1:
-                covsum = self.covariance[np.sum(dimensions[0:indSdarma]).astype(int):np.sum(dimensions[0:indSdarma + 1]).astype(int), np.sum(dimensions[0:indPwarma]).astype(int):np.sum(dimensions[0:indPwarma + 1]).astype(int)]
-                if md.frontalforcings.sd_arma_timestep != md.hydrology.arma_timestep and np.any(covsum != 0):
-                    raise IOError('FrontalForingsSubglacialDischargearma and hydrologyarmapw have different arma_timestep and non-zero covariance')
+                for ii in range(len(lsCovmats)):
+                    covm = lsCovmats[ii]
+                    covsum = covm[np.sum(dimensions[0:indSdarma]).astype(int):np.sum(dimensions[0:indSdarma + 1]).astype(int), np.sum(dimensions[0:indPwarma]).astype(int):np.sum(dimensions[0:indPwarma + 1]).astype(int)]
+                    if md.frontalforcings.sd_arma_timestep != md.hydrology.arma_timestep and np.any(covsum != 0):
+                        raise IOError('FrontalForingsSubglacialDischargearma and hydrologyarmapw have different arma_timestep and non-zero covariance')
             elif indSMBarma != -1:
-                covsum = self.covariance[np.sum(dimensions[0:indSMBarma]).astype(int):np.sum(dimensions[0:indSMBarma + 1]).astype(int), np.sum(dimensions[0:indPwarma]).astype(int):np.sum(dimensions[0:indPwarma + 1]).astype(int)]
-                if md.smb.arma_timestep != md.hydrology.arma_timestep and np.any(covsum != 0):
-                    raise IOError('SMBarma and hydrologyarmapw have different arma_timestep and non-zero covariance')
+                for ii in range(len(lsCovmats)):
+                    covm = lsCovmats[ii]
+                    covsum = covm[np.sum(dimensions[0:indSMBarma]).astype(int):np.sum(dimensions[0:indSMBarma + 1]).astype(int), np.sum(dimensions[0:indPwarma]).astype(int):np.sum(dimensions[0:indPwarma + 1]).astype(int)]
+                    if md.smb.arma_timestep != md.hydrology.arma_timestep and np.any(covsum != 0):
+                        raise IOError('SMBarma and hydrologyarmapw have different arma_timestep and non-zero covariance')
             elif indTFarma != -1:
-                covsum = self.covariance[np.sum(dimensions[0:indTFarma]).astype(int):np.sum(dimensions[0:indTFarma + 1]).astype(int), np.sum(dimensions[0:indPwarma]).astype(int):np.sum(dimensions[0:indPwarma + 1]).astype(int)]
-                if md.frontalforcings.arma_timestep != md.hydrology.arma_timestep and np.any(covsum != 0):
-                    raise IOError('FrontalForcingsRignotarma and hydrologyarmapw have different arma_timestep and non-zero covariance')
+                for ii in range(len(lsCovmats)):
+                    covm = lsCovmats[ii]
+                    covsum = covm[np.sum(dimensions[0:indTFarma]).astype(int):np.sum(dimensions[0:indTFarma + 1]).astype(int), np.sum(dimensions[0:indPwarma]).astype(int):np.sum(dimensions[0:indPwarma + 1]).astype(int)]
+                    if md.frontalforcings.arma_timestep != md.hydrology.arma_timestep and np.any(covsum != 0):
+                        raise IOError('FrontalForcingsRignotarma and hydrologyarmapw have different arma_timestep and non-zero covariance')
         elif indSdarma != -1:
             if indSMBarma != -1:
-                covsum = self.covariance[np.sum(dimensions[0:indSMBarma]).astype(int):np.sum(dimensions[0:indSMBarma + 1]).astype(int), np.sum(dimensions[0:indSdarma]).astype(int):np.sum(dimensions[0:indSdarma + 1]).astype(int)]
-                if md.smb.arma_timestep != md.frontalforcings.sd_arma_timestep and np.any(covsum != 0):
-                    raise IOError('SMBarma and FrontalForcingsSubglacialDischargearma have different arma_timestep and non-zero covariance')
+                for ii in range(len(lsCovmats)):
+                    covm = lsCovmats[ii]
+                    covsum = covm[np.sum(dimensions[0:indSMBarma]).astype(int):np.sum(dimensions[0:indSMBarma + 1]).astype(int), np.sum(dimensions[0:indSdarma]).astype(int):np.sum(dimensions[0:indSdarma + 1]).astype(int)]
+                    if md.smb.arma_timestep != md.frontalforcings.sd_arma_timestep and np.any(covsum != 0):
+                        raise IOError('SMBarma and FrontalForcingsSubglacialDischargearma have different arma_timestep and non-zero covariance')
             elif indTFarma != -1:
-                covsum = self.covariance[np.sum(dimensions[0:indSdarma]).astype(int):np.sum(dimensions[0:indSdarma + 1]).astype(int), np.sum(dimensions[0:indTFarma]).astype(int):np.sum(dimensions[0:indTFarma + 1]).astype(int)]
-                if md.frontalforcings.sd_arma_timestep != md.frontalforcings.arma_timestep and np.any(covsum != 0):
-                    raise IOError('FrontalForcingsSubglacialDischargearma and FrontalForcingsRignotarma have different arma_timestep and non-zero covariance')
+                for ii in range(len(lsCovmats)):
+                    covm = lsCovmats[ii]
+                    covsum = covm[np.sum(dimensions[0:indSdarma]).astype(int):np.sum(dimensions[0:indSdarma + 1]).astype(int), np.sum(dimensions[0:indTFarma]).astype(int):np.sum(dimensions[0:indTFarma + 1]).astype(int)]
+                    if md.frontalforcings.sd_arma_timestep != md.frontalforcings.arma_timestep and np.any(covsum != 0):
+                        raise IOError('FrontalForcingsSubglacialDischargearma and FrontalForcingsRignotarma have different arma_timestep and non-zero covariance')
         elif indSMBarma != -1:
             if indTFarma != -1:
-                covsum = self.covariance[np.sum(dimensions[0:indSMBarma]).astype(int):np.sum(dimensions[0:indSMBarma + 1]).astype(int), np.sum(dimensions[0:indTFarma]).astype(int):np.sum(dimensions[0:indTFarma + 1]).astype(int)]
-                if md.smb.arma_timestep != md.frontalforcings.arma_timestep and np.any(covsum != 0):
-                    raise IOError('SMBarma and FrontalForcingsRignotarma have different arma_timestep and non-zero covariance')
+                for ii in range(len(lsCovmats)):
+                    covm = lsCovmats[ii]
+                    covsum = covm[np.sum(dimensions[0:indSMBarma]).astype(int):np.sum(dimensions[0:indSMBarma + 1]).astype(int), np.sum(dimensions[0:indTFarma]).astype(int):np.sum(dimensions[0:indTFarma + 1]).astype(int)]
+                    if md.smb.arma_timestep != md.frontalforcings.arma_timestep and np.any(covsum != 0):
+                        raise IOError('SMBarma and FrontalForcingsRignotarma have different arma_timestep and non-zero covariance')
 
         md = checkfield(md, 'fieldname', 'stochasticforcing.isstochasticforcing', 'values', [0, 1])
         md = checkfield(md, 'fieldname', 'stochasticforcing.fields', 'numel', num_fields, 'cell', 1, 'values', self.supportedstochforcings())
-        md = checkfield(md, 'fieldname', 'stochasticforcing.covariance', 'NaN', 1, 'Inf', 1, 'size', [size_tot, size_tot])  # global covariance matrix
+        md = checkfield(md, 'fieldname', 'stochasticforcing.covariance', 'NaN', 1, 'Inf', 1, 'size', [size_tot, size_tot, numtcovmat])  # global covariance matrix
         md = checkfield(md, 'fieldname', 'stochasticforcing.stochastictimestep', 'NaN', 1,'Inf', 1, '>=', md.timestepping.time_step)
         md = checkfield(md, 'fieldname', 'stochasticforcing.randomflag', 'numel', [1], 'values', [0, 1])
+        if(numtcovmat>1): #check the time steps at which each covariance matrix starts to be applie
+            md = checkfield(md, 'fieldname', 'stochasticforcing.timecovariance', 'NaN', 1, 'Inf', 1, '>=',md.timestepping.start_time,'<=',md.timestepping.final_time,'size',[1,numtcovmat])  # global covariance matrix
         if checkdefaults:
             md = checkfield(md, 'fieldname', 'stochasticforcing.defaultdimension', 'numel', 1, 'NaN', 1, 'Inf', 1, '>', 0)
             md = checkfield(md, 'fieldname', 'stochasticforcing.default_id', 'Inf', 1, 'NaN', 1, '>=', 0, '<=', self.defaultdimension, 'size', [md.mesh.numberofelements])
@@ -259,20 +295,45 @@ class stochasticforcing(object):
                     dimensions[ind] = md.basalforcings.num_basins
                 elif field == 'FrictionWaterPressure' and ispwHydroarma:
                     dimensions[ind] = md.hydrology.num_basins
+            
+            if(len(np.shape(self.covariance))==3):
+                nrow,ncol,numtcovmat = np.shape(self.covariance)
+                lsCovmats = []
+                for ii in range(numtcovmat):
+                    lsCovmats.append(self.covariance[:,:,ii])
+                if(md.timestepping.interp_forcing==1):
+                    print('WARNING: md.timestepping.interp_forcing is 1, but be aware that there is no interpolation between covariance matrices')
+                    print('         the changes between covariance matrices occur at the time steps specified in md.stochasticforcing.timecovariance')
+            elif(len(np.shape(self.covariance))==2):
+                nrow,ncol = np.shape(self.covariance)
+                numtcovmat = 1
+                lsCovmats = [self.covariance]
 
             # Scaling covariance matrix (scale column-by-column and row-by-row)
             scaledfields = ['BasalforcingsDeepwaterMeltingRatearma','BasalforcingsSpatialDeepwaterMeltingRate','DefaultCalving', 'FloatingMeltRate', 'SMBarma', 'SMBforcing']  # list of fields that need scaling * 1 / yts
-            tempcovariance = np.copy(self.covariance)
-            for i in range(num_fields):
-                if self.fields[i] in scaledfields:
-                    inds = range(int(np.sum(dimensions[0:i])), int(np.sum(dimensions[0:i + 1])))
-                    for row in inds:  # scale rows corresponding to scaled field
-                        tempcovariance[row, :] = 1 / yts * tempcovariance[row, :]
-                    for col in inds:  # scale columns corresponding to scaled field
-                        tempcovariance[:, col] = 1 / yts * tempcovariance[:, col]
+            tempcovariance2d = np.zeros((numtcovmat,nrow*ncol))
+            # Loop over covariance matrices #
+            for kk in range(numtcovmat):
+                kkcov = lsCovmats[kk]
+                # Loop over the fields #
+                for i in range(num_fields):
+                    if self.fields[i] in scaledfields:
+                        inds = range(int(np.sum(dimensions[0:i])), int(np.sum(dimensions[0:i + 1])))
+                        for row in inds:  # scale rows corresponding to scaled field
+                            kkcov[row, :] = 1 / yts * kkcov[row, :]
+                        for col in inds:  # scale columns corresponding to scaled field
+                            kkcov[:, col] = 1 / yts * kkcov[:, col]
+                # Save scaled covariance #
+                for rr in range(nrow):
+                    ind0 = rr*ncol
+                    tempcovariance2d[kk,ind0:ind0+ncol] = np.copy(kkcov[rr,:])
+                    
             # Set dummy default_id vector if defaults not used
             if np.any(np.isnan(self.default_id)):
                 self.default_id = np.zeros(md.mesh.numberofelements)
+            # Set dummy timecovariance vector if a single covariance matrix is used
+            if(numtcovmat==1):
+                self.timecovariance = np.array([md.timestepping.start_time])
             # Reshape dimensions as column array for marshalling
             dimensions = dimensions.reshape(1, len(dimensions))
 
@@ -281,7 +342,9 @@ class stochasticforcing(object):
             WriteData(fid, prefix, 'data', dimensions, 'name', 'md.stochasticforcing.dimensions', 'format', 'IntMat', 'mattype', 2)
             WriteData(fid, prefix, 'object', self, 'fieldname', 'default_id', 'data', self.default_id - 1, 'format', 'IntMat', 'mattype', 2)  #12Nov2021 make sure this is zero-indexed!
             WriteData(fid, prefix, 'object', self, 'fieldname', 'defaultdimension', 'format', 'Integer')
-            WriteData(fid, prefix, 'data', tempcovariance, 'name', 'md.stochasticforcing.covariance', 'format', 'DoubleMat')
+            WriteData(fid, prefix, 'data', numtcovmat, 'name', 'md.stochasticforcing.num_timescovariance', 'format', 'Integer')
+            WriteData(fid, prefix, 'data', tempcovariance2d, 'name', 'md.stochasticforcing.covariance', 'format', 'DoubleMat')
+            WriteData(fid, prefix, 'object', self, 'fieldname', 'timecovariance', 'format', 'DoubleMat', 'scale', yts)
             WriteData(fid, prefix, 'object', self, 'fieldname', 'stochastictimestep', 'format', 'Double', 'scale', yts)
             WriteData(fid, prefix, 'object', self, 'fieldname', 'randomflag', 'format', 'Boolean')
     # }}}

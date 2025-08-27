@@ -60,12 +60,6 @@ const char* ErrorException::what() const throw(){/*{{{*/
 }/*}}}*/
 void ErrorException::Report() const{/*{{{*/
 
-	/*WINDOWS*/
-	if(!this->function_name || this->file_line==0){
-		cerr << "Error message: " << what() << endl;
-		return;
-	}
-
 	cerr <<"\n[" << this->rank<< "] ??? Error using ==> " << this->file_name << ":" << this->file_line << 
 	       "\n[" << this->rank<< "] " << this->function_name << " error message: " << what() << "\n" << endl;
 
@@ -75,21 +69,15 @@ const char* ErrorException::WrapperReport() const{/*{{{*/
 
 	/*Output*/
 	std::ostringstream buffer;
-	char *message = NULL;
 
-	/*WINDOWS*/
-	if(!this->function_name || this->file_line==0){ 
-		buffer << " error message: " << this->what_str;
-	}
-	else{
-		buffer << "\nError in ==> " << this->file_name << ":" << file_line << "\n";
-		buffer << this->function_name << " error message: " << this->what_str;
-	}
+	buffer << "\nError in ==> " << this->file_name << ":" << file_line << "\n";
+	buffer << this->function_name << " error message: " << this->what_str;
 
 	/*Convert std::ostringstream to std::string and then create char* */
 	std::string buffer2 = buffer.str();
-	message = new char[strlen(buffer2.c_str())+1];
-	sprintf(message,"%s",buffer2.c_str());
+	int   message_len = strlen(buffer2.c_str())+1;
+	char* message = new char[message_len];
+	snprintf(message, message_len,"%s",buffer2.c_str());
 
 	return message;
 }/*}}}*/

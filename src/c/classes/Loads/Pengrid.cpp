@@ -2,7 +2,6 @@
  * \brief: implementation of the Pengrid object
  */
 
-
 /*Headers*/
 /*{{{*/
 #ifdef HAVE_CONFIG_H
@@ -10,8 +9,6 @@
 #else
 #error "Cannot compile with HAVE_CONFIG_H symbol! run configure first!"
 #endif
-
-#define _IS_MULTI_ICE_
 
 #include "../classes.h"
 #include "shared/shared.h"
@@ -511,13 +508,7 @@ ElementMatrix* Pengrid::PenaltyCreateKMatrixMelting(IssmDouble kmax){/*{{{*/
 	parameters->FindParam(&penalty_factor,ThermalPenaltyFactorEnum);
 
 	/*Compute pressure melting point*/
-	#ifdef _IS_MULTI_ICE_
-	int materialstype=element->material->ObjectEnum();
-	if (materialstype==MatMultiIceEnum) 
-		t_pmp=parameters->FindParam(element,MaterialsMeltingpointEnum)-parameters->FindParam(element,MaterialsBetaEnum)*pressure;
-	else
-	#endif
-		t_pmp=parameters->FindParam(MaterialsMeltingpointEnum)-parameters->FindParam(MaterialsBetaEnum)*pressure;
+	t_pmp=parameters->FindParam(MaterialsMeltingpointEnum)-parameters->FindParam(MaterialsBetaEnum)*pressure;
 
 	/*Add penalty load*/
 	if (temperature<t_pmp){ //If T<Tpmp, there must be no melting. Therefore, melting should be  constrained to 0 when T<Tpmp, instead of using spcs, use penalties
@@ -592,13 +583,7 @@ ElementVector* Pengrid::PenaltyCreatePVectorMelting(IssmDouble kmax){/*{{{*/
 	parameters->FindParam(&penalty_factor,ThermalPenaltyFactorEnum);
 
 	/*Compute pressure melting point*/
-	#ifdef _IS_MULTI_ICE_
-	int materialstype=element->material->ObjectEnum();
-	if (materialstype==MatMultiIceEnum) 
-		t_pmp=parameters->FindParam(element,MaterialsMeltingpointEnum)-parameters->FindParam(element,MaterialsBetaEnum)*pressure;
-	else
-	#endif
-		t_pmp=parameters->FindParam(MaterialsMeltingpointEnum)-parameters->FindParam(MaterialsBetaEnum)*pressure;
+	t_pmp=parameters->FindParam(MaterialsMeltingpointEnum)-parameters->FindParam(MaterialsBetaEnum)*pressure;
 
 	/*Add penalty load
 	  This time, the penalty must have the same value as the one used for the thermal computation
@@ -633,13 +618,7 @@ ElementVector* Pengrid::PenaltyCreatePVectorThermal(IssmDouble kmax){/*{{{*/
 	parameters->FindParam(&penalty_factor,ThermalPenaltyFactorEnum);
 
 	/*Compute pressure melting point*/
-	#ifdef _IS_MULTI_ICE_
-	int materialstype=element->material->ObjectEnum();
-	if (materialstype==MatMultiIceEnum) 
-		t_pmp=parameters->FindParam(element,MaterialsMeltingpointEnum)-parameters->FindParam(element,MaterialsBetaEnum)*pressure;
-	else
-	#endif
-		t_pmp=parameters->FindParam(MaterialsMeltingpointEnum)-parameters->FindParam(MaterialsBetaEnum)*pressure;
+	t_pmp=parameters->FindParam(MaterialsMeltingpointEnum)-parameters->FindParam(MaterialsBetaEnum)*pressure;
 
 	pe->values[0]=kmax*pow(10.,penalty_factor)*t_pmp;
 

@@ -5,11 +5,10 @@
 #include "../../../toolkits/toolkits.h"
 #include "../../../classes/classes.h"
 #include "../../../shared/shared.h"
-#include "../../MeshPartitionx/MeshPartitionx.h"
 #include "../ModelProcessorx.h"
 
 void UpdateParametersTransient(Parameters* parameters,IoModel* iomodel){/*{{{*/
-	
+
 	bool isgroundingline;
 	int numoutputs;
 	char** requestedoutputs;
@@ -21,5 +20,3 @@ void UpdateParametersTransient(Parameters* parameters,IoModel* iomodel){/*{{{*/
       iomodel->DeleteData(&requestedoutputs,numoutputs,"md.groundingline.requested_outputs");
 	}
 }/*}}}*/
-
-

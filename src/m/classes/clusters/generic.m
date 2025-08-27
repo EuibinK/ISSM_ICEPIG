@@ -32,7 +32,7 @@ classdef generic
 		function cluster=generic(varargin) % {{{
 
 			%Change the defaults if ispc
-			if ispc & ~ismingw,
+			if ispc,
 				cluster.codepath      = [issmdir() '\bin'];
 				cluster.etcpath       = [issmdir() '\etc'];
 				cluster.executionpath = [issmdir() '\execution'];
@@ -59,6 +59,7 @@ classdef generic
 			disp(sprintf('    np: %i',cluster.np));
 			disp(sprintf('    npocean: %i',cluster.npocean));
 			disp(sprintf('    port: %i',cluster.port));
+			disp(sprintf('    interactive: %i',cluster.interactive));
 			disp(sprintf('    codepath: %s',cluster.codepath));
 			disp(sprintf('    executionpath: %s',cluster.executionpath));
 			disp(sprintf('    etcpath: %s',cluster.etcpath));
@@ -98,25 +99,18 @@ classdef generic
 			end
 
 			if ~ispc(),
+				% Check that executable exists at the right path
+				if ~exist([cluster.codepath '/' executable],'file'),
+					error(['File ' cluster.codepath '/' executable ' does not exist']);
+				end
+
+				% Process codepath and prepend empty spaces with \ to avoid errors in queuing script
+				codepath=strrep(cluster.codepath,' ','\ ');
+
+				% Write queuing script
 				fid=fopen([modelname '.queue'],'w');
 				fprintf(fid,'#!%s\n',cluster.shell);
-				if ~isvalgrind,
-					if cluster.interactive
-						if IssmConfig('_HAVE_MPI_'),
-							fprintf(fid,'mpiexec -np %i %s/%s %s %s %s\n',cluster.np,cluster.codepath,executable,solution,[cluster.executionpath '/' dirname],modelname);
-						else
-							fprintf(fid,'%s/%s %s %s %s',cluster.codepath,executable,solution,[cluster.executionpath '/' dirname],modelname);
-						end
-					else
-						if IssmConfig('_HAVE_MPI_'),
-							fprintf(fid,'mpiexec -np %i %s/%s %s %s %s 2> %s.errlog > %s.outlog &',cluster.np,cluster.codepath,executable,solution,[cluster.executionpath '/' dirname],modelname,modelname,modelname);
-						else
-							fprintf(fid,'%s/%s %s %s %s 2> %s.errlog > %s.outlog &',cluster.codepath,executable,solution,[cluster.executionpath '/' dirname],modelname,modelname,modelname);
-						end
-					end
-				elseif isgprof,
-					fprintf(fid,'\n gprof %s/issm.exe gmon.out > %s.performance',cluster.codepath,modelname);
-				else
+				if isvalgrind,
 					%Add --gen-suppressions=all to get suppression lines
 					%fprintf(fid,'LD_PRELOAD=%s \\\n',cluster.valgrindlib); it could be deleted
 					if ismac,
@@ -136,6 +130,22 @@ classdef generic
 							cluster.valgrind,cluster.valgrindsup,cluster.codepath,executable,solution,[cluster.executionpath '/' dirname],modelname,modelname,modelname);
 						end
 					end
+				elseif isgprof,
+					fprintf(fid,'\n gprof %s/issm.exe gmon.out > %s.performance',cluster.codepath,modelname);
+				else
+					if cluster.interactive
+						if IssmConfig('_HAVE_MPI_'),
+							fprintf(fid,'mpiexec -np %i %s/%s %s %s %s\n',cluster.np,cluster.codepath,executable,solution,[cluster.executionpath '/' dirname],modelname);
+						else
+							fprintf(fid,'%s/%s %s %s %s',cluster.codepath,executable,solution,[cluster.executionpath '/' dirname],modelname);
+						end
+					else
+						if IssmConfig('_HAVE_MPI_'),
+							fprintf(fid,'mpiexec -np %i %s/%s %s %s %s 2> %s.errlog > %s.outlog &',cluster.np,cluster.codepath,executable,solution,[cluster.executionpath '/' dirname],modelname,modelname,modelname);
+						else
+							fprintf(fid,'%s/%s %s %s %s 2> %s.errlog > %s.outlog &',cluster.codepath,executable,solution,[cluster.executionpath '/' dirname],modelname,modelname,modelname);
+						end
+					end
 				end
 				if ~io_gather, %concatenate the output files:
 					fprintf(fid,'\ncat %s.outbin.* > %s.outbin',modelname,modelname);
@@ -143,20 +153,13 @@ classdef generic
 				fclose(fid);
 
 			else % Windows
-
 				fid=fopen([modelname '.bat'],'w');
 				fprintf(fid,'@echo off\n');
 
-				% if IssmConfig('_HAVE_PETSC_MPI_'),
-				% 	warning('parallel runs not allowed yet in Windows. Defaulting to 1 cpus');
-				% 	cluster.np=1;
-				% end
-
 				if cluster.np>1,
-					% fprintf(fid,'"C:\\Program Files\\MPICH2\\bin\\mpiexec.exe" -n %i "%s/%s" %s ./ %s',cluster.np,cluster.codepath,executable,solution,modelname);
 					fprintf(fid,'"C:\\Program Files\\Microsoft MPI\\Bin\\mpiexec.exe" -n %i "%s/%s" %s ./ %s',cluster.np,cluster.codepath,executable,solution,modelname);
 				else
-					fprintf(fid,'"%s/%s" %s ./ %s',cluster.codepath,executable,solution,modelname);
+					fprintf(fid,'"%s\\%s" %s ./ %s',cluster.codepath,executable,solution,modelname);
 				end
 				fclose(fid);
 			end

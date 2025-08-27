@@ -34,6 +34,7 @@ const double Delflag=-99999;
 void Gembx(FemModel* femmodel){  /*{{{*/
 
 	int        count=0;
+	int        steps=0;
 	IssmDouble time,dt,finaltime;
 	IssmDouble timeclim=0.0;
 	IssmDouble t,smb_dt;
@@ -52,6 +53,11 @@ void Gembx(FemModel* femmodel){  /*{{{*/
 
 	IssmDouble timeinputs = time;
 
+	steps=0;
+	for (t=time;t<=time+dt-smb_dt;t=t+smb_dt){
+		steps=steps+1;
+	}
+
 	/*Start loop: */
 	count=1;
 	for (t=time;t<=time+dt-smb_dt;t=t+smb_dt){
@@ -62,17 +68,17 @@ void Gembx(FemModel* femmodel){  /*{{{*/
 			timeclim=time;
 			if (linear_interp) timeinputs = t-time+timeclim;
 			else timeinputs = t-time+timeclim+smb_dt/2;
-			element->SmbGemb(timeinputs,count);
+			element->SmbGemb(timeinputs,count,steps);
 		}
 		count=count+1;
 	}
 
 } /*}}}*/
-void GembgridInitialize(IssmDouble** pdz, int* psize, IssmDouble zTop, IssmDouble dzTop, IssmDouble zMax, IssmDouble zY){ /*{{{*/
+void GembgridInitialize(IssmDouble** pdz, int* psize, IssmDouble z_top, IssmDouble dz_top, IssmDouble z_max, IssmDouble beta){ /*{{{*/
 
 	/* This file sets up the initial grid spacing and total grid depth.  The
-	grid structure is set as constant grid length 'dzTop' for the top
-	'zTop' meters of the model grid. Bellow 'zTop' the gid length increases
+	grid structure is set as constant grid length 'dz_top' for the top
+	'z_top' meters of the model grid. Bellow 'z_top' the gid length increases
 	linearly with depth */
 
 	/*intermediary:*/
@@ -90,41 +96,41 @@ void GembgridInitialize(IssmDouble** pdz, int* psize, IssmDouble zTop, IssmDoubl
 
 	//----------------------Calculate Grid Lengths------------------------------
 	//calculate number of top grid points
-	dgpTop = zTop/dzTop;
+	dgpTop = z_top/dz_top;
 
-	//check to see if the top grid cell structure length (dzTop) goes evenly 
-	//into specified top structure depth (zTop). Also make sure top grid cell
-	//structure length (dzTop) is greater than 5 cm
+	//check to see if the top grid cell structure length (dz_top) goes evenly 
+	//into specified top structure depth (z_top). Also make sure top grid cell
+	//structure length (dz_top) is greater than 5 cm
 	#ifndef _HAVE_AD_  //avoid the round operation check!
 	if (dgpTop != round(dgpTop)){ 
-		_error_("top grid cell structure length does not go evenly into specified top structure depth, adjust dzTop or zTop\n");
+		_error_("top grid cell structure length does not go evenly into specified top structure depth, adjust dz_top or z_top\n");
 	}
 	#endif
-	if(dzTop < 0.05-Dtol){
-		_printf_("initial top grid cell length (dzTop) is < 0.05 m\n");
+	if(dz_top < 0.05-Dtol){
+		_printf_("initial top grid cell length (dz_top) is < 0.05 m\n");
 	}
 	gpTop=reCast<int,IssmDouble>(dgpTop);
 
 	//initialize top grid depth vector
 	dzT = xNew<IssmDouble>(gpTop); 
-	for (i=0;i<gpTop-Dtol;i++)dzT[i]=dzTop;
+	for (i=0;i<gpTop-Dtol;i++)dzT[i]=dz_top;
 
-	//bottom grid cell depth = x*zY^(cells from to structure)
+	//bottom grid cell depth = x*beta^(cells from to structure)
 	//figure out the number of grid points in the bottom vector (not known a priori)
-	gp0 = dzTop;
-	z0 = zTop;
+	gp0 = dz_top;
+	z0 = z_top;
 	gpBottom = 0;
-	while (zMax > z0+Dtol){
-		gp0= gp0 * zY;
+	while (z_max > z0+Dtol){
+		gp0= gp0 * beta;
 		z0 = z0 + gp0;
 		gpBottom++;
 	}
 	//initialize bottom vectors
 	dzB = xNewZeroInit<IssmDouble>(gpBottom);
-	gp0 = dzTop;
-	z0 = zTop;
+	gp0 = dz_top;
+	z0 = z_top;
 	for(i=0;i<gpBottom;i++){
-		gp0=gp0*zY;
+		gp0=gp0*beta;
 		dzB[i]=gp0;
 	}
 
@@ -227,7 +233,7 @@ IssmDouble gardnerAlb(IssmDouble* re, IssmDouble* dz, IssmDouble* d, IssmDouble 
 	//  do two layer calculation if there is more than 1 layer
 	IssmDouble z1=0.0;
 	int lice=0;
-	for(int l=0;(l<m & d[l]<dPHC-Dtol);l++){
+	for(int l=0;(l<m && d[l]<dPHC-Dtol);l++){
 		z1=z1+dz[l]*d[l]; //mm
 		lice=l+1;
 	}
@@ -239,7 +245,7 @@ IssmDouble gardnerAlb(IssmDouble* re, IssmDouble* dz, IssmDouble* d, IssmDouble 
 		IssmDouble as2 = 1.48 - pow(S2,-0.07);
 
 		// change in pure snow albedo due to soot loading
-		IssmDouble dac2 = max(0.04 - as2, pow(-c2,0.55)/(0.16 + 0.6*pow(S1,0.5) + (1.8*pow(c2,0.6))*pow(S2,-0.25)));
+		IssmDouble dac2 = max(0.04 - as2, pow(-c2,0.55)/(0.16 + 0.6*pow(S2,0.5) + (1.8*pow(c2,0.6))*pow(S2,-0.25)));
 
 		// determine the effective change due to finite depth and soot loading
 		IssmDouble A = min(1.0, (2.1 * pow(z1,1.35*(1.0-as) - 0.1*c1 - 0.13)));
@@ -660,11 +666,11 @@ void albedo(IssmDouble** pa, IssmDouble** padiff, int aIdx, IssmDouble* re, Issm
 			IssmDouble depthsnow=0.0;
 			IssmDouble aice=0.0;
 			int lice=0;
-			for(int l=0;(l<m & d[l]<dPHC-Dtol);l++){
+			for(int l=0;(l<m && d[l]<dPHC-Dtol);l++){
 				depthsnow=depthsnow+dz[l];
 				lice=l+1;
 			}
-			if (depthsnow<=0.1+Dtol & lice<m & d[lice]>=dPHC-Dtol){
+			if (depthsnow<=0.1+Dtol && lice<m && d[lice]>=dPHC-Dtol){
 				aice = ai_max + (as_min - ai_max)*(d[lice]-dIce)/(dPHC-dIce);
 				a[0]= aice + max(a[0]-aice,0.0)*(depthsnow/0.1);
 			}
@@ -891,15 +897,27 @@ void thermo(IssmDouble* pshf, IssmDouble* plhf, IssmDouble* pEC, IssmDouble** pT
 	// must go evenly into one hour or the data frequency if it is smaller
 
 	// all integer factors of the number of second in a day (86400 [s])
-	int f[45] = {1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 15, 16, 18, 20, 24, 25, 30, 36, 40, 45, 48, 50, 60,
+	IssmDouble f[58] = {1./200, 1./180, 1./150, 1./144, 1./120, 1./100, 1./90, 1./80, 1./75, 1./72, 1./60, 1./50, 1./48, 
+	 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 15, 16, 18, 20, 24, 25, 30, 36, 40, 45, 48, 50, 60,
     72, 75, 80, 90, 100, 120, 144, 150, 180, 200, 225, 240, 300, 360, 400, 450, 600, 720, 900, 1200, 1800, 3600};
 
-	// return the min integer factor that is < dt
+	// return the min factor that is < dt
 	max_fdt=f[0];
+	bool maxfound=false;
 	for(int i=0;i<45;i++){
-		if (f[i]<dt-Dtol)if(f[i]>=max_fdt-Dtol)max_fdt=f[i];
+		if (f[i]<dt-Dtol){
+			if (f[i]>=max_fdt-Dtol){
+				max_fdt=f[i];
+				maxfound=true;
+			}
+		}
 	}
 	dt=max_fdt;
+	if (maxfound==false){
+		if(VerboseSmb() && sid==0 && IssmComm::GetRank()==0){
+			_printf0_(" WARNING: calculated timestep for thermal loop is < " << f[0] << " seconds. (" << dt << " sec) \n");
+		}
+	}
 
 	// determine mean (harmonic mean) of K/dz for u, d, & p
 	Au = xNew<IssmDouble>(m);
@@ -1269,7 +1287,7 @@ void shortwave(IssmDouble** pswf, int swIdx, int aIdx, IssmDouble dsw, IssmDoubl
 	swf=xNewZeroInit<IssmDouble>(m);
 
 	// SHORTWAVE FUNCTION
-	if (swIdx == 0 | (dIce - d[0])<Dtol) {// all sw radation is absorbed in by the top grid cell
+	if (swIdx == 0 || (dIce - d[0])<Dtol) {// all sw radation is absorbed in by the top grid cell
 
 		// calculate surface shortwave radiation fluxes [W m-2]
 		if (aIdx == 1){
@@ -1544,7 +1562,7 @@ void accumulation(IssmDouble** pT, IssmDouble** pdz, IssmDouble** pd, IssmDouble
 
 		if (T_air <= CtoK+Ttol){ // if snow
 
-			IssmDouble  z_snow = P/dSnow;               // depth of snow
+			IssmDouble z_snow = P/dSnow;               // depth of snow
 			IssmDouble dfall = gdnNew;
 			IssmDouble sfall = gspNew;
 			IssmDouble refall = reNew;
@@ -2077,15 +2095,18 @@ void managelayers(IssmDouble* pmAdd, IssmDouble* pdz_add, IssmDouble* paddE, Iss
 	for (int i=0;i<n;i++){
 		if (i==0){
 			dzMin2[i]=dzMin;
+			dzMax2[i]=dzMin*2.0;
 		}
 		else{
 			Zcum[i]=Zcum[i-1]+dz[i];
 			if (Zcum[i]<=zTop+Dtol){
 				dzMin2[i]=dzMin;
+				dzMax2[i]=dzMin*2.0;
 				X=i;
 			}
 			else{
 				dzMin2[i]=zY2*dzMin2[i-1];
+				dzMax2[i]=max(zY2*dzMin2[i],dzMin*2.0);
 			}
 		}
 	}
@@ -2147,30 +2168,13 @@ void managelayers(IssmDouble* pmAdd, IssmDouble* pdz_add, IssmDouble* paddE, Iss
 	celldelete(&gsp,n,D,D_size);
 	celldelete(&EI,n,D,D_size);
 	celldelete(&EW,n,D,D_size);
+	celldelete(&dzMin2,n,D,D_size);
+	celldelete(&dzMax2,n,D,D_size);
 	n=D_size;
 	xDelete<int>(D);
 
-	// check if any of the cell depths are too large
-	X=0;
-	Zcum[0]=dz[0]; // Compute a cumulative depth vector
-	for (int i=0;i<n;i++){
-		if (i==0){
-			dzMax2[i]=dzMin*2.0;
-		}
-		else{
-			Zcum[i]=Zcum[i-1]+dz[i];
-			if (Zcum[i]<=zTop+Dtol){
-				dzMax2[i]=dzMin*2.0;
-				X=i;
-			}
-			else{
-				dzMax2[i]=max(zY2*dzMin2[i-1],dzMin*2.0);
-			}
-		}
-	}
-
 	for (int j=n-1;j>=0;j--){
-		if ((j<X && dz[j] > dzMax2[j]+Dtol) || (dz[j] > dzMax2[j]*zY2+Dtol)){
+		if (dz[j] > dzMax2[j]+Dtol){
 			// _printf_("dz > dzMin * 2");
 			// split in two
 			cellsplit(&dz, n, j,.5);
@@ -2394,13 +2398,13 @@ void densification(IssmDouble** pd,IssmDouble** pdz, IssmDouble* T, IssmDouble* 
 				break;
 
 			case 4: // Li and Zwally (2004)
-				c0 = (C/dIce) * (139.21 - 0.542*Tmean)*8.36*pow(CtoK - T[i],-2.061);
+				c0 = (C/dIce) * max(139.21 - 0.542*Tmean,1.0)*8.36*pow(max(CtoK - T[i],1.0),-2.061);
 				c1 = c0;
 				break;
 
 			case 5: // Helsen et al. (2008)
 				// common variable
-				c0 = (C/dIce) * (76.138 - 0.28965*Tmean)*8.36*pow(CtoK - T[i],-2.061);
+				c0 = (C/dIce) * max(76.138 - 0.28965*Tmean,1.0)*8.36*pow(max(CtoK - T[i],1.0),-2.061);
 				c1 = c0;
 				break;
 

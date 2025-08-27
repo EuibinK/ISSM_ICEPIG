@@ -11,9 +11,10 @@ classdef SMBsemic
 		dailydlradiation	= NaN;
 		dailywindspeed		= NaN;
 		dailypressure		= NaN;
-		dailyairdensity		= NaN;
+		dailyairdensity   = NaN;
 		dailyairhumidity	= NaN;
 		dailytemperature	= NaN;
+
 		Tamp              = NaN;
 		mask              = NaN;
 		hice              = NaN;
@@ -59,6 +60,9 @@ classdef SMBsemic
 
 		% method
 		ismethod  = 0;
+
+		isdesertification = 0; % for precipitation-desertifcation effect
+		isLWDcorrect = 0;
 	end
 	methods
 		function self = SMBsemic(varargin) % {{{
@@ -87,12 +91,13 @@ classdef SMBsemic
 		end % }}}
 		function list = outputlists(self,md) % {{{
 			if self.ismethod == 1
-				list = {'SmbMassBalance','SmbMassBalanceSnow','SmbMassBalanceIce',...
-					'SmbMassBalanceSemic','SmbMelt','SmbAccumulation',...
+				list = {'default','SmbMassBalance','SmbMassBalanceSnow','SmbMassBalanceIce',...
+					'SmbMelt','SmbRefreeze','SmbAccumulation',...
 					'SmbHIce','SmbHSnow','SmbAlbedo','SmbAlbedoSnow','TemperatureSEMIC',...
-					'SmbSemicQmr'};
+					'SmbSemicQmr','TotalSmb','TotalSmbMelt','TotalSmbRefreeze',...
+					'SmbRunoff','SmbEvaporation'};
 			else
-				list = {'SmbMassBalance'};
+				list = {'default','SmbMassBalance'};
 			end
 		end % }}}
 		function self = initialize(self,md) % {{{
@@ -104,7 +109,7 @@ classdef SMBsemic
 			% Usage
 			%  md.smb = initialize(md.smb,md);
 
-			if isnan(self.s0gcm),
+			if isnan(self.s0gcm)
 				if ~isnan(md.geometry.surface) & (numel(md.geometry.surface) == md.mesh.numberofvertices)
 					self.s0gcm=md.geometry.surface;
 					disp('      no SMBsemic.s0gcm specified: values from md.geometry.surface');
@@ -113,13 +118,13 @@ classdef SMBsemic
 					disp('      no SMBsemic.s0gcm specified: values set as zero');
 				end
 			end
-			if isnan(self.mask),
+			if isnan(self.mask)
 				self.mask = 2*ones(md.mesh.numberofvertices,1);
 				disp('      no SMBsemic.mask specified: values set as 2 for ice');
 			end
 
 			% update each values.
-			if isnan(self.Tamp) 
+			if isnan(self.Tamp)
 				self.Tamp= 3*ones(md.mesh.numberofvertices,1);
 				disp('      no SMBsemic.Tamp specified: values set as 3.0');
 			end
@@ -142,9 +147,10 @@ classdef SMBsemic
 			% for slater
 			self.tmin  = 263.15;
 			self.tmax  = 273.15;
-			% for isba & denby
+			% for ISBA & denby
 			self.mcrit = 6e-8;
-			% for isba
+			% for ISBA
+			% value from Douville et al. (1995)
 			self.tau_a = 0.008;
 			self.tau_f = 0.24;
 			self.wcrit = 15.0;
@@ -158,31 +164,36 @@ classdef SMBsemic
 			self.desfac		      = -log(2.0)/1000;
 			self.desfacElevation = 2000;
 			self.rlaps		      = 7.4;
-			self.rdl			      = 0.29;
+			self.rdl			      = 29; % from  Marty et al. (2002)
 
-			self.ismethod        = 0;
+			self.ismethod          = 0;
+			self.isdesertification = 1;
+			self.isLWDcorrect      = 1;
 			self.requested_outputs={'default'};
 		end % }}}
 		function md = checkconsistency(self,md,solution,analyses) % {{{
 
-			if ismember('MasstransportAnalysis',analyses),
+			if ismember('MasstransportAnalysis',analyses)
 				md = checkfield(md,'fieldname','smb.desfac','<=',1,'numel',1);
 				md = checkfield(md,'fieldname','smb.s0gcm','>=',0,'NaN',1,'Inf',1,'size',[md.mesh.numberofvertices 1]);
 				md = checkfield(md,'fieldname','smb.rlaps','>=',0,'numel',1);
 				md = checkfield(md,'fieldname','smb.rdl','>=',0,'numel',1);
-				md = checkfield(md,'fieldname','smb.dailysnowfall','timeseries',1,'NaN',1,'Inf',1);
-				md = checkfield(md,'fieldname','smb.dailyrainfall','timeseries',1,'NaN',1,'Inf',1);
-				md = checkfield(md,'fieldname','smb.dailydsradiation','timeseries',1,'NaN',1,'Inf',1);
-				md = checkfield(md,'fieldname','smb.dailydlradiation','timeseries',1,'NaN',1,'Inf',1);
-				md = checkfield(md,'fieldname','smb.dailywindspeed','timeseries',1,'NaN',1,'Inf',1);
-				md = checkfield(md,'fieldname','smb.dailypressure','timeseries',1,'NaN',1,'Inf',1);
-				md = checkfield(md,'fieldname','smb.dailyairdensity','timeseries',1,'NaN',1,'Inf',1);
-				md = checkfield(md,'fieldname','smb.dailyairhumidity','timeseries',1,'NaN',1,'Inf',1);
-				md = checkfield(md,'fieldname','smb.dailytemperature','timeseries',1,'NaN',1,'Inf',1);
+				md = checkfield(md,'fieldname','smb.dailysnowfall','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+				md = checkfield(md,'fieldname','smb.dailyrainfall','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+				md = checkfield(md,'fieldname','smb.dailydsradiation','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+				md = checkfield(md,'fieldname','smb.dailydlradiation','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+				md = checkfield(md,'fieldname','smb.dailywindspeed','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+				md = checkfield(md,'fieldname','smb.dailypressure','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+				md = checkfield(md,'fieldname','smb.dailyairdensity','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+				md = checkfield(md,'fieldname','smb.dailyairhumidity','timeseries',1,'NaN',1,'Inf',1,'>=',0);
+				md = checkfield(md,'fieldname','smb.dailytemperature','timeseries',1,'NaN',1,'Inf',1,'>=',0);
 
 				% TODO: transient model should be merged with SEMIC developed by Ruckamp et al. (2018)
 
 				md = checkfield(md,'fieldname','smb.ismethod','numel',1,'values',[0,1]);
+                md = checkfield(md,'fieldname','smb.isdesertification','NaN',1,'Inf',1,'numel',1,'values',[0, 1]);
+			    md = checkfield(md,'fieldname','smb.isLWDcorrect','NaN',1,'Inf',1,'numel',1,'values',[0, 1]);
+			
 				if self.ismethod == 1 % transient mode
 					md = checkfield(md,'fieldname','smb.desfacElevation','>=',0,'numel',1);
 
@@ -202,7 +213,7 @@ classdef SMBsemic
 					md = checkfield(md,'fieldname','smb.qmr','NaN',1,'Inf',1,'size',[md.mesh.numberofvertices, 1]);
 				end
 			end
-			md = checkfield(md,'fieldname','smb.steps_per_step','>=',1,'numel',[1]);
+            md = checkfield(md,'fieldname','smb.steps_per_step','>=',1,'numel',[1]);
 			md = checkfield(md,'fieldname','smb.averaging','numel',[1],'values',[0 1 2]);
 			md = checkfield(md,'fieldname','smb.requested_outputs','stringrow',1);
 			% check requested_outputs
@@ -231,10 +242,9 @@ classdef SMBsemic
 			fielddisplay(self,'dailyairhumidity','daily air specific humidity [kg/kg]');
 			fielddisplay(self,'dailytemperature','daily surface air temperature [K]');
 			fielddisplay(self,'rlaps','present day lapse rate (default is 7.4 [degree/km]; Erokhina et al. 2017)');
-			fielddisplay(self,'desfac','desertification elevation factor (default is -log(2.0)/1000 [1/km]; Vizcaino et al. 2010)');
-			fielddisplay(self,'rdl','longwave downward radiation decrease (default is 0.29 [W/m^2/km]; Marty et al. 2002)');
+			fielddisplay(self,'desfac','desertification elevation factor (default is -log(2.0)/1000 [1/m]; Vizcaino et al. 2010)');
+			fielddisplay(self,'rdl','longwave downward radiation decrease (default is 29 [W/m^2/km]; Marty et al. 2002)');
 			fielddisplay(self,'s0gcm','GCM reference elevation; (default is 0) [m]');
-			fielddisplay(self,'albedo_scheme','albedom scheme. 0: none, 1: (default is 0)');
 
 			fielddisplay(self,'ismethod','method for calculating SMB with SEMIC. Default version of SEMIC is really slow. 0: steady, 1: transient (default: 0)');
 			if self.ismethod == 1 % transient mode
@@ -245,19 +255,27 @@ classdef SMBsemic
 				fielddisplay(self,'hice','initial thickness of ice [unit: m]');
 				fielddisplay(self,'hsnow','initial thickness of snow [unit: m]');
 				fielddisplay(self,'mask','masking for albedo. 0: ocean, 1: land, 2: ice (default: 2)');
+				fielddisplay(self,'qmr','initial net energy difference between melt and refreeze in SEMIC [unit: W m^{-2}]. This variable can be set with zeros because net energy difference between melt and refreeze is dissipated fast.');
 				fielddisplay(self,'hcrit','critical snow height for albedo [unit: m]');
 				fielddisplay(self,'rcrit','critical refreezing height for albedo [no unit]');
 
 				disp(sprintf('\nSEMIC albedo parameters.'));
-				fielddisplay(self,'albedo_scheme','albedo scheme for SEMIC. 0: none, 1: slater, 2: isba, 3: denby, 4: alex (default is 0)');
+				fielddisplay(self,'albedo_scheme','albedo scheme for SEMIC. 0: none, 1: slater, 2: denby, 3: isba, 4: alex (default is 0)');
 				fielddisplay(self,'alb_smax','maximum snow albedo (default: 0.79)');
 				fielddisplay(self,'alb_smin','minimum snow albedo (default: 0.6)');
 				fielddisplay(self,'albi','background albedo for bare ice (default: 0.41)');
 				fielddisplay(self,'albl','background albedo for bare land (default: 0.07)');
+
+                fielddisplay(self,'isdesertification','enable or disable desertification of Vizcaino et al. (2010). 0: off, 1: on (default: 1)')
+                fielddisplay(self,'isLWDcorrect','enable or disable downward longwave correction of Marty et al. (2002). 0: off, 1: on (default: 1)')
 			end
 			% albedo_scheme - 0: none, 1: slater, 2: isba, 3: denby, 4: alex.
-			if self.albedo_scheme == 1
-				disp(sprintf('\n\tSEMIC snow albedo parameters for Slater et al, (1998).'));
+         if self.albedo_scheme == 0
+            disp(sprintf('\n\tSEMIC snow albedo parameter of None.'));
+				disp(sprintf('\t   albedo of snow is updated from albedo snow max (alb_smax).'));
+            disp(sprintf('\t   alb_snow = abl_smax'));
+			elseif self.albedo_scheme == 1
+				disp(sprintf('\n\tSEMIC snow albedo parameters of Slater et al, (1998).'));
 				disp(sprintf('\t   alb = alb_smax - (alb_smax - alb_smin)*tm^(3.0)'))
 				disp(sprintf('\t   tm  = 1 (tsurf > 273.15 K)'));
 				disp(sprintf('\t         tm = f*(tsurf-tmin) (tmin <= tsurf < 273.15)'));
@@ -265,16 +283,18 @@ classdef SMBsemic
 				disp(sprintf('\t   f = 1/(273.15-tmin)'));
 				fielddisplay(self,'tmin','minimum temperature for which albedo decline become effective. (default: 263.15 K)[unit: K])');
 				fielddisplay(self,'tmax','maxmium temperature for which albedo decline become effective. This value should be fixed. (default: 273.15 K)[unit: K])');
-			elseif self.albedo_scheme == 2,
-				disp(sprintf('\n\tSEMIC snow albedo parameters for ISBA.? where is citation?'));
+			elseif self.albedo_scheme == 2
+				disp(sprintf('\n\tSEMIC snow albedo parameters for Denby et al. (2002 Tellus)'));
+				fielddisplay(self,'mcrit','critical melt rate (default: 6e-8) [unit: m/sec]');
+			elseif self.albedo_scheme == 3
+				disp(sprintf('\n\tSEMIC snow albedo parameters for ISBA (Douville et al., 1995).'));
 				fielddisplay(self,'mcrit','critical melt rate (default: 6e-8) [unit: m/sec]');
 				fielddisplay(self,'wcrit','critical liquid water content (default: 15) [unit: kg/m2]');
 				fielddisplay(self,'tau_a','dry albedo decline [unit: 1/day]');
 				fielddisplay(self,'tau_f','wet albedo decline [unit: 1/day]');
-			elseif self.albedo_scheme == 3,
-				disp(sprintf('\n\tSEMIC snow albedo parameters for Denby et al. (2002 Tellus)'));
-				fielddisplay(self,'mcrit','critical melt rate (default: 6e-8) [unit: m/sec]');
-			elseif self.albedo_scheme == 4,
+				disp(sprintf('\n\tReference'));
+				disp(sprintf('\tDouville, H., Royer, J.-F., and Mahfouf, J.-F.: A new snow parameterization for the Météo-France climate model. Part I: validation in stand-alone experiments, Climate Dynamics, 12, 21–35, https://doi.org/10.1007/s003820050092, 1995.'));
+			elseif self.albedo_scheme == 4
 				disp(sprintf('\n\tSEMIC snow albedo parameters for Alex.?'));
 				fielddisplay(self,'afac','[unit: ?]');
 				fielddisplay(self,'tmid','[unit: ?]');
@@ -343,7 +363,10 @@ classdef SMBsemic
 				%for alex
 				WriteData(fid,prefix,'object',self,'class','smb','fieldname','tmid','format','Double');
 				WriteData(fid,prefix,'object',self,'class','smb','fieldname','afac','format','Double');
-			end
+            end
+            %specific parameterization
+			WriteData(fid,prefix,'object',self,'class','smb','fieldname','isdesertification','format','Integer');
+			WriteData(fid,prefix,'object',self,'class','smb','fieldname','isLWDcorrect','format','Integer');
 
 			WriteData(fid,prefix,'object',self,'fieldname','steps_per_step','format','Integer');
 			WriteData(fid,prefix,'object',self,'fieldname','averaging','format','Integer');
@@ -351,7 +374,7 @@ classdef SMBsemic
 			%process requested outputs
 			outputs = self.requested_outputs;
 			pos  = find(ismember(outputs,'default'));
-			if ~isempty(pos),
+			if ~isempty(pos)
 				outputs(pos) = []; %remove 'default' from outputs
 				outputs      = [outputs defaultoutputs(self,md)]; %add defaults
 			end

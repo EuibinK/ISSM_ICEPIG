@@ -27,11 +27,7 @@
 #include "../shared/io/io.h"
 #include "../shared/shared.h"
 #include "../classes/Inputs/TransientInput.h"
-
-#ifdef _HAVE_CODIPACK_
-extern CoDi_global codi_global;
-#include <sstream> // for output of the CoDiPack tape
-#endif
+#include "../toolkits/codipack/CoDiPackGlobal.h"
 
 /*IoConstant class and methods*/
 IoConstant::IoConstant(){/*{{{*/
@@ -47,7 +43,7 @@ IoConstant::~IoConstant(){/*{{{*/
 /*}}}*/
 IoConstant::IoConstant(bool value,const char* name_in){/*{{{*/
 	this->isindependent = false;
-	this->constant      = new BoolParam(0,value);
+	this->constant      = new BoolParam(IoConstantEnum,value);
 
 	_assert_(name_in);
 	int len=strlen(name_in);
@@ -57,7 +53,7 @@ IoConstant::IoConstant(bool value,const char* name_in){/*{{{*/
 /*}}}*/
 IoConstant::IoConstant(int value,const char* name_in){/*{{{*/
 	this->isindependent = false;
-	this->constant      = new IntParam(0,value);
+	this->constant      = new IntParam(IoConstantEnum, value);
 
 	_assert_(name_in);
 	int len=strlen(name_in);
@@ -67,7 +63,7 @@ IoConstant::IoConstant(int value,const char* name_in){/*{{{*/
 /*}}}*/
 IoConstant::IoConstant(IssmDouble value,const char* name_in){/*{{{*/
 	this->isindependent = false;
-	this->constant      = new DoubleParam(0,value);
+	this->constant      = new DoubleParam(IoConstantEnum, value);
 
 	_assert_(name_in);
 	int len=strlen(name_in);
@@ -77,7 +73,7 @@ IoConstant::IoConstant(IssmDouble value,const char* name_in){/*{{{*/
 /*}}}*/
 IoConstant::IoConstant(char* value,const char* name_in){/*{{{*/
 	this->isindependent = false;
-	this->constant      = new StringParam(0,value);
+	this->constant      = new StringParam(IoConstantEnum, value);
 
 	_assert_(name_in);
 	int len=strlen(name_in);
@@ -87,7 +83,7 @@ IoConstant::IoConstant(char* value,const char* name_in){/*{{{*/
 /*}}}*/
 IoConstant::IoConstant(char** value,int numstrings,const char* name_in){/*{{{*/
 	this->isindependent = false;
-	this->constant      = new StringArrayParam(0,value,numstrings);
+	this->constant      = new StringArrayParam(IoConstantEnum, value, numstrings);
 
 	_assert_(name_in);
 	int len=strlen(name_in);
@@ -405,9 +401,9 @@ void  IoModel::CheckFile(void){/*{{{*/
 			_printf0_("=========================================================================\n");
 			_printf0_(" Marshalled file is corrupted                                            \n");
 			_printf0_("                                                                         \n");
-			_printf0_("   * Last record found is :                                              \n");
-			_printf0_("     the corresponding model field has probably been marshalled          \n");
-			_printf0_("     incorrectly                                                         \n");
+			_printf0_("    Last record found is:                                                \n");
+			_printf0_("    the corresponding model field has probably been marshalled           \n");
+			_printf0_("    incorrectly                                                          \n");
 			_printf0_("                                                                         \n");
 			_printf0_("=========================================================================\n");
 			_printf0_("\n");
@@ -454,6 +450,12 @@ void  IoModel::ConstantToInput(Inputs* inputs,Elements* elements,IssmDouble valu
 		for(Object* & object : elements->objects){
 			Element* element=xDynamicCast<Element*>(object);
 			element->InputCreateP1FromConstant(inputs,this,value,vector_enum);
+		}
+	}
+	else if (type==P0Enum){
+		for(Object* & object : elements->objects){
+			Element* element=xDynamicCast<Element*>(object);
+			element->InputCreateP0FromConstant(inputs,this,value,vector_enum);
 		}
 	}
 	else _error_("not supported yet!");
@@ -1021,6 +1023,35 @@ void  IoModel::FetchData(IssmDouble* pscalar,const char* data_name){/*{{{*/
 
 }
 /*}}}*/
+void  IoModel::FetchData(IssmDouble** pscalar, const char* data_name){/*{{{*/
+
+   /*output: */
+   IssmPDouble *scalar = NULL;
+   int          code   = 0;
+
+   /*recover my_rank:*/
+   int my_rank=IssmComm::GetRank();
+
+   /*Set file pointer to beginning of the data: */
+   fid=this->SetFilePointerToData(&code,NULL,data_name);
+   if(code!=3)_error_("expecting a IssmDouble for \""<<data_name<<"\"");
+
+   /*Now fetch: */
+
+   /*We have to read a matrix from disk. First read the dimensions of the matrix, then the whole matrix: */
+
+   /*Now allocate matrix: */
+   /*Read matrix on node 0, then broadcast: */
+   scalar=xNew<IssmPDouble>(1);
+   if(my_rank==0) if(fread(scalar,sizeof(IssmPDouble),1,fid)!=1) _error_("could not read matrix ");
+   ISSM_MPI_Bcast(scalar,1,ISSM_MPI_PDOUBLE,0,IssmComm::GetComm());
+
+   _printf0_("scalar: " << *scalar << "\n");
+   *pscalar=xNew<IssmDouble>(1);
+   *pscalar[0]=scalar[0];
+   xDelete<IssmPDouble>(scalar);
+}
+/*}}}*/
 void  IoModel::FetchData(char** pstring,const char* data_name){/*{{{*/
 
 	/*output: */
@@ -1426,6 +1457,31 @@ void  IoModel::FetchData(IssmPDouble** pmatrix,int* pM,int* pN,const char* data_
 	if(pN) *pN=N;
 }
 /*}}}*/
+void  IoModel::FetchData(IssmPDouble** pscalar,const char* data_name){/*{{{*/
+
+   /*output: */
+   IssmPDouble   *scalar = NULL;
+   int      code;
+
+   /*recover my_rank:*/
+   int my_rank=IssmComm::GetRank();
+
+   /*Set file pointer to beginning of the data: */
+   fid=this->SetFilePointerToData(&code,NULL,data_name);
+
+   if(code!=3)_error_("expecting a IssmDouble for \""<<data_name<<"\"");
+
+   /*We have to read a scalar from disk. First read the dimensions of the scalar, then the scalar: */
+   scalar=xNew<IssmPDouble>(1);
+   if(my_rank==0){
+      if(fread(scalar,sizeof(IssmPDouble),1,fid)!=1)_error_("could not read scalar ");
+   }
+   ISSM_MPI_Bcast(scalar,1,ISSM_MPI_PDOUBLE,0,IssmComm::GetComm());
+
+   /*Assign output pointers: */
+   *pscalar=scalar;
+}
+/*}}}*/
 #endif
 void  IoModel::FetchData(IssmDouble*** pmatrices,int** pmdims,int** pndims, int* pnumrecords,const char* data_name){/*{{{*/
 
@@ -1507,6 +1563,77 @@ void  IoModel::FetchData(IssmDouble*** pmatrices,int** pmdims,int** pndims, int*
 	*pmdims=mdims;
 	*pndims=ndims;
 	*pnumrecords=numrecords;
+}
+/*}}}*/
+void  IoModel::FetchData(IssmDouble** pmatrix,int* pM,int* pN, int layer_number,const char* data_name){/*{{{*/
+	/*Same function as above, but here we want to fetch only one specific "layer" of the dataset to avoid memory issues*/
+
+	/*output: */
+	int          M=0,N=0;
+	IssmPDouble *matrix = NULL;
+
+	/*intermediary: */
+	int  numrecords=0;
+	int  code,i;
+
+	/*recover my_rank:*/
+	int my_rank=IssmComm::GetRank();
+
+	/*Set file pointer to beginning of the data: */
+	fid=this->SetFilePointerToData(&code,NULL,data_name);
+	if(code!=8)_error_("expecting a IssmDouble mat array for \""<<data_name<<"\"");
+
+	if(my_rank==0){
+		if(fread(&numrecords,sizeof(int),1,fid)!=1) _error_("could not read number of records in matrix array ");
+	}
+	ISSM_MPI_Bcast(&numrecords,1,ISSM_MPI_INT,0,IssmComm::GetComm());
+
+	if(numrecords){
+
+		/*Check consistency of layer number*/
+		_assert_(layer_number>=0);
+		if(layer_number>=numrecords) _error_("layer number of "<<data_name<<" cannot exceed "<< numrecords-1);
+
+		/*Skip until we get to the right layer*/
+		if(my_rank==0){
+			for(i=0;i<layer_number;i++){
+				if(fread(&M,sizeof(int),1,fid)!=1) _error_("could not read number of rows in " << i << "th matrix of matrix array");
+				if(fread(&N,sizeof(int),1,fid)!=1) _error_("could not read number of columns in " << i << "th matrix of matrix array");
+				fseek(fid,M*N*sizeof(double),SEEK_CUR);
+			}
+		}
+
+		/*fetch this slice!*/
+		if(my_rank==0){
+			if(fread(&M,sizeof(int),1,fid)!=1) _error_("could not read number of rows in " << i << "th matrix of matrix array");
+		}
+		ISSM_MPI_Bcast(&M,1,ISSM_MPI_INT,0,IssmComm::GetComm());
+
+		if(my_rank==0){
+			if(fread(&N,sizeof(int),1,fid)!=1) _error_("could not read number of columns in " << i << "th matrix of matrix array");
+		}
+		ISSM_MPI_Bcast(&N,1,ISSM_MPI_INT,0,IssmComm::GetComm());
+
+		/*Now allocate matrix: */
+		if(M*N){
+			matrix=xNew<IssmPDouble>(M*N);
+
+			/*Read matrix on node 0, then broadcast: */
+			if(my_rank==0) if(fread(matrix,M*N*sizeof(IssmPDouble),1,fid)!=1) _error_("could not read matrix ");
+			ISSM_MPI_Bcast(matrix,M*N,ISSM_MPI_PDOUBLE,0,IssmComm::GetComm());
+
+			*pmatrix=xNew<IssmDouble>(M*N);
+			for(int i=0;i<M*N;++i) (*pmatrix)[i]=matrix[i];
+			xDelete<IssmPDouble>(matrix);
+		}
+		else{
+			*pmatrix=NULL;
+		}
+	}
+
+	/*Assign output pointers: */
+	if(pM) *pM = M;
+	if(pN) *pN = N;
 }
 /*}}}*/
 void  IoModel::FetchData(Options* options,const char* lastnonoption){/*{{{*/
@@ -1901,6 +2028,25 @@ void  IoModel::FetchDataToInput(Inputs* inputs,Elements* elements,const char* ve
 				N=pN[i];
 				matrix=array[i];
 
+				//initialize times:
+				if(M==this->numberofvertices || M==(this->numberofvertices+1)){
+					times=xNew<IssmDouble>(N);
+					if(M==this->numberofvertices) times[0] = matrix[M-1];
+					if(M==this->numberofvertices+1) for(int t=0;t<N;t++) times[t] = matrix[(M-1)*N+t];
+				}
+				else if(M==this->numberofelements || M==(this->numberofelements+1)){
+					times=xNew<IssmDouble>(N);
+					if(M==this->numberofelements) times[0] = matrix[M-1];
+					if(M==this->numberofelements+1) for(int t=0;t<N;t++) times[t] = matrix[(M-1)*N+t];
+				}
+				else if(M==2 || M==1){
+					times=xNew<IssmDouble>(N);
+					if(M==1) times[0] = 0;
+					if(M==2) for(int t=0;t<N;t++) times[t] = matrix[(M-1)*N+t];
+				}
+				else _error_("FetchDataToInput error message: row size of MatArray elements should be either numberofelements (+1) or numberofvertices (+1)");
+
+
 				//initialize transient input dataset:
 				TransientInput* transientinput=inputs->SetDatasetTransientInput(input_enum,i, times,N);
 				for(Object* & object : elements->objects){
@@ -2120,24 +2266,12 @@ void  IoModel::FetchIndependentConstant(int* pXcount,IssmPDouble* X,const char* 
 		/*Now, before we even broadcast this to other nodes, declare the scalar  as an independent variable!. If we
 		 *have been supplied an X vector, use it instead of what we just read: */
 		#if defined(_HAVE_CODIPACK_)
-			// FIXME codi here we just assign instead of using "operator <<="
 			if(X){
 				scalar=X[Xcount];
 			} else {
 				scalar=pscalar;
 			}
-			#if _CODIPACK_MAJOR_==2
-			auto& tape_codi = IssmDouble::getTape();
-			tape_codi.registerInput(scalar);
-			codi_global.input_indices.push_back(scalar.getIdentifier());
-			#elif _CODIPACK_MAJOR_==1
-			auto& tape_codi = IssmDouble::getGlobalTape();
-			tape_codi.registerInput(scalar);
-			codi_global.input_indices.push_back(scalar.getGradientData());
-			#else
-			#error "_CODIPACK_MAJOR_ not supported"
-			#endif
-
+			codi_global.registerInput(scalar);
 		#else
 			if(X){
 				scalar<<=X[Xcount];
@@ -2207,40 +2341,16 @@ void  IoModel::FetchIndependentData(int* pXcount,IssmPDouble* X,const char* data
 			/*Now, before we even broadcast this to other nodes, declare the whole matrix as a independent variable!
 			  If we have been supplied an X vector, use it instead of what we just read: */
 			#if defined(_HAVE_CODIPACK_)
-				// FIXME codi here we just assign instead of using "operator <<="
-				#if _CODIPACK_MAJOR_==2
-				auto& tape_codi = IssmDouble::getTape();
-				#elif _CODIPACK_MAJOR_==1
-				auto& tape_codi = IssmDouble::getGlobalTape();
-				#else
-				#error "_CODIPACK_MAJOR_ not supported"
-				#endif
-
 				if(X){
 					for (int i=0;i<M*N;i++) {
 						matrix[i]=X[Xcount+i];
-						tape_codi.registerInput(matrix[i]);
-						#if _CODIPACK_MAJOR_==2
-						codi_global.input_indices.push_back(matrix[i].getIdentifier());
-						#elif _CODIPACK_MAJOR_==1
-						codi_global.input_indices.push_back(matrix[i].getGradientData());
-						#else
-						#error "_CODIPACK_MAJOR_ not supported"
-						#endif
-
+						codi_global.registerInput(matrix[i]);
 					}
 				}
 				else{
 					for (int i=0;i<M*N;i++) {
 						matrix[i]=buffer[i];
-						tape_codi.registerInput(matrix[i]);
-						#if _CODIPACK_MAJOR_==2
-						codi_global.input_indices.push_back(matrix[i].getIdentifier());
-						#elif _CODIPACK_MAJOR_==1
-						codi_global.input_indices.push_back(matrix[i].getGradientData());
-						#else
-						#error "_CODIPACK_MAJOR_ not supported"
-						#endif
+						codi_global.registerInput(matrix[i]);
 					}
 				}
 			#else /*ADOLC*/
@@ -2329,7 +2439,7 @@ void  IoModel::FetchMultipleData(char*** pstrings,int* pnumstrings,const char* d
 
 	/*Assign output pointers: */
 	*pstrings=strings;
-	*pnumstrings=num_instances;
+	if(pnumstrings) *pnumstrings=num_instances;
 }
 /*}}}*/
 void  IoModel::FetchMultipleData(int** pvector, int* pnum_instances,const char* data_name){/*{{{*/
@@ -2536,7 +2646,9 @@ void  IoModel::FetchMultipleData(IssmDouble*** pmatrices,int** pmdims,int** pndi
 	else{
 		xDelete<int>(ndims);
 	}
-	*pnumrecords=num_instances;
+	if(pnumrecords){
+		*pnumrecords=num_instances;
+	}
 }
 /*}}}*/
 void  IoModel::FetchMultipleData(int*** pmatrices,int** pmdims,int** pndims, int* pnumrecords,const char* data_name){/*{{{*/
@@ -2679,6 +2791,18 @@ void  IoModel::FindConstant(bool* pvalue,const char* constant_name){/*{{{*/
 		IoConstant* ioconstant=*iter;
 
 		if(strcmp(ioconstant->name,constant_name)==0){
+			if(ioconstant->constant->ObjectEnum()!=BoolParamEnum){
+				_printf0_("=========================================================================\n");
+				_printf0_(" Marshalled file is not consistent with compiled code                    \n");
+				_printf0_("                                                                         \n");
+				_printf0_("    This problem typically happens when two different versions of ISSM   \n");
+				_printf0_("    are being used. Make sure that you are running the same version:     \n");
+				_printf0_("    - to marshall the model (i.e., MATLAB/python interface)              \n");
+				_printf0_("    - to run ISSM (i.e., the compiled code issm.exe)                     \n");
+				_printf0_("                                                                         \n");
+				_printf0_("=========================================================================\n\n");
+				_error_("\""<< constant_name <<"\" cannot return a bool, it is a " << EnumToStringx(ioconstant->constant->ObjectEnum()));
+			}
 			ioconstant->constant->GetParameterValue(pvalue);
 			return;
 		}
@@ -2697,6 +2821,18 @@ void  IoModel::FindConstant(int* pvalue,const char* constant_name){/*{{{*/
 		IoConstant* ioconstant=*iter;
 
 		if(strcmp(ioconstant->name,constant_name)==0){
+			if(ioconstant->constant->ObjectEnum()!=IntParamEnum){
+				_printf0_("=========================================================================\n");
+				_printf0_(" Marshalled file is not consistent with compiled code                    \n");
+				_printf0_("                                                                         \n");
+				_printf0_("    This problem typically happens when two different versions of ISSM   \n");
+				_printf0_("    are being used. Make sure that you are running the same version:     \n");
+				_printf0_("    - to marshall the model (i.e., MATLAB/python interface)              \n");
+				_printf0_("    - to run ISSM (i.e., the compiled code issm.exe)                     \n");
+				_printf0_("                                                                         \n");
+				_printf0_("=========================================================================\n\n");
+				_error_("\""<< constant_name <<"\" cannot return an int, it is a " << EnumToStringx(ioconstant->constant->ObjectEnum()));
+			}
 			ioconstant->constant->GetParameterValue(pvalue);
 			return;
 		}
@@ -2714,6 +2850,18 @@ void  IoModel::FindConstant(IssmDouble* pvalue,const char* constant_name){/*{{{*
 		IoConstant* ioconstant=*iter;
 
 		if(strcmp(ioconstant->name,constant_name)==0){
+			if(ioconstant->constant->ObjectEnum()!=DoubleParamEnum){
+				_printf0_("=========================================================================\n");
+				_printf0_(" Marshalled file is not consistent with compiled code                    \n");
+				_printf0_("                                                                         \n");
+				_printf0_("    This problem typically happens when two different versions of ISSM   \n");
+				_printf0_("    are being used. Make sure that you are running the same version:     \n");
+				_printf0_("    - to marshall the model (i.e., MATLAB/python interface)              \n");
+				_printf0_("    - to run ISSM (i.e., the compiled code issm.exe)                     \n");
+				_printf0_("                                                                         \n");
+				_printf0_("=========================================================================\n\n");
+				_error_("\""<< constant_name <<"\" cannot return a double, it is a " << EnumToStringx(ioconstant->constant->ObjectEnum()));
+			}
 			ioconstant->constant->GetParameterValue(pvalue);
 			return;
 		}
@@ -2731,6 +2879,18 @@ void  IoModel::FindConstant(char** pvalue,const char* constant_name){/*{{{*/
 		IoConstant* ioconstant=*iter;
 
 		if(strcmp(ioconstant->name,constant_name)==0){
+			if(ioconstant->constant->ObjectEnum()!=StringParamEnum){
+				_printf0_("=========================================================================\n");
+				_printf0_(" Marshalled file is not consistent with compiled code                    \n");
+				_printf0_("                                                                         \n");
+				_printf0_("    This problem typically happens when two different versions of ISSM   \n");
+				_printf0_("    are being used. Make sure that you are running the same version:     \n");
+				_printf0_("    - to marshall the model (i.e., MATLAB/python interface)              \n");
+				_printf0_("    - to run ISSM (i.e., the compiled code issm.exe)                     \n");
+				_printf0_("                                                                         \n");
+				_printf0_("=========================================================================\n\n");
+				_error_("\""<< constant_name <<"\" cannot return a string, it is a " << EnumToStringx(ioconstant->constant->ObjectEnum()));
+			}
 			ioconstant->constant->GetParameterValue(pvalue);
 			return;
 		}
@@ -2748,6 +2908,18 @@ void  IoModel::FindConstant(char*** pvalue,int* psize,const char* constant_name)
 		IoConstant* ioconstant=*iter;
 
 		if(strcmp(ioconstant->name,constant_name)==0){
+			if(ioconstant->constant->ObjectEnum()!=StringArrayParamEnum){
+				_printf0_("=========================================================================\n");
+				_printf0_(" Marshalled file is not consistent with compiled code                    \n");
+				_printf0_("                                                                         \n");
+				_printf0_("    This problem typically happens when two different versions of ISSM   \n");
+				_printf0_("    are being used. Make sure that you are running the same version:     \n");
+				_printf0_("    - to marshall the model (i.e., MATLAB/python interface)              \n");
+				_printf0_("    - to run ISSM (i.e., the compiled code issm.exe)                     \n");
+				_printf0_("                                                                         \n");
+				_printf0_("=========================================================================\n\n");
+				_error_("\""<< constant_name <<"\" cannot return a string array, it is a " << EnumToStringx(ioconstant->constant->ObjectEnum()));
+			}
 			ioconstant->constant->GetParameterValue(pvalue,psize);
 			return;
 		}
@@ -3047,38 +3219,7 @@ void  IoModel::StartTrace(bool trace){/*{{{*/
 
 		#elif defined(_HAVE_CODIPACK_)
 		//fprintf(stderr, "*** Codipack IoModel::StartTrace\n");
-		/*
-		 * FIXME codi
-		 * - ADOL-C variant uses fine grained tracing with various arguments
-		 * - ADOL-C variant sets a garbage collection parameter for its tape
-		 * -> These parameters are not read for the CoDiPack ISSM version!
-		 */
-		#if _CODIPACK_MAJOR_==2
-		auto& tape_codi = IssmDouble::getTape();
-		#elif _CODIPACK_MAJOR_==1
-		auto& tape_codi = IssmDouble::getGlobalTape();
-		#else
-		#error "_CODIPACK_MAJOR_ not supported"
-		#endif
-
-		tape_codi.setActive();
-		#if _AD_TAPE_ALLOC_
-		//alloc_profiler.Tag(StartInit, true);
-		IssmDouble x_t(1.0), y_t(1.0);
-		tape_codi.registerInput(y_t);
-		int codi_allocn = 0;
-		this->FetchData(&codi_allocn,"md.autodiff.tapeAlloc");
-		for(int i = 0;i < codi_allocn;++i) {
-			x_t = y_t * y_t;
-		}
-		/*
-		std::stringstream out_s;
-		IssmDouble::getTape().printStatistics(out_s);
-		_printf0_("StartTrace::Tape Statistics	   : TapeAlloc count=[" << codi_allocn << "]\n" << out_s.str());
-		*/
-		tape_codi.reset();
-		//alloc_profiler.Tag(FinishInit, true);
-		#endif
+		codi_global.start();
 		#endif
 	}
 

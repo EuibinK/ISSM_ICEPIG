@@ -61,7 +61,7 @@ void debris_core(FemModel* femmodel){ /*{{{*/
 	if(save_results) femmodel->RequestedOutputsx(&femmodel->results,requested_outputs,numoutputs);
 	if(solution_type==DebrisSolutionEnum)femmodel->RequestedDependentsx();
 
-	/*Free ressources:*/
+	/*Free resources:*/
 	if(numoutputs){for(int i=0;i<numoutputs;i++){xDelete<char>(requested_outputs[i]);} xDelete<char*>(requested_outputs);}
 
 	/*profiler*/

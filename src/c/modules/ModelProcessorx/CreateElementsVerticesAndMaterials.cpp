@@ -1,7 +1,6 @@
 /*
  * CreateElementsNodesAndMaterialsStressbalanceHoriz.c:
  */
-#define _IS_MULTI_ICE_
 
 #include "../../toolkits/toolkits.h"
 #include "../../classes/classes.h"
@@ -101,68 +100,6 @@ void CreateMaterials(Elements* elements,Inputs* inputs,Materials* materials,IoMo
 
 	/*Create materials*/
 	switch(materials_type){
-
-				
-#ifdef _IS_MULTI_ICE_
-		
-		case MatMultiIceEnum:
-		{		   
-                     
- 			//iomodel->FetchDataToInput(inputs,elements,"md.materials.mantle_density"		,			MultiMaterialsMantleDensityEnum); 			// iomodel->FetchDataToInput(inputs,elements,"md.materials.mantle_shear_modulus"	,	MultiMaterialsMantleShearModulusEnum);			
-			// iomodel->FetchDataToInput(inputs,elements,"md.materials.lithosphere_density"	,	   		MultiMaterialsLithosphereDensityEnum);    	// iomodel->FetchDataToInput(inputs,elements,"md.materials.lithosphere_shear_modulus",	MultiMaterialsLithosphereShearModulusEnum);
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.thermal_exchange_velocity",			MultiMaterialsThermalExchangeVelocityEnum);			
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.mixed_layer_capacity",				MultiMaterialsMixedLayerCapacityEnum);
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.beta",								MultiMaterialsBetaEnum);	 	
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.meltingpoint",						MultiMaterialsMeltingpointEnum);  
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.effectiveconductivity_averaging",	MultiMaterialsEffectiveconductivityAveragingEnum);  
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.temperateiceconductivity",			MultiMaterialsTemperateiceconductivityEnum);
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.thermalconductivity",				MultiMaterialsThermalconductivityEnum);
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.heatcapacity",						MultiMaterialsHeatcapacityEnum);
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.latentheat",						MultiMaterialsLatentheatEnum);			
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.rho_freshwater",					MultiMaterialsRhoFreshwaterEnum);
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.mu_water",							MultiMaterialsMuWaterEnum);
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.rho_water",							MultiMaterialsRhoWaterEnum);
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.rho_ice",							MultiMaterialsRhoIceEnum);
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.rheology_B",						MaterialsRheologyBEnum);
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.rheology_n",						MaterialsRheologyNEnum);
-			iomodel->FetchDataToInput(inputs,elements,"md.materials.rheology_law",						MultiMaterialsRheologyLawEnum);
-
-			for (i=0;i<iomodel->numberofelements;i++) 
-				if(iomodel->my_elements[i]){
-					 materials->AddObject(new MultiMatice(i+1,i,iomodel));
-				}
-
-			switch(iomodel->domaindim){
-				case 2:
-					inputs->DuplicateInput(MaterialsRheologyBEnum,MaterialsRheologyBbarEnum);
-					break;
-				case 3:
-					break;
-				default:
-					_error_("Mesh not supported yet");
-			}
-
-			iomodel->DeleteData(14,// "md.materials.mantle_density", "md.materials.mantle_shear_modulus", "md.materials.lithosphere_density",	 "md.materials.lithosphere_shear_modulus",	
-							"md.materials.rheology_law",				
-							"md.materials.thermal_exchange_velocity",	
-							"md.materials.mixed_layer_capacity",		
-							"md.materials.beta",						
-							"md.materials.meltingpoint",				
-							"md.materials.effectiveconductivity_averaging",
-							"md.materials.temperateiceconductivity",	
-							"md.materials.thermalconductivity",		
-							"md.materials.heatcapacity",				
-							"md.materials.latentheat",				
-							"md.materials.rho_freshwater",			
-							"md.materials.mu_water",					
-							"md.materials.rho_water",					
-							"md.materials.rho_ice");	
-			break;
-		 }
-#endif
-
-
-
 		case MaticeEnum:
 			iomodel->FetchDataToInput(inputs,elements,"md.materials.rheology_B",MaterialsRheologyBEnum);
 			iomodel->FetchDataToInput(inputs,elements,"md.materials.rheology_n",MaterialsRheologyNEnum);
@@ -369,8 +306,6 @@ void CreateMaterials(Elements* elements,Inputs* inputs,Materials* materials,IoMo
 
 	/*Free data: */
 	iomodel->DeleteData(3,"md.material.rheology_B","md.material.rheology_n","md.damage.D");
-
-
 }/*}}}*/
 void CreateVertices(Elements* elements,Vertices* vertices,IoModel* iomodel,int solution_type,bool isamr){/*{{{*/
 
@@ -517,7 +452,7 @@ void CreateVertices(Elements* elements,Vertices* vertices,IoModel* iomodel,int s
 	/*Create Vertices, depending on the constructor type: */
 	if(solution_type!=LoveSolutionEnum) CreateNumberNodeToElementConnectivity(iomodel);
 	if(!isamr){
-		bool isoceancoupling;
+		int isoceancoupling;
 		iomodel->FindConstant(&isoceancoupling,"md.transient.isoceancoupling");
 
 		//iomodel->FetchData(6,"md.mesh.x","md.mesh.y","md.mesh.z","md.geometry.base","md.geometry.thickness","md.mask.ice_levelset");

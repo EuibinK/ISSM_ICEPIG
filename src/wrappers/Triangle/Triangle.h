@@ -18,7 +18,7 @@
 
 #ifdef _HAVE_JAVASCRIPT_MODULES_
 #undef _DO_NOT_LOAD_GLOBALS_ /*only module where this needs to be undefined, so as to 
-							   not include IssmComm several times in the javascript Modle construct.*/
+							   not include IssmComm several times in the JavaScript module construct.*/
 #endif
 
 /*Header files: */

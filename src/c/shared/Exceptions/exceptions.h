@@ -33,7 +33,7 @@ using namespace std;
 /*Assertion macro: do nothing if macro _ISSM_DEBUG_ undefined*/
 #ifdef _ISSM_DEBUG_ 
 #define _assert_(statement)\
-  if (!(statement)) _error_("Assertion \""<<#statement<<"\" failed, please report bug to "<<PACKAGE_BUGREPORT)
+  if (!(statement)) _error_("Assertion \""<<#statement<<"\" failed, please report bug at "<<PACKAGE_BUGREPORT)
 #else
 #define _assert_(ignore)\
   ((void) 0)

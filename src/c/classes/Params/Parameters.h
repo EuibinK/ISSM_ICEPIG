@@ -1,15 +1,11 @@
 #ifndef _CONTAINER_PARAMETERS_H_
 #define  _CONTAINER_PARAMETERS_H_
 #include <stdio.h>
-#define _IS_MULTI_ICE_
-
 
 /*forward declarations */
 class Param;
 class DataSet;
-#ifdef _IS_MULTI_ICE_
-#include "../Elements/Element.h" 
-#endif
+class MarshallHandle;
 template <class doublematrix> class Matrix;
 template <class doubletype> class Vector;
 #include "../../shared/shared.h"
@@ -44,13 +40,11 @@ class Parameters{
 		void  FindParam(bool* pinteger,int enum_type);
 		void  FindParam(int* pinteger,int enum_type);
 		void  FindParam(IssmDouble* pscalar, int enum_type);
-		void  FindParam(IssmDouble* pscalar, int enum_type,IssmDouble time);
-		void  FindParam(IssmDouble* pscalar, int row,IssmDouble time,int enum_type);
+		void  FindParam(IssmDouble* pscalar, int enum_type, IssmDouble time);
+		void  FindParam(IssmDouble* pscalar, int enum_type, IssmDouble time, int timestepping, IssmDouble dt);
+		void  FindParam(IssmDouble* pscalar, int row, IssmDouble time, int enum_type);
+		void  FindParam(IssmDouble* pscalar, int row, IssmDouble time, int timestepping, IssmDouble dt, int enum_type);
 		void  FindParam(char** pstring,int enum_type);
-		#ifdef _IS_MULTI_ICE_
-		void  FindParam(Element* element, IssmDouble* pscalar,int param_enum); 
-		IssmDouble FindParam(Element* element, int param_enum);  
-		#endif
 		void  FindParam(char*** pstringarray,int* pM,int enum_type);
 		void  FindParam(int** pintarray,int* pM,int enum_type);
 		void  FindParam(int** pintarray,int* pM,int* PN,int enum_type);
@@ -63,9 +57,11 @@ class Parameters{
 		void  FindParam(DataSet** pdataset, int enum_type);
 		void  FindParamAndMakePassive(IssmPDouble* pscalar, int enum_type);
 		void  FindParamAndMakePassive(IssmPDouble** pvec,int* pM,int enum_type);
+		void  FindControlParam(IssmDouble** pvec,int* pM, int param_enum, const char* data);
+		void  FindControlParamAndMakePassive(IssmPDouble** pvec,int* pM, int param_enum, const char* data);
 		void  FindParamInDataset(IssmDouble** pIssmDoublearray,int* pM,int* pN,int dataset_type,int enum_type);
 		IssmDouble FindParam(int enum_type);
-		
+
 		void  SetParam(bool boolean,int enum_type);
 		void  SetParam(int integer,int enum_type);
 		void  SetParam(IssmDouble scalar, int enum_type);
@@ -73,13 +69,16 @@ class Parameters{
 		void  SetParam(char** stringarray,int M,int enum_type);
 		void  SetParam(IssmDouble* IssmDoublearray,int M,int enum_type);
 		void  SetParam(IssmDouble* IssmDoublearray,int M,int N,int enum_type);
+		void  SetParam(IssmDouble* IssmDoublearray, int enum_type);
 		void  SetParam(int* intarray,int M,int enum_type);
 		void  SetParam(int* intarray,int M,int N,int enum_type);
 		void  SetParam(Vector<IssmDouble>* vec,int enum_type);
 		void  SetParam(Matrix<IssmDouble>* mat,int enum_type);
 		void  SetParam(FILE* fid,int enum_type);
 		void  SetParam(DataSet* dataset,int enum_type);
-
+		void  SetControlFromVector(IssmDouble* array, int enum_type, int M, int N, int offset);
+		void  SetGradientFromVector(IssmDouble* array, int enum_type, int M, int N, int offset);
+		void  GetVectorFromControl(Vector<IssmDouble>* vector,int control_enum,int control_index,int N,const char* data,int offset);
 		Param* FindParamObject(int enum_type);
 
 };

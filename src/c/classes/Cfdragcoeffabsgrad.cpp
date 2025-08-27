@@ -28,6 +28,8 @@ Cfdragcoeffabsgrad::Cfdragcoeffabsgrad(){/*{{{*/
 
 	this->definitionenum = -1;
 	this->name = NULL;
+	this->J = 0.;
+	this->firsttimepassed = false;
 }
 /*}}}*/
 Cfdragcoeffabsgrad::Cfdragcoeffabsgrad(char* in_name, int in_definitionenum){/*{{{*/
@@ -36,6 +38,31 @@ Cfdragcoeffabsgrad::Cfdragcoeffabsgrad(char* in_name, int in_definitionenum){/*{
 
 	this->name		= xNew<char>(strlen(in_name)+1);
 	xMemCpy<char>(this->name,in_name,strlen(in_name)+1);
+
+	this->J = 0.;
+	this->firsttimepassed = false;
+}
+/*}}}*/
+Cfdragcoeffabsgrad::Cfdragcoeffabsgrad(char* in_name, int in_definitionenum, IssmDouble in_J){/*{{{*/
+
+	this->definitionenum=in_definitionenum;
+
+	this->name		= xNew<char>(strlen(in_name)+1);
+	xMemCpy<char>(this->name,in_name,strlen(in_name)+1);
+
+	this->J = in_J;
+	this->firsttimepassed = false;
+}
+/*}}}*/
+Cfdragcoeffabsgrad::Cfdragcoeffabsgrad(char* in_name, int in_definitionenum, IssmDouble in_J, bool in_firsttimepassed){/*{{{*/
+
+	this->definitionenum=in_definitionenum;
+
+	this->name		= xNew<char>(strlen(in_name)+1);
+	xMemCpy<char>(this->name,in_name,strlen(in_name)+1);
+
+	this->J = in_J;
+	this->firsttimepassed = in_firsttimepassed;
 }
 /*}}}*/
 Cfdragcoeffabsgrad::~Cfdragcoeffabsgrad(){/*{{{*/
@@ -44,7 +71,7 @@ Cfdragcoeffabsgrad::~Cfdragcoeffabsgrad(){/*{{{*/
 /*}}}*/
 /*Object virtual function resolutoin: */
 Object* Cfdragcoeffabsgrad::copy() {/*{{{*/
-	Cfdragcoeffabsgrad* mf = new Cfdragcoeffabsgrad(this->name,this->definitionenum);
+	Cfdragcoeffabsgrad* mf = new Cfdragcoeffabsgrad(this->name,this->definitionenum, this->J, this->firsttimepassed);
 	return (Object*) mf;
 }
 /*}}}*/
@@ -68,6 +95,8 @@ void Cfdragcoeffabsgrad::Marshall(MarshallHandle* marshallhandle){/*{{{*/
 
 	marshallhandle->call(this->definitionenum);
 	marshallhandle->call(this->name);
+	marshallhandle->call(this->J);
+	marshallhandle->call(this->firsttimepassed);
 } 
 /*}}}*/
 int Cfdragcoeffabsgrad::ObjectEnum(void){/*{{{*/
@@ -89,19 +118,22 @@ char* Cfdragcoeffabsgrad::Name(){/*{{{*/
 IssmDouble Cfdragcoeffabsgrad::Response(FemModel* femmodel){/*{{{*/
 
 	/*recover parameters: */
-	IssmDouble J=0.;
+	IssmDouble J_part=0.;
 	IssmDouble J_sum=0.;
 
-	for(Object* & object : femmodel->elements->objects){
-		Element* element=xDynamicCast<Element*>(object);
-		J+=this->Cfdragcoeffabsgrad_Calculation(element);
+	if (!this->firsttimepassed){
+		for(Object* & object : femmodel->elements->objects){
+			Element* element=xDynamicCast<Element*>(object);
+			J_part+=this->Cfdragcoeffabsgrad_Calculation(element);
+		}
+
+		ISSM_MPI_Allreduce ( (void*)&J_part,(void*)&J_sum,1,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,IssmComm::GetComm());
+		ISSM_MPI_Bcast(&J_sum,1,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
+		this->J=J_sum;
+
+		this->firsttimepassed = true;
 	}
-
-	ISSM_MPI_Allreduce ( (void*)&J,(void*)&J_sum,1,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,IssmComm::GetComm());
-	ISSM_MPI_Bcast(&J_sum,1,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
-	J=J_sum;
-
-	return J;
+	return this->J;
 }/*}}}*/
 IssmDouble Cfdragcoeffabsgrad::Cfdragcoeffabsgrad_Calculation(Element* element){/*{{{*/
 
@@ -136,18 +168,18 @@ IssmDouble Cfdragcoeffabsgrad::Cfdragcoeffabsgrad_Calculation(Element* element){
 	DatasetInput *datasetinput = basalelement->GetDatasetInput(definitionenum);  _assert_(datasetinput);
 	Input        *drag_input   = NULL;
 
-	/* get the friction law: if 2-Weertman, 11-Schoof or 14-RegularizedCoulomb, which has a different names of C */
+	/* get the friction law: if 2-Weertman, 11-Schoof, 14-RegularizedCoulomb 15-RegularizedCoulomb2, which has a different names of C */
 	element->FindParam(&frictionlaw, FrictionLawEnum);
 	switch(frictionlaw) {
 		case 2:
 		case 11:
 		case 14:
+		case 15:
 			drag_input = basalelement->GetInput(FrictionCEnum); _assert_(drag_input);
 			break;
 		default:
 			drag_input = basalelement->GetInput(FrictionCoefficientEnum); _assert_(drag_input);
 	}
-
 
 	/* Start  looping on the number of gaussian points: */
 	Gauss* gauss=basalelement->NewGauss(2);

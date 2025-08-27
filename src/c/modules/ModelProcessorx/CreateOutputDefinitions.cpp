@@ -204,13 +204,13 @@ void CreateOutputDefinitions(Elements* elements,Parameters* parameters,Inputs* i
 					 _error_("cfsurfacesquare weight size not supported yet");
 
 					/*First create a cfsurfacesquare object for that specific string (cfsurfacesquare_model_string_s[j]):*/
-					output_definitions->AddObject(new Cfsurfacesquare(cfsurfacesquare_name_s[j],StringToEnumx(cfsurfacesquare_definitionstring_s[j]),StringToEnumx(cfsurfacesquare_model_string_s[j]),cfsurfacesquare_datatime_s[j],false));
+					output_definitions->AddObject(new Cfsurfacesquare(cfsurfacesquare_name_s[j],StringToEnumx(cfsurfacesquare_definitionstring_s[j]),StringToEnumx(cfsurfacesquare_model_string_s[j]),cfsurfacesquare_datatime_s[j]));
 
 					/*Now, for this particular cfsurfacesquare object, make sure we plug into the elements: the observation, and the weights.*/
 					for(Object* & object : elements->objects){
 						Element* element=xDynamicCast<Element*>(object);
-						element->DatasetInputAdd(StringToEnumx(cfsurfacesquare_definitionstring_s[j]),cfsurfacesquare_observation_s[j],inputs,iomodel,cfsurfacesquare_observation_M_s[j],cfsurfacesquare_observation_N_s[j],obs_vector_type,StringToEnumx(cfsurfacesquare_observation_string_s[j]),7,SurfaceObservationEnum);
-						element->DatasetInputAdd(StringToEnumx(cfsurfacesquare_definitionstring_s[j]),cfsurfacesquare_weights_s[j],inputs,iomodel,cfsurfacesquare_weights_M_s[j],cfsurfacesquare_weights_N_s[j],weight_vector_type,StringToEnumx(cfsurfacesquare_weights_string_s[j]),7,WeightsSurfaceObservationEnum);
+						element->DatasetInputAdd(StringToEnumx(cfsurfacesquare_definitionstring_s[j]),cfsurfacesquare_observation_s[j],inputs,iomodel,cfsurfacesquare_observation_M_s[j],cfsurfacesquare_observation_N_s[j],obs_vector_type,StringToEnumx(cfsurfacesquare_observation_string_s[j]),SurfaceObservationEnum);
+						element->DatasetInputAdd(StringToEnumx(cfsurfacesquare_definitionstring_s[j]),cfsurfacesquare_weights_s[j],inputs,iomodel,cfsurfacesquare_weights_M_s[j],cfsurfacesquare_weights_N_s[j],weight_vector_type,StringToEnumx(cfsurfacesquare_weights_string_s[j]),WeightsSurfaceObservationEnum);
 
 					}
 
@@ -241,6 +241,73 @@ void CreateOutputDefinitions(Elements* elements,Parameters* parameters,Inputs* i
 				xDelete<int>(cfsurfacesquare_weights_N_s);
 				xDelete<char*>(cfsurfacesquare_weights_string_s);
 				xDelete<IssmDouble>(cfsurfacesquare_datatime_s);
+				/*}}}*/
+			}
+			else if (output_definition_enums[i]==CfsurfacesquaretransientEnum){
+				/*Deal with cfsurfacesquaretransient: {{{*/
+
+				/*cfsurfacesquaretransient variables: */
+				int          num_cfsurfacesquaretransients,test;
+				char       **cfssqt_name_s                = NULL;
+				char       **cfssqt_definitionstring_s    = NULL;
+				char       **cfssqt_model_string_s        = NULL;
+				IssmDouble **cfssqt_observations_s        = NULL;
+				int         *cfssqt_observations_M_s      = NULL;
+				int         *cfssqt_observations_N_s      = NULL;
+				IssmDouble **cfssqt_weights_s             = NULL;
+				int         *cfssqt_weights_M_s           = NULL;
+				int         *cfssqt_weights_N_s           = NULL;
+
+				/*Fetch name, model_string, observation, observation_string, etc ... (see src/m/classes/cfsurfacesquaretransient.m): */
+				iomodel->FetchMultipleData(&cfssqt_name_s,&num_cfsurfacesquaretransients,"md.cfsurfacesquaretransient.name");
+				iomodel->FetchMultipleData(&cfssqt_definitionstring_s,&test,"md.cfsurfacesquaretransient.definitionstring"); _assert_(test==num_cfsurfacesquaretransients);
+				iomodel->FetchMultipleData(&cfssqt_model_string_s,&test,"md.cfsurfacesquaretransient.model_string"); _assert_(test==num_cfsurfacesquaretransients);
+				iomodel->FetchMultipleData(&cfssqt_observations_s,&cfssqt_observations_M_s,&cfssqt_observations_N_s,&test, "md.cfsurfacesquaretransient.observations"); _assert_(test==num_cfsurfacesquaretransients);
+				iomodel->FetchMultipleData(&cfssqt_weights_s,&cfssqt_weights_M_s,&cfssqt_weights_N_s, &test,"md.cfsurfacesquaretransient.weights"); _assert_(test==num_cfsurfacesquaretransients);
+
+				for(j=0;j<num_cfsurfacesquaretransients;j++){
+
+               /*Check that we can use P1 inputs*/
+					if (cfssqt_observations_M_s[j]!=(iomodel->numberofvertices+1)) _error_("observations should be a P1 time series");
+               if (cfssqt_weights_M_s[j]!=iomodel->numberofvertices+1)        _error_("weights should be a P1 time series");
+					_assert_(cfssqt_observations_N_s[j]>0);
+
+					/*extract data times from last row of observations*/
+					IssmDouble *datatimes = xNew<IssmDouble>(cfssqt_observations_N_s[j]);
+					for(int k=0;k<cfssqt_observations_N_s[j];k++) datatimes[k] = (cfssqt_observations_s[j])[cfssqt_observations_N_s[j]*(cfssqt_weights_M_s[j]-1)+k];
+
+					/*First create a cfsurfacesquaretransient object for that specific string (cfssqt_model_string_s[j]):*/
+					output_definitions->AddObject(new Cfsurfacesquaretransient(cfssqt_name_s[j], StringToEnumx(cfssqt_definitionstring_s[j]), StringToEnumx(cfssqt_model_string_s[j]), cfssqt_observations_N_s[j],datatimes ));
+					xDelete<IssmDouble>(datatimes);
+
+					/*Now, for this particular cfsurfacesquaretransient object, make sure we plug into the elements: the observation, and the weights.*/
+					for(Object* & object : elements->objects){
+						Element* element=xDynamicCast<Element*>(object);
+						element->DatasetInputAdd(StringToEnumx(cfssqt_definitionstring_s[j]),cfssqt_observations_s[j],inputs,iomodel,cfssqt_observations_M_s[j],cfssqt_observations_N_s[j],1,SurfaceObservationEnum,SurfaceObservationEnum);
+						element->DatasetInputAdd(StringToEnumx(cfssqt_definitionstring_s[j]),cfssqt_weights_s[j],inputs,iomodel,cfssqt_weights_M_s[j],cfssqt_weights_N_s[j],1,WeightsSurfaceObservationEnum,WeightsSurfaceObservationEnum);
+
+					}
+				}
+
+				/*Free resources:*/
+				for(j=0;j<num_cfsurfacesquaretransients;j++){
+					char* string=NULL;
+					IssmDouble* matrix = NULL;
+					string = cfssqt_definitionstring_s[j];		xDelete<char>(string);
+					string = cfssqt_model_string_s[j];			xDelete<char>(string);
+					string = cfssqt_name_s[j];    xDelete<char>(string);
+					matrix = cfssqt_observations_s[j]; xDelete<IssmDouble>(matrix);
+					matrix = cfssqt_weights_s[j]; xDelete<IssmDouble>(matrix);
+				}
+				xDelete<char*>(cfssqt_name_s);
+				xDelete<char*>(cfssqt_model_string_s);
+				xDelete<char*>(cfssqt_definitionstring_s);
+				xDelete<IssmDouble*>(cfssqt_observations_s);
+				xDelete<int>(cfssqt_observations_M_s);
+				xDelete<int>(cfssqt_observations_N_s);
+				xDelete<IssmDouble*>(cfssqt_weights_s);
+				xDelete<int>(cfssqt_weights_M_s);
+				xDelete<int>(cfssqt_weights_N_s);
 				/*}}}*/
 			}
 			else if (output_definition_enums[i]==CfdragcoeffabsgradEnum){
@@ -281,7 +348,7 @@ void CreateOutputDefinitions(Elements* elements,Parameters* parameters,Inputs* i
 
 						Element* element=xDynamicCast<Element*>(object);
 
-						element->DatasetInputAdd(StringToEnumx(cfdragcoeffabsgrad_definitionstring_s[j]),cfdragcoeffabsgrad_weights_s[j],inputs,iomodel,cfdragcoeffabsgrad_weights_M_s[j],cfdragcoeffabsgrad_weights_N_s[j],weight_vector_type,StringToEnumx(cfdragcoeffabsgrad_weights_string_s[j]),7,WeightsSurfaceObservationEnum);
+						element->DatasetInputAdd(StringToEnumx(cfdragcoeffabsgrad_definitionstring_s[j]),cfdragcoeffabsgrad_weights_s[j],inputs,iomodel,cfdragcoeffabsgrad_weights_M_s[j],cfdragcoeffabsgrad_weights_N_s[j],weight_vector_type,StringToEnumx(cfdragcoeffabsgrad_weights_string_s[j]),WeightsSurfaceObservationEnum);
 
 					}
 
@@ -305,6 +372,175 @@ void CreateOutputDefinitions(Elements* elements,Parameters* parameters,Inputs* i
 				xDelete<char*>(cfdragcoeffabsgrad_weights_string_s);
 				/*}}}*/
 			}
+			else if (output_definition_enums[i]==CfdragcoeffabsgradtransientEnum){
+				/*Deal with cfdragcoeffabsgradtransient: {{{*/
+
+				/*cfdragcoeffabsgrad variables: */
+				int          num_cfdragcoeffabsgradtransients, test;
+				char**       cfdraggradt_name_s						= NULL;    
+				char**		 cfdraggradt_definitionstring_s		= NULL;    
+				IssmDouble** cfdraggradt_weights_s					= NULL;
+				int*         cfdraggradt_weights_M_s				= NULL;
+				int*         cfdraggradt_weights_N_s				= NULL;
+
+				/*Fetch name, model_string, observation, observation_string, etc ... (see src/m/classes/cfdragcoeffabsgradtransient.m): */
+				iomodel->FetchMultipleData(&cfdraggradt_name_s,&num_cfdragcoeffabsgradtransients,                                                        "md.cfdragcoeffabsgradtransient.name");
+				iomodel->FetchMultipleData(&cfdraggradt_definitionstring_s,&num_cfdragcoeffabsgradtransients,                                            "md.cfdragcoeffabsgradtransient.definitionstring");
+				iomodel->FetchMultipleData(&cfdraggradt_weights_s,&cfdraggradt_weights_M_s,&cfdraggradt_weights_N_s,&test,             "md.cfdragcoeffabsgradtransient.weights");
+
+				for(j=0;j<num_cfdragcoeffabsgradtransients;j++){
+
+					/*Check that we can use P1 inputs*/
+					if (cfdraggradt_weights_M_s[j]!=iomodel->numberofvertices+1)  _error_("weights should be a P1 time series");
+
+					/*extract data times from last row of observations*/
+					IssmDouble *datatimes = xNew<IssmDouble>(cfdraggradt_weights_N_s[j]);
+					for(int k=0;k<cfdraggradt_weights_N_s[j];k++) datatimes[k] = (cfdraggradt_weights_s[j])[cfdraggradt_weights_N_s[j]*(cfdraggradt_weights_M_s[j]-1)+k];
+
+					 /*First create a cfdragcoeffabsgradtransient object for that specific string:*/
+					output_definitions->AddObject(new Cfdragcoeffabsgradtransient(cfdraggradt_name_s[j],StringToEnumx(cfdraggradt_definitionstring_s[j]), cfdraggradt_weights_N_s[j], datatimes));
+
+					/*Now, for this particular cfdragcoeffabsgrad object, make sure we plug into the elements: the observation, and the weights.*/
+					for(Object* & object : elements->objects){
+
+						Element* element=xDynamicCast<Element*>(object);
+
+						element->DatasetInputAdd(StringToEnumx(cfdraggradt_definitionstring_s[j]),cfdraggradt_weights_s[j],inputs,iomodel,cfdraggradt_weights_M_s[j],cfdraggradt_weights_N_s[j],1,WeightsSurfaceObservationEnum,WeightsSurfaceObservationEnum);
+
+					}
+				}
+
+				/*Free resources:*/
+				for(j=0;j<num_cfdragcoeffabsgradtransients;j++){
+					char* string=NULL;
+					IssmDouble* matrix = NULL;
+
+					string = cfdraggradt_definitionstring_s[j];		xDelete<char>(string);
+					string = cfdraggradt_name_s[j];    xDelete<char>(string);
+					matrix = cfdraggradt_weights_s[j]; xDelete<IssmDouble>(matrix);
+				}
+				xDelete<char*>(cfdraggradt_name_s);
+				xDelete<char*>(cfdraggradt_definitionstring_s);
+				xDelete<IssmDouble*>(cfdraggradt_weights_s);
+				xDelete<int>(cfdraggradt_weights_M_s);
+				xDelete<int>(cfdraggradt_weights_N_s);
+				/*}}}*/
+			}
+			else if (output_definition_enums[i]==CfrheologybbarabsgradEnum){
+				/*Deal with cfrheologybbarabsgrad: {{{*/
+
+				/*cfrheologybbarabsgrad variables: */
+				int          num_cfrheologybbarabsgrads;
+				char**       cfrheologybbarabsgrad_name_s                = NULL;
+				char**       cfrheologybbarabsgrad_definitionstring_s    = NULL;
+				IssmDouble** cfrheologybbarabsgrad_weights_s             = NULL;
+				int*         cfrheologybbarabsgrad_weights_M_s           = NULL;
+				int*         cfrheologybbarabsgrad_weights_N_s           = NULL;
+				char**       cfrheologybbarabsgrad_weights_string_s      = NULL;
+
+				/*Fetch name, model_string, observation, observation_string, etc ... (see src/m/classes/cfrheologybbarabsgrad.m): */
+				iomodel->FetchMultipleData(&cfrheologybbarabsgrad_name_s,&num_cfrheologybbarabsgrads,                                                        "md.cfrheologybbarabsgrad.name");
+				iomodel->FetchMultipleData(&cfrheologybbarabsgrad_definitionstring_s,&num_cfrheologybbarabsgrads,                                            "md.cfrheologybbarabsgrad.definitionstring");
+				iomodel->FetchMultipleData(&cfrheologybbarabsgrad_weights_s,&cfrheologybbarabsgrad_weights_M_s,&cfrheologybbarabsgrad_weights_N_s,&num_cfrheologybbarabsgrads,             "md.cfrheologybbarabsgrad.weights");
+				iomodel->FetchMultipleData(&cfrheologybbarabsgrad_weights_string_s,&num_cfrheologybbarabsgrads,                                              "md.cfrheologybbarabsgrad.weights_string");
+
+				for(j=0;j<num_cfrheologybbarabsgrads;j++){
+
+					int weight_vector_type=0;
+					if ((cfrheologybbarabsgrad_weights_M_s[j]==iomodel->numberofvertices) || (cfrheologybbarabsgrad_weights_M_s[j]==iomodel->numberofvertices+1)){
+						weight_vector_type=1;
+					}
+					else if ((cfrheologybbarabsgrad_weights_M_s[j]==iomodel->numberofelements) || (cfrheologybbarabsgrad_weights_M_s[j]==iomodel->numberofelements+1)){
+						weight_vector_type=2;
+					}
+					else
+					 _error_("cfrheologybbarabsgrad weight size not supported yet");
+
+					/*First create a cfrheologybbarabsgrad object for that specific string (cfrheologybbarabsgrad_model_string_s[j]):*/
+					output_definitions->AddObject(new Cfrheologybbarabsgrad(cfrheologybbarabsgrad_name_s[j],StringToEnumx(cfrheologybbarabsgrad_definitionstring_s[j]),StringToEnumx(cfrheologybbarabsgrad_weights_string_s[j])));
+
+					/*Now, for this particular cfrheologybbarabsgrad object, make sure we plug into the elements: the observation, and the weights.*/
+					for(Object* & object : elements->objects){
+
+						Element* element=xDynamicCast<Element*>(object);
+
+						element->DatasetInputAdd(StringToEnumx(cfrheologybbarabsgrad_definitionstring_s[j]),cfrheologybbarabsgrad_weights_s[j],inputs,iomodel,cfrheologybbarabsgrad_weights_M_s[j],cfrheologybbarabsgrad_weights_N_s[j],weight_vector_type,StringToEnumx(cfrheologybbarabsgrad_weights_string_s[j]),WeightsSurfaceObservationEnum);
+
+					}
+
+				}
+				    /*Free resources:*/
+            for(j=0;j<num_cfrheologybbarabsgrads;j++){
+               char* string=NULL;
+               IssmDouble* matrix = NULL;
+
+               string = cfrheologybbarabsgrad_definitionstring_s[j];    xDelete<char>(string);
+               string = cfrheologybbarabsgrad_weights_string_s[j];      xDelete<char>(string);
+               string = cfrheologybbarabsgrad_name_s[j];    xDelete<char>(string);
+               matrix = cfrheologybbarabsgrad_weights_s[j]; xDelete<IssmDouble>(matrix);
+            }
+            xDelete<char*>(cfrheologybbarabsgrad_name_s);
+            xDelete<char*>(cfrheologybbarabsgrad_definitionstring_s);
+            xDelete<IssmDouble*>(cfrheologybbarabsgrad_weights_s);
+            xDelete<int>(cfrheologybbarabsgrad_weights_M_s);
+            xDelete<int>(cfrheologybbarabsgrad_weights_N_s);
+            xDelete<char*>(cfrheologybbarabsgrad_weights_string_s);
+            /*}}}*/
+         }
+			else if (output_definition_enums[i]==CfrheologybbarabsgradtransientEnum){
+				/*Deal with cfrheologybbarabsgradtransient: {{{*/
+
+				/*cfrheologybbarabsgrad variables: */
+				int          num_cfrheologybbarabsgradtransients, test;
+				char**       cfrheogradt_name_s                = NULL;
+				char**       cfrheogradt_definitionstring_s    = NULL;
+				IssmDouble** cfrheogradt_weights_s             = NULL;
+				int*         cfrheogradt_weights_M_s           = NULL;
+				int*         cfrheogradt_weights_N_s           = NULL;
+				char**       cfrheogradt_weights_string_s      = NULL;
+
+				/*Fetch name, model_string, observation, observation_string, etc ... (see src/m/classes/cfrheologybbarabsgradtransient.m): */
+				iomodel->FetchMultipleData(&cfrheogradt_name_s,&num_cfrheologybbarabsgradtransients,                                                        "md.cfrheologybbarabsgradtransient.name");
+				iomodel->FetchMultipleData(&cfrheogradt_definitionstring_s,&num_cfrheologybbarabsgradtransients,                                            "md.cfrheologybbarabsgradtransient.definitionstring");
+				iomodel->FetchMultipleData(&cfrheogradt_weights_s,&cfrheogradt_weights_M_s,&cfrheogradt_weights_N_s,&test,             "md.cfrheologybbarabsgradtransient.weights");
+
+				for(j=0;j<num_cfrheologybbarabsgradtransients;j++){
+
+					if (cfrheogradt_weights_M_s[j]!=iomodel->numberofvertices+1) _error_("weights should be a P1 time series");
+
+					/*extract data times from last row of observations*/
+					IssmDouble *datatimes = xNew<IssmDouble>(cfrheogradt_weights_N_s[j]);
+					for(int k=0;k<cfrheogradt_weights_N_s[j];k++) datatimes[k] = (cfrheogradt_weights_s[j])[cfrheogradt_weights_N_s[j]*(cfrheogradt_weights_M_s[j]-1)+k];
+
+					/*First create a cfrheologybbarabsgradtransient object for that specific string:*/
+					output_definitions->AddObject(new Cfrheologybbarabsgradtransient(cfrheogradt_name_s[j],StringToEnumx(cfrheogradt_definitionstring_s[j]), cfrheogradt_weights_N_s[j], datatimes));
+
+					/*Now, for this particular cfrheologybbarabsgrad object, make sure we plug into the elements: the observation, and the weights.*/
+					for(Object* & object : elements->objects){
+
+						Element* element=xDynamicCast<Element*>(object);
+
+						element->DatasetInputAdd(StringToEnumx(cfrheogradt_definitionstring_s[j]),cfrheogradt_weights_s[j],inputs,iomodel,cfrheogradt_weights_M_s[j],cfrheogradt_weights_N_s[j],1,WeightsSurfaceObservationEnum,WeightsSurfaceObservationEnum);
+
+					}
+				}
+
+				/*Free resources:*/
+            for(j=0;j<num_cfrheologybbarabsgradtransients;j++){
+               char* string=NULL;
+               IssmDouble* matrix = NULL;
+
+               string = cfrheogradt_definitionstring_s[j];    xDelete<char>(string);
+               string = cfrheogradt_name_s[j];    xDelete<char>(string);
+               matrix = cfrheogradt_weights_s[j]; xDelete<IssmDouble>(matrix);
+            }
+            xDelete<char*>(cfrheogradt_name_s);
+            xDelete<char*>(cfrheogradt_definitionstring_s);
+            xDelete<IssmDouble*>(cfrheogradt_weights_s);
+            xDelete<int>(cfrheogradt_weights_M_s);
+            xDelete<int>(cfrheogradt_weights_N_s);
+            /*}}}*/
+         }
 			else if (output_definition_enums[i]==CfsurfacelogvelEnum){
 				/*Deal with cfsurfacelogvel: {{{*/
 
@@ -358,16 +594,16 @@ void CreateOutputDefinitions(Elements* elements,Parameters* parameters,Inputs* i
 					 _error_("cfsurfacelogvel weight size not supported yet");
 
 					/*First create a cfsurfacelogvel object for that specific string (cfsurfacelogvel_modeltring[j]):*/
-					output_definitions->AddObject(new Cfsurfacelogvel(cfsurfacelogvel_name[j],StringToEnumx(cfsurfacelogvel_definitionstring[j]),cfsurfacelogvel_datatime[j],false));
+					output_definitions->AddObject(new Cfsurfacelogvel(cfsurfacelogvel_name[j],StringToEnumx(cfsurfacelogvel_definitionstring[j]),cfsurfacelogvel_datatime[j]));
 
 					/*Now, for this particular cfsurfacelogvel object, make sure we plug into the elements: the observation, and the weights.*/
 					for(Object* & object : elements->objects){
 
 						Element* element=xDynamicCast<Element*>(object);
 
-						element->DatasetInputAdd(StringToEnumx(cfsurfacelogvel_definitionstring[j]),cfsurfacelogvel_vxobs[j],inputs,iomodel,cfsurfacelogvel_observation_M[j],cfsurfacelogvel_observation_N[j],obs_vector_type,StringToEnumx(cfsurfacelogvel_vxobs_string[j]),7,VxObsEnum);
-							element->DatasetInputAdd(StringToEnumx(cfsurfacelogvel_definitionstring[j]),cfsurfacelogvel_vyobs[j],inputs,iomodel,cfsurfacelogvel_observation_M[j],cfsurfacelogvel_observation_N[j],obs_vector_type,StringToEnumx(cfsurfacelogvel_vyobs_string[j]),7,VyObsEnum);
-						element->DatasetInputAdd(StringToEnumx(cfsurfacelogvel_definitionstring[j]),cfsurfacelogvel_weights[j],inputs,iomodel,cfsurfacelogvel_weights_M[j],cfsurfacelogvel_weights_N[j],weight_vector_type,StringToEnumx(cfsurfacelogvel_weightstring[j]),7,WeightsSurfaceObservationEnum);
+						element->DatasetInputAdd(StringToEnumx(cfsurfacelogvel_definitionstring[j]),cfsurfacelogvel_vxobs[j],inputs,iomodel,cfsurfacelogvel_observation_M[j],cfsurfacelogvel_observation_N[j],obs_vector_type,StringToEnumx(cfsurfacelogvel_vxobs_string[j]),VxObsEnum);
+							element->DatasetInputAdd(StringToEnumx(cfsurfacelogvel_definitionstring[j]),cfsurfacelogvel_vyobs[j],inputs,iomodel,cfsurfacelogvel_observation_M[j],cfsurfacelogvel_observation_N[j],obs_vector_type,StringToEnumx(cfsurfacelogvel_vyobs_string[j]),VyObsEnum);
+						element->DatasetInputAdd(StringToEnumx(cfsurfacelogvel_definitionstring[j]),cfsurfacelogvel_weights[j],inputs,iomodel,cfsurfacelogvel_weights_M[j],cfsurfacelogvel_weights_N[j],weight_vector_type,StringToEnumx(cfsurfacelogvel_weightstring[j]),WeightsSurfaceObservationEnum);
 
 					}
 
@@ -452,13 +688,13 @@ void CreateOutputDefinitions(Elements* elements,Parameters* parameters,Inputs* i
 					 _error_("cflevelsetmisfit weight size not supported yet");
 
 					/*First create a cflevelsetmisfit object for that specific string (cflevelsetmisfit_model_string_s[j]):*/
-					output_definitions->AddObject(new Cflevelsetmisfit(cflevelsetmisfit_name_s[j],StringToEnumx(cflevelsetmisfit_definitionstring_s[j]),StringToEnumx(cflevelsetmisfit_model_string_s[j]),cflevelsetmisfit_datatime_s[j],false));
+					output_definitions->AddObject(new Cflevelsetmisfit(cflevelsetmisfit_name_s[j],StringToEnumx(cflevelsetmisfit_definitionstring_s[j]),StringToEnumx(cflevelsetmisfit_model_string_s[j]),cflevelsetmisfit_datatime_s[j]));
 
 					/*Now, for this particular cflevelsetmisfit object, make sure we plug into the elements: the observation, and the weights.*/
 					for(Object* & object : elements->objects){
 						Element* element=xDynamicCast<Element*>(object);
-						element->DatasetInputAdd(StringToEnumx(cflevelsetmisfit_definitionstring_s[j]),cflevelsetmisfit_observation_s[j],inputs,iomodel,cflevelsetmisfit_observation_M_s[j],cflevelsetmisfit_observation_N_s[j],obs_vector_type,StringToEnumx(cflevelsetmisfit_observation_string_s[j]),7,LevelsetObservationEnum);
-						element->DatasetInputAdd(StringToEnumx(cflevelsetmisfit_definitionstring_s[j]),cflevelsetmisfit_weights_s[j],inputs,iomodel,cflevelsetmisfit_weights_M_s[j],cflevelsetmisfit_weights_N_s[j],weight_vector_type,StringToEnumx(cflevelsetmisfit_weights_string_s[j]),7,WeightsLevelsetObservationEnum);
+						element->DatasetInputAdd(StringToEnumx(cflevelsetmisfit_definitionstring_s[j]),cflevelsetmisfit_observation_s[j],inputs,iomodel,cflevelsetmisfit_observation_M_s[j],cflevelsetmisfit_observation_N_s[j],obs_vector_type,StringToEnumx(cflevelsetmisfit_observation_string_s[j]),LevelsetObservationEnum);
+						element->DatasetInputAdd(StringToEnumx(cflevelsetmisfit_definitionstring_s[j]),cflevelsetmisfit_weights_s[j],inputs,iomodel,cflevelsetmisfit_weights_M_s[j],cflevelsetmisfit_weights_N_s[j],weight_vector_type,StringToEnumx(cflevelsetmisfit_weights_string_s[j]),WeightsLevelsetObservationEnum);
 					}
 				}
 

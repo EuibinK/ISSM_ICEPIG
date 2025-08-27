@@ -6,11 +6,20 @@
 #include "../../shared/shared.h"
 #include "../../toolkits/toolkits.h"
 #include "./../../classes/Inputs/DatasetInput.h"
+#include "../InputDuplicatex/InputDuplicatex.h"
 
 void FloatingiceMeltingRatex(FemModel* femmodel){/*{{{*/
 
 	/*Intermediaties*/
-	int  basalforcing_model;
+	int basalforcing_model;
+	int melt_style;
+
+	/*First, get melt_interpolation model from parameters*/
+	femmodel->parameters->FindParam(&melt_style,GroundinglineMeltInterpolationEnum);
+	if(melt_style==IntrusionMeltEnum){
+		InputDuplicatex(femmodel,MaskOceanLevelsetEnum,DistanceToGroundinglineEnum);//FIXME Duplicate first so that it can preserve the sign
+		femmodel->DistanceToFieldValue(MaskOceanLevelsetEnum,0.,DistanceToGroundinglineEnum);
+	}
 
 	/*First, get BMB model from parameters*/
 	femmodel->parameters->FindParam(&basalforcing_model,BasalforcingsEnum);
@@ -181,6 +190,9 @@ void FloatingiceMeltingRateIsmip6x(FemModel* femmodel){/*{{{*/
 		/*Syncronize across cpus*/
 		ISSM_MPI_Allreduce(tf_weighted_avg,tf_weighted_avg_cpu,num_basins,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,IssmComm::GetComm());
 		ISSM_MPI_Allreduce(areas_summed,areas_summed_cpu,num_basins,ISSM_MPI_DOUBLE,ISSM_MPI_SUM,IssmComm::GetComm());
+
+		/*Make sure Area is not zero to avoid dividing by 0 if a basin is not present in the model*/
+		for(int k=0;k<num_basins;k++) if(areas_summed_cpu[k]==0.) areas_summed_cpu[k] = 1.;
 
 		/*Compute weighted means and save*/
 		for(int k=0;k<num_basins;k++){tf_weighted_avg_cpu[k] = tf_weighted_avg_cpu[k]/areas_summed_cpu[k];}

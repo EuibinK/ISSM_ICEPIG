@@ -47,19 +47,20 @@ end
 %check that all the created nodes belong to at least one element
 removeorphans=1;
 if removeorphans,
-	orphan=find(~ismember([1:length(x)],sort(unique(elements(:)))));
-	for i=1:length(orphan),
+	uniqueelements=sort(unique(elements(:)));
+	orphans=find(~ismember([1:length(x)],uniqueelements));
+	for i=1:length(orphans),
 		disp('WARNING: removing orphans');
 		%get rid of the orphan node i
 		%update x and y
-		x=[x(1:orphan(i)-(i-1)-1); x(orphan(i)-(i-1)+1:end)];
-		y=[y(1:orphan(i)-(i-1)-1); y(orphan(i)-(i-1)+1:end)];
+		x=[x(1:orphans(i)-(i-1)-1); x(orphans(i)-(i-1)+1:end)];
+		y=[y(1:orphans(i)-(i-1)-1); y(orphans(i)-(i-1)+1:end)];
 		%update elements
-		pos=find(elements>orphan(i)-(i-1));
+		pos=find(elements>orphans(i)-(i-1));
 		elements(pos)=elements(pos)-1;
 		%update segments
-		pos1=find(segments(:,1)>orphan(i)-(i-1));
-		pos2=find(segments(:,2)>orphan(i)-(i-1));
+		pos1=find(segments(:,1)>orphans(i)-(i-1));
+		pos2=find(segments(:,2)>orphans(i)-(i-1));
 		segments(pos1,1)=segments(pos1,1)-1;
 		segments(pos2,2)=segments(pos2,2)-1;
 	end
@@ -76,7 +77,8 @@ md.mesh.segmentmarkers=segmentmarkers;
 %Fill in rest of fields:
 md.mesh.numberofelements=size(md.mesh.elements,1);
 md.mesh.numberofvertices=length(md.mesh.x);
-md.mesh.vertexonboundary=zeros(md.mesh.numberofvertices,1); md.mesh.vertexonboundary(md.mesh.segments(:,1:2))=1;
+md.mesh.vertexonboundary=zeros(md.mesh.numberofvertices,1);
+md.mesh.vertexonboundary(md.mesh.segments(:,1:2))=1;
 
 %Now, build the connectivity tables for this mesh.
 md.mesh.vertexconnectivity=NodeConnectivity(md.mesh.elements,md.mesh.numberofvertices);

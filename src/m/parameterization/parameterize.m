@@ -1,9 +1,9 @@
 function md=parameterize(md,parametername)
 %PARAMETERIZE - parameterize a model
 %
-%   from a parameter matlab file, start filling in all the @model fields that were not 
+%   from a parameter MATLAB file, start filling in all the @model fields that were not 
 %   filled in by the mesh.m and mask.m @model methods.
-%   Warning: the parameter file must be able to be run in Matlab
+%   Warning: the parameter file must be able to be run in MATLAB
 %
 %   Usage:
 %      md=parameterize(md,parametername)
@@ -55,4 +55,6 @@ if isempty(md.miscellaneous.name),
 	[path,root,ext]=fileparts(parametername);
 	md.miscellaneous.name=root; 
 end
-md.miscellaneous.notes=['Model created by using parameter file: ' parametername ' on: ' datestr(now)];
+if isempty(md.miscellaneous.notes), 
+	md.miscellaneous.notes=['Model created by using parameter file: ' parametername ' on: ' datestr(now)];
+end

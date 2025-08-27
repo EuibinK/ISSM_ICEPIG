@@ -7,7 +7,7 @@
 #include "../../toolkits/toolkits.h"
 #include "../../classes/classes.h"
 
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,const char* output_string){
+int OutputDefinitionsResponsex(IssmDouble* presponse, FemModel* femmodel,const char* output_string){
 
 	/*Ok, go find the output definitions dataset in the parameters, where our responses are hiding: */
 	DataSet* output_definitions=((DataSetParam*)femmodel->parameters->FindParamObject(OutputdefinitionEnum))->value;
@@ -20,22 +20,28 @@ IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,const char* output_stri
 		if(strcmp(name,output_string)==0){
 
 			/*This is the object that we have been chasing for. compute the response and return: */
-			IssmDouble return_value=definition->Response(femmodel);
+			*presponse = definition->Response(femmodel);
 
-			/*cleanup: */
+			/*cleanup and return*/
 			xDelete<char>(name);
-
-			/*return:*/
-			return return_value;
+			return 0;
 		}
 		xDelete<char>(name);
 	}
 
 	/*If we are here, did not find the definition for this response, not good!: */
-	_error_("Could not find the response for output definition " << output_string << " because could not find the definition itself!");
+	_printf0_("=================================================================\n");
+	_printf0_("WARNING: Could not find the output \"" << output_string << "\"\n");
+	_printf0_("         - either this output is unavailable for this model run \n");
+	_printf0_("         - or there may be a spelling error in your requested_outputs \n");
+	_printf0_("         - or there may be a spelling error in an outputdefinition \n");
+	_printf0_("           object name (unlikely)\n");
+	_printf0_("=================================================================\n");
+
+	return 1;
 }
 
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,int output_enum){
+int OutputDefinitionsResponsex(IssmDouble* presponse, FemModel* femmodel,int output_enum){
 
 	/*Ok, go find the output definitions dataset in the parameters, where our responses are hiding: */
 	DataSet* output_definitions=((DataSetParam*)femmodel->parameters->FindParamObject(OutputdefinitionEnum))->value;
@@ -48,15 +54,19 @@ IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,int output_enum){
 		if(en==output_enum){
 
 			/*This is the object that we have been chasing for. compute the response and return: */
-			IssmDouble return_value=definition->Response(femmodel);
-
-			/*return:*/
-			return return_value;
+			*presponse = definition->Response(femmodel);
+			return 0;
 		}
 	}
 
 	/*If we are here, did not find the definition for this response, not good!: */
-	_error_("Could not find the response for output definition " << EnumToStringx(output_enum)
-				<<" ("<<output_enum<<")"
-				<< " because could not find the definition itself!");
+	_printf0_("=================================================================\n");
+	_printf0_("WARNING: Could not find the output \"" << EnumToStringx(output_enum)<< "\"\n");
+	_printf0_("         - either this output is unavailable for this model run \n");
+	_printf0_("         - or there may be a spelling error in your requested_outputs \n");
+	_printf0_("         - or there may be a spelling error in an outputdefinition \n");
+	_printf0_("           object name (unlikely)\n");
+	_printf0_("=================================================================\n");
+
+	return 1;
 }

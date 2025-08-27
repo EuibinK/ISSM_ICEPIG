@@ -4,13 +4,23 @@
  * numtimes time steps. 
  */
 
-#include "./GiaDeflectionCorex.h"
+#ifdef HAVE_CONFIG_H
+   #include <config.h>
+#else
+#error "Cannot compile with HAVE_CONFIG_H symbol! run configure first!"
+#endif
 
+#include "./GiaDeflectionCorex.h"
 #include "../../classes/classes.h"
 #include "../../shared/shared.h"
 #include "../../toolkits/toolkits.h"
 #include "../InputUpdateFromConstantx/InputUpdateFromConstantx.h"
 
+#ifdef _HAVE_AD_
+void GiaDeflectionCorex( IssmDouble* pwi, IssmDouble* pdwidt, GiaDeflectionCoreArgs* arguments){
+	_error_("Not compiled with AD as this function requires Fortran");
+}
+#else
 /*External blocks: {{{*/
 struct blockp{
 	double pset[7];
@@ -43,7 +53,7 @@ extern "C" {
 
 void GiaDeflectionCorex( IssmDouble* pwi, IssmDouble* pdwidt, GiaDeflectionCoreArgs* arguments){
 
-	/*Recover material parameters and loading history: see GiaDeflectionCoreArgs for more details {{{*/
+	/*Recover material parameters and loading history: see GiaDeflectionCoreArgs for more details*/
 	IssmDouble  ri                        = arguments->ri;                        //radial distance from center of disk to vertex i
 	IssmDouble  re                        = arguments->re;                        //radius of disk
 	IssmDouble *hes                       = arguments->hes;                       //loading history (in ice thickness)
@@ -61,14 +71,12 @@ void GiaDeflectionCorex( IssmDouble* pwi, IssmDouble* pdwidt, GiaDeflectionCoreA
 	int         iedge                     = arguments->iedge;
 	IssmDouble  yts                       = arguments->yts;
 
-	/*}}}*/
-
 	/*Modify inputs to match naruse code: */
 	int Ntime=numtimes; // number of times with load history
 	int Ntimm=Ntime-1; // Ntime-1 : for slope/y-cept of load segments
 	int Ntimp=Ntime+1; // Ntime+1 : for evaluation time
 
-	/*Prepare block inputs for fortran distme and what0 routines of the naruse code: {{{*/
+	/*Prepare block inputs for fortran distme and what0 routines of the naruse code:*/
 	/*Now, let's set pset from the data that we got in input to GiaDeflectionCorex: */
 	blockp_.pset[0]=reCast<IssmPDouble>(lithosphere_thickness);
 	blockp_.pset[1]=reCast<IssmPDouble>(mantle_viscosity);
@@ -87,9 +95,9 @@ void GiaDeflectionCorex( IssmDouble* pwi, IssmDouble* pdwidt, GiaDeflectionCoreA
 	/*times in kyr: */
 	IssmPDouble* blockt_time=xNew<IssmPDouble>(Ntimp);
 	for(int i=0;i<Ntimp;i++){
-		blockt_time[i]=times[i]/1000.0/yts; 
-		if(i==numtimes-1) blockt_time[i]=reCast<IssmPDouble>(times[numtimes-1])/1000.0/yts; // final loading time, same as evaluation time
-		if(i==numtimes)   blockt_time[i]=reCast<IssmPDouble>(times[numtimes-1])/1000.0/yts;   // evaluation time
+		blockt_time[i]=reCast<IssmPDouble>(times[i]/1000.0/yts); 
+		if(i==numtimes-1) blockt_time[i]=reCast<IssmPDouble>(times[numtimes-1]/1000.0/yts); // final loading time, same as evaluation time
+		if(i==numtimes)   blockt_time[i]=reCast<IssmPDouble>(times[numtimes-1]/1000.0/yts);   // evaluation time
 	}
 
 	IssmPDouble* blockt_bi=xNew<IssmPDouble>(Ntimm);
@@ -112,3 +120,4 @@ void GiaDeflectionCorex( IssmDouble* pwi, IssmDouble* pdwidt, GiaDeflectionCoreA
 	xDelete<IssmPDouble>(blocky_zhload);
 
 }
+#endif

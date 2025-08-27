@@ -6,14 +6,14 @@ from project3d import project3d
 from WriteData import WriteData
 
 
-class frictioncoulomb(object):
-    """FRICTIONCOULOMB class definition
+class frictioncoulomb():
+    """frictioncoulomb class definition
 
     Usage:
         frictioncoulomb = frictioncoulomb()
     """
 
-    def __init__(self):  # {{{
+    def __init__(self, *args):  # {{{
         self.coefficient = np.nan
         self.coefficientcoulomb = np.nan
         self.p = np.nan
@@ -22,7 +22,12 @@ class frictioncoulomb(object):
         self.effective_pressure = np.nan
         self.effective_pressure_limit = 0
 
-        self.setdefaultparameters()
+        nargs = len(args)
+
+        if nargs == 0:
+            self.setdefaultparameters()
+        else:
+            raise Exception('constructor not supported')
     # }}}
 
     def __repr__(self):  # {{{
@@ -76,15 +81,17 @@ class frictioncoulomb(object):
     # }}}
 
     def marshall(self, prefix, md, fid):  # {{{
+        yts = md.constants.yts
+
         WriteData(fid, prefix, 'name', 'md.friction.law', 'data', 7, 'format', 'Integer')
-        WriteData(fid, prefix, 'object', self, 'fieldname', 'coefficient', 'format', 'DoubleMat', 'mattype', 1, 'timeserieslength', md.mesh.numberofvertices + 1, 'yts', md.constants.yts)
+        WriteData(fid, prefix, 'object', self, 'fieldname', 'coefficient', 'format', 'DoubleMat', 'mattype', 1, 'timeserieslength', md.mesh.numberofvertices + 1, 'yts', yts)
         WriteData(fid, prefix, 'object', self, 'fieldname', 'coefficientcoulomb', 'format', 'DoubleMat', 'mattype', 1)
         WriteData(fid, prefix, 'object', self, 'fieldname', 'p', 'format', 'DoubleMat', 'mattype', 2)
         WriteData(fid, prefix, 'object', self, 'fieldname', 'q', 'format', 'DoubleMat', 'mattype', 2)
         WriteData(fid, prefix, 'class', 'friction', 'object', self, 'fieldname', 'coupling', 'format', 'Integer')
         WriteData(fid, prefix, 'object', self, 'class', 'friction', 'fieldname', 'effective_pressure_limit', 'format', 'Double')
         if self.coupling == 1:
-            WriteData(fid, prefix, 'class', 'friction', 'object', self, 'fieldname', 'effective_pressure', 'format', 'DoubleMat', 'mattype', 1, 'timeserieslength', md.mesh.numberofvertices + 1, 'yts', md.constants.yts)
+            WriteData(fid, prefix, 'class', 'friction', 'object', self, 'fieldname', 'effective_pressure', 'format', 'DoubleMat', 'mattype', 1, 'timeserieslength', md.mesh.numberofvertices + 1, 'yts', yts)
         elif self.coupling == 2:
             raise ValueError('not implemented yet')
         elif self.coupling > 2:

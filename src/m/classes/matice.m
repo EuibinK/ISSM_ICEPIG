@@ -20,6 +20,7 @@ classdef matice
 		thermal_exchange_velocity       = 0.;
 		rheology_B                      = NaN;
 		rheology_n                      = NaN;
+		rheology_phi                    = 0.;
 		rheology_law                    = '';
 
 		%slc
@@ -95,8 +96,9 @@ classdef matice
 			self.rheology_law='Paterson';
 
 			%Rheology for ice: 
-			self.rheology_B=2.1*1e8;
+			self.rheology_B=2.1*10^8;
 			self.rheology_n=3;
+			self.rheology_phi=0.01;
 
 			%SLR
 			self.earth_density= 5512;  % average density of the Earth, (kg/m^3)
@@ -136,7 +138,8 @@ classdef matice
 			fielddisplay(self,'thermal_exchange_velocity','thermal exchange velocity [m/s]');
 			fielddisplay(self,'rheology_B','flow law parameter [Pa s^(1/n)]');
 			fielddisplay(self,'rheology_n','Glen''s flow law exponent');
-			fielddisplay(self,'rheology_law',['law for the temperature dependance of the rheology: ''None'', ''BuddJacka'', Cuffey'', ''CuffeyTemperate'', ''Paterson'', ''Arrhenius'', ''LliboutryDuval'', ''NyeH2O'', ''GBSH2O'', or ''NyeCO2''']);
+			fielddisplay(self,'rheology_phi','rheology phi (dimensionless)');
+			fielddisplay(self,'rheology_law',['law for the temperature dependance of the rheology: ''None'', ''BuddJacka'', Cuffey'', ''CuffeyTemperate'', ''Paterson'', ''Arrhenius'', ''LliboutryDuval'', ''NyeH2O'', ''NyeCO2'', or ''GBSH2O''']);
 			fielddisplay(self,'earth_density','Mantle density [kg/m^-3]');
 		end % }}}
 		function marshall(self,prefix,md,fid) % {{{
@@ -161,6 +164,7 @@ classdef matice
 			end
 			WriteData(fid,prefix,'object',self,'class','materials','fieldname','rheology_B','format','DoubleMat','mattype',mattype,'timeserieslength',tsl+1,'yts',md.constants.yts);
 			WriteData(fid,prefix,'object',self,'class','materials','fieldname','rheology_n','format','DoubleMat','mattype',2);
+			WriteData(fid,prefix,'object',self,'class','materials','fieldname','rheology_phi','format','Double');
 			WriteData(fid,prefix,'data',self.rheology_law,'name','md.materials.rheology_law','format','String');
 			WriteData(fid,prefix,'object',self,'class','materials','fieldname','earth_density','format','Double');
 		end % }}}
@@ -182,6 +186,7 @@ classdef matice
 			writejsdouble(fid,[modelname '.materials.mixed_layer_capacity'],self.mixed_layer_capacity);
 			writejs1Darray(fid,[modelname '.materials.rheology_B'],self.rheology_B);
 			writejs1Darray(fid,[modelname '.materials.rheology_n'],self.rheology_n);
+			writejsdouble(fid,[modelname '.materials.rheology_phi'],self.rheology_phi);
 			writejsstring(fid,[modelname '.materials.rheology_law'],self.rheology_law);
 			writejsdouble(fid,[modelname '.materials.earth_density'],self.earth_density);
 

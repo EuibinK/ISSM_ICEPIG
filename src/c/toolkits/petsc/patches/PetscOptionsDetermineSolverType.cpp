@@ -28,10 +28,12 @@ void PetscOptionsDetermineSolverType(int* psolver_type){
 	int solver_type=PETSCPACKAGE;
 
 	/*retrieve mat_type option: */
-	#if PETSC_VERSION_GE(3,7,0)
-	PetscOptionsGetString(NULL,PETSC_NULL,"-mat_type",&option[0],100,&flag);
-	#else
+	#if PETSC_VERSION_LT(3,7,0)
 	PetscOptionsGetString(PETSC_NULL,"-mat_type",&option[0],100,&flag);
+	#elif PETSC_VERSION_LT(3,19,0)
+	PetscOptionsGetString(NULL,PETSC_NULL,"-mat_type",&option[0],100,&flag);
+	#else /*newest version*/
+	PetscOptionsGetString(NULL,PETSC_NULLPTR,"-mat_type",&option[0],100,&flag);
 	#endif
 
 	if (strcmp(option,"aijmumps")==0){
@@ -53,25 +55,24 @@ void PetscOptionsDetermineSolverType(int* psolver_type){
 		solver_type=SUPERLUDISTPACKAGE;
 	}
 
-	#if PETSC_VERSION_MAJOR >= 3
-		#if PETSC_VERSION_MINOR >= 7
-		PetscOptionsGetString(NULL,PETSC_NULL,"-pc_factor_mat_solver_package",&option[0],100,&flag);
-		#else
-		PetscOptionsGetString(PETSC_NULL,"-pc_factor_mat_solver_package",&option[0],100,&flag);
-		#endif
-	if (strcmp(option,"mumps")==0){
-		solver_type=MUMPSPACKAGE_LU;
-	}
-	#endif
+	#if PETSC_VERSION_LT(3,7,0)
+	PetscOptionsGetString(PETSC_NULL,"-pc_factor_mat_solver_package",&option[0],100,&flag);
+   #elif PETSC_VERSION_LT(3,19,0)
+	PetscOptionsGetString(NULL,PETSC_NULL,"-pc_factor_mat_solver_package",&option[0],100,&flag);
+   #else
+	PetscOptionsGetString(NULL,PETSC_NULLPTR,"-pc_factor_mat_solver_package",&option[0],100,&flag);
+   #endif
 
-	#if PETSC_VERSION_GE(3,7,0)
-	PetscOptionsGetString(NULL,PETSC_NULL,"-issm_option_solver",&option[0],100,&flag);
-	#else
+	#if PETSC_VERSION_LT(3,7,0)
 	PetscOptionsGetString(PETSC_NULL,"-issm_option_solver",&option[0],100,&flag);
-	#endif
-	if(strcmp(option,"FS")==0 || strcmp(option,"stokes")==0){
-		solver_type=FSSolverEnum;
-	}
+   #elif PETSC_VERSION_LT(3,19,0)
+	PetscOptionsGetString(NULL,PETSC_NULL,"-issm_option_solver",&option[0],100,&flag);
+   #else
+	PetscOptionsGetString(NULL,PETSC_NULLPTR,"-issm_option_solver",&option[0],100,&flag);
+   #endif
+
+	if(strcmp(option,"mumps")==0) solver_type=MUMPSPACKAGE_LU;
+	if(strcmp(option,"FS")==0 || strcmp(option,"stokes")==0) solver_type=FSSolverEnum;
 
 	*psolver_type=solver_type;
 }

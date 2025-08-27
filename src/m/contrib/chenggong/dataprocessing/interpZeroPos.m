@@ -13,8 +13,6 @@ function X0 = interpZeroPos(X, Y)
 %                      x2*y1-x1*y2
 %                x0 = -------------
 %                        y1-y2
-% Author: Cheng Gong
-% Last modified: 2020-10-20
 [m, n] = size(X);
 [my, k] = size(Y);
 if m~=my

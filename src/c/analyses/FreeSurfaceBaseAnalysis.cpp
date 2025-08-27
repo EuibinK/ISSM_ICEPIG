@@ -6,6 +6,35 @@
 
 /*Model processing*/
 void FreeSurfaceBaseAnalysis::CreateConstraints(Constraints* constraints,IoModel* iomodel){/*{{{*/
+
+	/*Use spcthickness for now*/
+	IssmDouble* spcthickness = NULL;
+	int         M,N;
+	iomodel->FetchData(&spcthickness,&M,&N,"md.masstransport.spcthickness");
+	if(M!=iomodel->numberofvertices || N!=1) _error_("Size of constraints not supported yet");
+
+	/*Check if there is any NaN*/
+	bool isconstraints = false;
+	for(int i=0;i<M;i++) if(!xIsNan<IssmDouble>(spcthickness[i])) isconstraints = true;
+	if(!isconstraints){
+		iomodel->DeleteData(spcthickness,"md.masstransport.spcthickness");
+		return;
+	}
+
+	_printf0_("   WARNING: using md.geometry to constrain free base solver\n");
+
+	/*Use spcthickness for now*/
+	IssmDouble* base= NULL;
+	iomodel->FetchData(&base,&M,&N,"md.geometry.base");
+	if(M!=iomodel->numberofvertices || N!=1) _error_("Size of constraints not supported yet");
+	for(int i=0;i<M;i++) if(xIsNan<IssmDouble>(spcthickness[i])) base[i] = NAN;
+
+	/*Create Constraints based on this new vector*/
+	IoModelToConstraintsx(constraints,iomodel,base,M, N, FreeSurfaceBaseAnalysisEnum, P1Enum, 0);
+
+	/*Cleanup and return*/
+	iomodel->DeleteData(spcthickness,"md.masstransport.spcthickness");
+	iomodel->DeleteData(base,"md.geometry.base");
 }/*}}}*/
 void FreeSurfaceBaseAnalysis::CreateLoads(Loads* loads, IoModel* iomodel){/*{{{*/
 
@@ -295,18 +324,18 @@ ElementMatrix* FreeSurfaceBaseAnalysis::CreateKMatrix(Element* element){/*{{{*/
 			}
 		}
 		else if(stabilization==5){
-			D_scalar=gauss->weight*Jdet*dt;
+			D_scalar=gauss->weight*Jdet*dt*tau;
 			if(dim==2){
 				for(int i=0;i<numnodes;i++){
 					for(int j=0;j<numnodes;j++){
-						Ke->values[i*numnodes+j]+=tau*D_scalar*
+						Ke->values[i*numnodes+j]+=D_scalar*
 							(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i])*
 							(vx*dbasis[0*numnodes+j]+vy*dbasis[1*numnodes+j]);
 					}
 				}
 			}
 			else{
-				for(int i=0;i<numnodes;i++) for(int j=0;j<numnodes;j++) Ke->values[i*numnodes+j]+=tau*D_scalar*(vx*dbasis[0*numnodes+i])*(vx*dbasis[0*numnodes+j]);
+				for(int i=0;i<numnodes;i++) for(int j=0;j<numnodes;j++) Ke->values[i*numnodes+j]+=D_scalar*(vx*dbasis[0*numnodes+i])*(vx*dbasis[0*numnodes+j]);
 			}
 		}
 	}
@@ -324,13 +353,14 @@ ElementVector* FreeSurfaceBaseAnalysis::CreatePVector(Element* element){/*{{{*/
 
 	/*Intermediaries*/
 	int         domaintype,dim,stabilization;
-	IssmDouble  Jdet,dt;
-	IssmDouble  gmb,fmb,mb,bed,vx,vy,vz,tau;
+	IssmDouble  Jdet,dt,intrusiondist,factor;
+	IssmDouble  gmb,fmb,mb,bed,vx,vy,vz,tau,gldistance;
 	Element*    basalelement = NULL;
 	IssmDouble *xyz_list  = NULL;
 
 	/*Get basal element*/
 	element->FindParam(&domaintype,DomainTypeEnum);
+
 	switch(domaintype){
 		case Domain2DhorizontalEnum:
 			basalelement = element;
@@ -364,6 +394,8 @@ ElementVector* FreeSurfaceBaseAnalysis::CreatePVector(Element* element){/*{{{*/
 	/*Retrieve all inputs and parameters*/
 	basalelement->FindParam(&dt,TimesteppingTimeStepEnum);
 	basalelement->FindParam(&melt_style,GroundinglineMeltInterpolationEnum);
+	basalelement->FindParam(&intrusiondist,GroundinglineIntrusionDistanceEnum);
+
 	Input* groundedice_input   = basalelement->GetInput(MaskOceanLevelsetEnum);              _assert_(groundedice_input);
 	Input* gmb_input           = basalelement->GetInput(BasalforcingsGroundediceMeltingRateEnum);  _assert_(gmb_input);
 	Input* fmb_input           = basalelement->GetInput(BasalforcingsFloatingiceMeltingRateEnum);  _assert_(fmb_input);
@@ -391,7 +423,11 @@ ElementVector* FreeSurfaceBaseAnalysis::CreatePVector(Element* element){/*{{{*/
 	phi=basalelement->GetGroundedPortion(xyz_list);
 	Gauss*      gauss     = NULL;
 	if(melt_style==SubelementMelt2Enum){
-		basalelement->GetGroundedPart(&point1,&fraction1,&fraction2,&mainlyfloating);
+		basalelement->GetGroundedPart(&point1,&fraction1,&fraction2,&mainlyfloating,MaskOceanLevelsetEnum,0);
+		gauss = basalelement->NewGauss(point1,fraction1,fraction2,3);
+	}
+	if(melt_style==IntrusionMeltEnum){
+		basalelement->GetGroundedPart(&point1,&fraction1,&fraction2,&mainlyfloating,DistanceToGroundinglineEnum,intrusiondist);
 		gauss = basalelement->NewGauss(point1,fraction1,fraction2,3);
 	}
 	else{
@@ -403,7 +439,6 @@ ElementVector* FreeSurfaceBaseAnalysis::CreatePVector(Element* element){/*{{{*/
 
 		basalelement->JacobianDeterminant(&Jdet,xyz_list,gauss);
 		basalelement->NodalFunctions(basis,gauss);
-
 
 		vz_input->GetInputValue(&vz,gauss);  
 		gmb_input->GetInputValue(&gmb,gauss);
@@ -429,9 +464,29 @@ ElementVector* FreeSurfaceBaseAnalysis::CreatePVector(Element* element){/*{{{*/
 			if (phi<0.99999999) mb=fmb;  
 			else mb=gmb;
 		}
-		else  _error_("melt interpolation "<<EnumToStringx(melt_style)<<" not implemented yet");
+		else if(melt_style==IntrusionMeltEnum){
+			Input* gldistance_input = basalelement->GetInput(DistanceToGroundinglineEnum); _assert_(gldistance_input); 
+			gldistance_input->GetInputValue(&gldistance,gauss);
+			if(intrusiondist==0){
+				if(gllevelset>0.) mb=gmb;
+				else mb=fmb;
+			}
+			else if(gldistance>intrusiondist) {
+				mb=gmb;
+			}
+			else if(gldistance<=intrusiondist && gldistance>0) {
+				mb=fmb*(1-gldistance/intrusiondist); 
+			}
+			else{
+				mb=fmb;
+			}
+		}
+		else{
+			_error_("melt interpolation "<<EnumToStringx(melt_style)<<" not implemented yet");
+		}
 
-		for(int i=0;i<numnodes;i++) pe->values[i]+=Jdet*gauss->weight*(bed+dt*(mb) + dt*vz)*basis[i];
+		factor = Jdet*gauss->weight*(bed+dt*(mb) + dt*vz);
+		for(int i=0;i<numnodes;i++) pe->values[i]+=factor*basis[i];
 
 		if(stabilization==5){
 			/*SUPG*/
@@ -439,13 +494,15 @@ ElementVector* FreeSurfaceBaseAnalysis::CreatePVector(Element* element){/*{{{*/
 			if(dim==1){
 				vx_input->GetInputAverage(&vx);
 				tau=h/(2.*fabs(vx)+1e-10);
-				for(int i=0;i<numnodes;i++) pe->values[i]+=Jdet*gauss->weight*(dt*mb+dt*vz)*tau*(vx*dbasis[0*numnodes+i]);
+				factor = Jdet*gauss->weight*(dt*mb+dt*vz)*tau;
+				for(int i=0;i<numnodes;i++) pe->values[i]+=factor*(vx*dbasis[0*numnodes+i]);
 			}
 			else{ 
 				vx_input->GetInputAverage(&vx);
 				vy_input->GetInputAverage(&vy);
 				tau=1*h/(2.*pow(vx*vx+vy*vy,0.5)+1e-10);
-				for(int i=0;i<numnodes;i++) pe->values[i]+=Jdet*gauss->weight*(bed*0.+dt*mb+dt*vz)*tau*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
+				factor = Jdet*gauss->weight*(bed*0.+dt*mb+dt*vz)*tau;
+				for(int i=0;i<numnodes;i++) pe->values[i]+=factor*(vx*dbasis[0*numnodes+i]+vy*dbasis[1*numnodes+i]);
 			}
 		}
 	}

@@ -138,8 +138,9 @@ class Element: public Object{
 		int                Id();
 		void               InputCreate(IssmDouble* vector,Inputs* inputs,IoModel* iomodel,int M,int N,int vector_type,int vector_enum,int code);
 		void               InputCreateP1FromConstant(Inputs* inputs,IoModel* iomodel,IssmDouble value,int vector_enum);
+		void               InputCreateP0FromConstant(Inputs* inputs,IoModel* iomodel,IssmDouble value,int vector_enum);
 		void               ControlInputCreate(IssmDouble* doublearray,IssmDouble* independents_min,IssmDouble* independents_max,Inputs*inputs,IoModel* iomodel,int M,int N,IssmDouble scale,int input_enum,int id);
-		void					 DatasetInputAdd(int enum_type,IssmDouble* vector,Inputs* inputs,IoModel* iomodel,int M,int N,int vector_type,int vector_enum,int code,int input_enum);
+		void					 DatasetInputAdd(int enum_type,IssmDouble* vector,Inputs* inputs,IoModel* iomodel,int M,int N,int vector_type,int vector_enum,int input_enum);
 		void               InputUpdateFromConstant(IssmDouble constant, int name);
 		void               InputUpdateFromConstant(int constant, int name);
 		void               InputUpdateFromConstant(bool constant, int name);
@@ -176,6 +177,7 @@ class Element: public Object{
 		void               PicoComputeBasalMelt();
 		void               PositiveDegreeDay(IssmDouble* pdds,IssmDouble* pds,IssmDouble signorm,bool ismungsm,bool issetpddfac);
 		void               PositiveDegreeDaySicopolis(bool isfirnwarming);
+		void               SmbDebrisEvatt();
 		void               RignotMeltParameterization();
 		void               ResultInterpolation(int* pinterpolation,int*nodesperelement,int* parray_size, int output_enum);
 		void               ResultToPatch(IssmDouble* values,int nodesperelement,int output_enum);
@@ -188,7 +190,7 @@ class Element: public Object{
 		void               SmbSemic();
 		void               SmbSemicTransient();
 		int                Sid();
-		void               SmbGemb(IssmDouble timeinputs, int count);
+		void               SmbGemb(IssmDouble timeinputs, int count, int steps);
 		void               StrainRateESA(IssmDouble* epsilon,IssmDouble* xyz_list,Gauss* gauss,Input* vx_input,Input* vy_input);
 		void               StrainRateFS(IssmDouble* epsilon,IssmDouble* xyz_list,Gauss* gauss,Input* vx_input,Input* vy_input,Input* vz_input);
 		void               StrainRateHO(IssmDouble* epsilon,IssmDouble* xyz_list,Gauss* gauss,Input* vx_input,Input* vy_input);
@@ -201,6 +203,8 @@ class Element: public Object{
 		IssmDouble         TotalFloatingBmb(IssmDouble* mask, bool scaled);
 		IssmDouble         TotalGroundedBmb(IssmDouble* mask, bool scaled);
 		IssmDouble         TotalSmb(IssmDouble* mask, bool scaled);
+		IssmDouble         TotalSmbMelt(IssmDouble* mask, bool scaled);
+		IssmDouble         TotalSmbRefreeze(IssmDouble* mask, bool scaled);
 		void               TransformInvStiffnessMatrixCoord(ElementMatrix* Ke,int cs_enum);
 		void               TransformInvStiffnessMatrixCoord(ElementMatrix* Ke,Node** nodes,int numnodes,int cs_enum);
 		void               TransformInvStiffnessMatrixCoord(ElementMatrix* Ke,Node** nodes,int numnodes,int* cs_array);
@@ -221,6 +225,7 @@ class Element: public Object{
 		void               TransformStiffnessMatrixCoord(ElementMatrix* Ke,Node** nodes,int numnodes,int cs_enum);
 		void               TransformStiffnessMatrixCoord(ElementMatrix* Ke,Node** nodes,int numnodes,int* cs_array);
 		void               TransformStiffnessMatrixCoord(ElementMatrix* Ke,int numnodes,int* transformenum_list){_error_("not implemented yet");};/*Tiling only*/
+		void               FrictionAlpha2CreateInput(void);
 		void               ViscousHeatingCreateInput(void);
 		void               ThermalToEnthalpy(IssmDouble * penthalpy,IssmDouble temperature,IssmDouble waterfraction,IssmDouble pressure);
 		IssmDouble         TMeltingPoint(IssmDouble pressure);
@@ -237,7 +242,9 @@ class Element: public Object{
 		virtual void       AverageOntoPartition(Vector<IssmDouble>* partition_contributions,Vector<IssmDouble>* partition_areas,IssmDouble* vertex_response,IssmDouble* qmu_part)=0;
 		virtual void		 BasalNodeIndices(int* pnumindices,int** pindices,int finiteelement){_error_("not implemented yet");};
 		virtual void       CalvingRateParameterization(void){_error_("not implemented yet");};
+		virtual void       CalvingRateCalvingMIP(void){_error_("not implemented yet");};
 		virtual void       CalvingRateVonmises(void){_error_("not implemented yet");};
+		virtual void       CalvingRateVonmisesAD(void){_error_("not implemented yet");};
 		virtual void       CalvingRateTest(void){_error_("not implemented yet");};
 		virtual void       CalvingCrevasseDepth(void){_error_("not implemented yet");};
 		virtual void	    CalvingRateLevermann(void)=0;
@@ -266,7 +273,7 @@ class Element: public Object{
 		virtual Element*   GetBasalElement(void)=0;
 		virtual int        GetElementType(void)=0;
 		virtual IssmDouble GetHorizontalSurfaceArea(void){_error_("not implemented");};
-		virtual void       GetGroundedPart(int* point1,IssmDouble* fraction1,IssmDouble* fraction2, bool* mainlyfloating)=0;
+		virtual void       GetGroundedPart(int* point1,IssmDouble* fraction1,IssmDouble* fraction2, bool* mainlyfloating,int distance_enum, IssmDouble intrusion_distance)=0;
 		virtual IssmDouble GetGroundedPortion(IssmDouble* xyz_list)=0;
 		virtual void        GetFractionGeometry(IssmDouble* weights, IssmDouble* pphi, int* ppoint1,IssmDouble* pfraction1,IssmDouble* pfraction2, bool* ptrapezeisnegative, IssmDouble* gl)=0;
 		virtual void       GetNodalWeightsAndAreaAndCentroidsFromLeveset(IssmDouble* loadweights, IssmDouble* ploadarea, IssmDouble* platbar, IssmDouble* plongbar, IssmDouble late, IssmDouble longe, IssmDouble area,  int levelsetenum)=0;
@@ -384,6 +391,8 @@ class Element: public Object{
 		virtual IssmDouble TotalFloatingBmb(bool scaled)=0;
 		virtual IssmDouble TotalGroundedBmb(bool scaled)=0;
 		virtual IssmDouble TotalSmb(bool scaled)=0;
+		virtual IssmDouble TotalSmbMelt(bool scaled)=0;
+		virtual IssmDouble TotalSmbRefreeze(bool scaled)=0;
 		virtual void       Update(Inputs* inputs,int index, IoModel* iomodel,int analysis_counter,int analysis_type,int finite_element)=0;
 		virtual void       UpdateConstraintsExtrudeFromBase(void)=0;
 		virtual void       UpdateConstraintsExtrudeFromTop(void)=0;
@@ -398,8 +407,8 @@ class Element: public Object{
 		virtual void       WriteFieldIsovalueSegment(DataSet* segments,int fieldenum,IssmDouble fieldvalue){_error_("not implemented yet");};
 
 		#ifdef _HAVE_ESA_
-		virtual void          EsaGeodetic2D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast, Vector<IssmDouble>* pX, Vector<IssmDouble>* pY,IssmDouble* xx,IssmDouble* yy)=0;
-		virtual void          EsaGeodetic3D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast,IssmDouble* latitude,IssmDouble* longitude,IssmDouble* radius,IssmDouble* xx,IssmDouble* yy,IssmDouble* zz)=0;
+		virtual void          EsaGeodetic2D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast, Vector<IssmDouble>* pGravity, Vector<IssmDouble>* pX, Vector<IssmDouble>* pY,IssmDouble* xx,IssmDouble* yy)=0;
+      virtual void          EsaGeodetic3D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast,Vector<IssmDouble>* pGravity, IssmDouble* latitude,IssmDouble* longitude,IssmDouble* radius,IssmDouble* xx,IssmDouble* yy,IssmDouble* zz)=0;
 		#endif
 		#ifdef _HAVE_SEALEVELCHANGE_
 		virtual IssmDouble    GetArea3D(void)=0;

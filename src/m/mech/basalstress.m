@@ -33,7 +33,7 @@ b  =  alpha2.*ub;
 bx = -alpha2.*ubx;
 by = -alpha2.*uby;
 
-%reeeturn magnitude of only one output is requested
+%return magnitude of only one output is requested
 if nargout==1
 	bx = b;
 end

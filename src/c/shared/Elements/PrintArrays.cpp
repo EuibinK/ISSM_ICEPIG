@@ -83,3 +83,25 @@ void printbinary(int n){
 		i>>=1;
 	}
 }
+
+void InversionStatsHeader(int NJ){
+	//https://cboard.cprogramming.com/c-programming/151930-ascii-table-border.html
+	int width = max(10*NJ,24);
+	_printf0_("\n");
+	_printf0_("┌────┬─────────────────┬────────────┬"); for(int i=0;i<width;i++){_printf0_("─");} _printf0_("┐\n");
+	_printf0_("│Iter│  Cost function  │ Grad. norm │  List of contributions "); for(int i=0;i<width-24;i++){_printf0_(" ");} _printf0_("│\n");
+	_printf0_("├────┼─────────────────┼────────────┼"); for(int i=0;i<width;i++){_printf0_("─");} _printf0_("┤\n");
+}
+void InversionStatsIter(int iter,double J, double Gnorm, double* Jlist, int N){
+	int width = max(10*N,24);
+	_printf0_("│"<<setw(3)<<iter<<" ");
+	_printf0_("│ f(x)="<<setw(10)<<setprecision(5)<<J<<" ");
+	_printf0_("│   "<<setw(8)<<setprecision(3)<<Gnorm<<" │");
+	for(int i=0;i<N;i++) _printf0_(" "<<setw(9)<<setprecision(4)<<Jlist[i]);
+	for(int i=0;i<width-10*N;i++){_printf0_(" ");}
+	_printf0_("│\n");
+}
+void InversionStatsFooter(int NJ){
+	int width = max(10*NJ,24);
+	_printf0_("└────┴─────────────────┴────────────┴");for(int i=0;i<width;i++){_printf0_("─");} _printf0_("┘\n");
+}

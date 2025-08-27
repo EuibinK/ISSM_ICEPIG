@@ -1,119 +1,119 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import numpy as np
 from os import environ, path
 import sys
 import struct
 from argparse import ArgumentParser
 
-def BinRead(filin, filout='', verbose=0):  #{{{
+def BinRead(infile, outfile='', verbose=0):  #{{{
 
-    print("reading binary file.")
-    f = open(filin, 'rb')
+    print('reading binary file')
+    f = open(infile, 'rb')
 
-    if filout:
-        sys.stdout = open(filout, 'w')
+    if outfile:
+        sys.stdout = open(outfile, 'w')
 
     while True:
         try:
-            #Step 1: read size of record name
+            # Step 1: Read size of record name
             recordnamesize = struct.unpack('i', f.read(struct.calcsize('i')))[0]
         except struct.error as e:
-            print("probable EOF: {}".format(e))
+            print('probable EOF: {}'.format(e))
             break
 
-        print("============================================================================ ")
+        print('============================================================================')
         if verbose > 2:
-            print("\n recordnamesize = {}".format(recordnamesize))
-        recordname = struct.unpack('{}s'.format(recordnamesize), f.read(recordnamesize))[0]
-        print("field: {}".format(recordname))
+            print('\n recordnamesize = {}'.format(recordnamesize))
+        recordname = struct.unpack('{}s'.format(recordnamesize), f.read(recordnamesize))[0].decode('ASCII')
+        print('field: {}'.format(recordname))
 
-        #Step 2: read the data itself.
-        #first read length of record
+        # Step 2: Read the data itself
+        # First read length of record
         #reclen = struct.unpack('i', f.read(struct.calcsize('i')))[0]
         reclen = struct.unpack('q', f.read(struct.calcsize('q')))[0]
         if verbose > 1:
-            print("reclen = {}".format(reclen))
+            print('reclen = {}'.format(reclen))
 
-        #read data code:
+        # Read data code
         code = struct.unpack('i', f.read(struct.calcsize('i')))[0]
-        print("Format = {} (code {})".format(CodeToFormat(code), code))
+        print('Format = {} (code {})'.format(CodeToFormat(code), code))
 
         if code == FormatToCode('Boolean'):
             bval = struct.unpack('i', f.read(reclen - struct.calcsize('i')))[0]
-            print("value = {}".format(bval))
+            print('value = {}'.format(bval))
 
         elif code == FormatToCode('Integer'):
             ival = struct.unpack('i', f.read(reclen - struct.calcsize('i')))[0]
-            print("value = {}".format(ival))
+            print('value = {}'.format(ival))
 
         elif code == FormatToCode('Double'):
             dval = struct.unpack('d', f.read(reclen - struct.calcsize('i')))[0]
-            print("value = {}".format(dval))
+            print('value = {}'.format(dval))
 
         elif code == FormatToCode('String'):
             strlen = struct.unpack('i', f.read(struct.calcsize('i')))[0]
             if verbose > 1:
-                print("strlen = {}".format(strlen))
+                print('strlen = {}'.format(strlen))
             sval = struct.unpack('{}s'.format(strlen), f.read(strlen))[0]
-            print("value = '{}'".format(sval))
+            print('value = {}'.format(sval))
 
         elif code == FormatToCode('BooleanMat'):
-            #read matrix type:
+            # Read matrix type
             mattype = struct.unpack('i', f.read(struct.calcsize('i')))[0]
-            print("mattype = {}".format(mattype))
+            print('mattype = {}'.format(mattype))
 
-            #now read matrix
+            # Read matrix
             s = [0, 0]
             s[0] = struct.unpack('i', f.read(struct.calcsize('i')))[0]
             s[1] = struct.unpack('i', f.read(struct.calcsize('i')))[0]
-            print("size = [{}x{}]".format(s[0], s[1]))
+            print('size = [{}x{}]'.format(s[0], s[1]))
             data = np.zeros((s[0], s[1]))
             for i in range(s[0]):
                 for j in range(s[1]):
-                    data[i][j] = struct.unpack('d', f.read(struct.calcsize('d')))[0]    #get to the "c" convention, hence the transpose
+                    data[i][j] = struct.unpack('d', f.read(struct.calcsize('d')))[0]
                     if verbose > 2:
-                        print("data[{}, {}] = {}".format(i, j, data[i][j]))
+                        print('data[{}, {}] = {}'.format(i, j, data[i][j]))
 
         elif code == FormatToCode('IntMat'):
-            #read matrix type:
+            # Read matrix type
             mattype = struct.unpack('i', f.read(struct.calcsize('i')))[0]
-            print("mattype = {}".format(mattype))
+            print('mattype = {}'.format(mattype))
 
-            #now read matrix
+            # Read matrix
             s = [0, 0]
             s[0] = struct.unpack('i', f.read(struct.calcsize('i')))[0]
             s[1] = struct.unpack('i', f.read(struct.calcsize('i')))[0]
-            print("size = [{}x{}]".format(s[0], s[1]))
+            print('size = [{}x{}]'.format(s[0], s[1]))
             data = np.zeros((s[0], s[1]))
             for i in range(s[0]):
                 for j in range(s[1]):
-                    data[i][j] = struct.unpack('d', f.read(struct.calcsize('d')))[0]    #get to the "c" convention, hence the transpose
+                    data[i][j] = struct.unpack('d', f.read(struct.calcsize('d')))[0]
                     if verbose > 2:
-                        print("data[{}, {}] = {}".format(i, j, data[i][j]))
+                        print('data[{}, {}] = {}'.format(i, j, data[i][j]))
 
         elif code == FormatToCode('DoubleMat'):
-            #read matrix type:
+            # Read matrix type
             mattype = struct.unpack('i', f.read(struct.calcsize('i')))[0]
-            print("mattype = {}".format(mattype))
+            print('mattype = {}'.format(mattype))
 
-            #now read matrix
+            # Read matrix
             s = [0, 0]
             s[0] = struct.unpack('i', f.read(struct.calcsize('i')))[0]
             s[1] = struct.unpack('i', f.read(struct.calcsize('i')))[0]
-            print("size = [{}x{}]".format(s[0], s[1]))
+            print('size = [{}x{}]'.format(s[0], s[1]))
             data = np.zeros((s[0], s[1]))
             for i in range(s[0]):
                 for j in range(s[1]):
-                    data[i][j] = struct.unpack('d', f.read(struct.calcsize('d')))[0]    #get to the "c" convention, hence the transpose
+                    data[i][j] = struct.unpack('d', f.read(struct.calcsize('d')))[0]
                     if verbose > 2:
-                        print("data[{}, {}] = {}".format(i, j, data[i][j]))
+                        print('data[{}, {}] = {}'.format(i, j, data[i][j]))
 
         elif code == FormatToCode('MatArray'):
             f.seek(reclen - 4, 1)
-            print("skipping {} bytes for code {}.".format(code, reclen - 4))
+            print('skipping {} bytes for code {}'.format(code, reclen - 4))
         elif code == FormatToCode('StringArray'):
             f.seek(reclen - 4, 1)
-            print("skipping {} bytes for code {}.".format(code, reclen - 4))
+            print('skipping {} bytes for code {}'.format(code, reclen - 4))
 
         else:
             raise TypeError('BinRead error message: data type: {} not supported yet! ({})'.format(code, recordname))
@@ -122,10 +122,9 @@ def BinRead(filin, filout='', verbose=0):  #{{{
 #}}}
 
 def FormatToCode(format):  # {{{
-    """
-    This routine takes the format string, and hardcodes it into an integer, which
-    is passed along the record, in order to identify the nature of the dataset being
-    sent.
+    """This routine takes the format string and converts it into an integer, 
+    which is passed along with the record in order to identify the nature of 
+    the data being sent.
     """
 
     if format == 'Boolean':
@@ -153,10 +152,8 @@ def FormatToCode(format):  # {{{
 # }}}
 
 def CodeToFormat(code):  # {{{
-    """
-    This routine takes the format string, and hardcodes it into an integer, which
-    is passed along the record, in order to identify the nature of the dataset being
-    sent.
+    """This routine takes a datatype code and converts it to the corresponding 
+    string in order to identify the nature of the data retrieved.
     """
 
     if code == 1:
@@ -185,10 +182,10 @@ def CodeToFormat(code):  # {{{
 
 if __name__ == '__main__':  #{{{
     parser = ArgumentParser(description='BinRead - function to read binary input file.')
-    parser.add_argument('-f', '--filin', help='name of binary input file', default='')
-    parser.add_argument('-o', '--filout', help='optional name of text output file', default='')
+    parser.add_argument('-f', '--infile', help='name of binary input file', default='')
+    parser.add_argument('-o', '--outfile', help='optional name of text output file', default='')
     parser.add_argument('-v', '--verbose', help='optional level of output', default=0)
     args = parser.parse_args()
 
-    BinRead(args.filin, args.filout, args.verbose)
+    BinRead(args.infile, args.outfile, args.verbose)
 #}}}

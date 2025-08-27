@@ -57,13 +57,20 @@ void SchurCGSolver(Vector<IssmDouble>** puf,Mat Kff, Vec pf, Vec uf0,IS isv,IS i
 	PetscOptionsGetReal(PETSC_NULL,"-elltol",&ELLTOL,NULL);
 	PetscOptionsGetInt(PETSC_NULL,"-schur_pc",&precond,NULL);
 	PetscOptionsGetInt(PETSC_NULL,"-max_iter",&maxiter,NULL);
-	#else
+	#elif PETSC_VERSION_LT(3,19,0)
 	PetscOptionsGetString(NULL,PETSC_NULL,"-ksp_type",ksp_type,49,&flg);
 	PetscOptionsGetString(NULL,PETSC_NULL,"-pc_type",pc_type,49,&flg);
 	PetscOptionsGetReal(NULL,PETSC_NULL,"-tol",&TOL,NULL);
 	PetscOptionsGetReal(NULL,PETSC_NULL,"-elltol",&ELLTOL,NULL);
 	PetscOptionsGetInt(NULL,PETSC_NULL,"-schur_pc",&precond,NULL);
 	PetscOptionsGetInt(NULL,PETSC_NULL,"-max_iter",&maxiter,NULL);
+	#else
+	PetscOptionsGetString(NULL,PETSC_NULLPTR,"-ksp_type",ksp_type,49,&flg);
+	PetscOptionsGetString(NULL,PETSC_NULLPTR,"-pc_type",pc_type,49,&flg);
+	PetscOptionsGetReal(NULL,PETSC_NULLPTR,"-tol",&TOL,NULL);
+	PetscOptionsGetReal(NULL,PETSC_NULLPTR,"-elltol",&ELLTOL,NULL);
+	PetscOptionsGetInt(NULL,PETSC_NULLPTR,"-schur_pc",&precond,NULL);
+	PetscOptionsGetInt(NULL,PETSC_NULLPTR,"-max_iter",&maxiter,NULL);
 	#endif
 
 	if(precond){
@@ -688,8 +695,10 @@ void solutionsequence_schurcg(FemModel* femmodel){/*{{{*/
 		/*Create pressure matrix of choice*/
 		#if PETSC_VERSION_LT(3,7,0)
 		PetscOptionsGetInt(PETSC_NULL,"-schur_pc",&precond,NULL);
-		#else
+		#elif PETSC_VERSION_LT(3,19,0)
 		PetscOptionsGetInt(NULL,PETSC_NULL,"-schur_pc",&precond,NULL);
+		#else
+		PetscOptionsGetInt(NULL,PETSC_NULLPTR,"-schur_pc",&precond,NULL);
 		#endif
 
 		StressbalanceAnalysis* analysis = new StressbalanceAnalysis();	

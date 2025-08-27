@@ -8,6 +8,7 @@ classdef transient
 		isage             = 0;
 		issmb             = 0;
 		ismasstransport   = 0;
+		ismmemasstransport   = 0;
 		isoceantransport  = 0;
 		isstressbalance   = 0;
 		isthermal         = 0;
@@ -38,6 +39,7 @@ classdef transient
 			self.isage             = 0;
 			self.issmb             = 0;
 			self.ismasstransport   = 0;
+			self.ismmemasstransport= 0;
 			self.isoceantransport  = 0;
 			self.isstressbalance   = 0;
 			self.isthermal         = 0;
@@ -61,6 +63,7 @@ classdef transient
 			self.isage             = 0;
 			self.issmb             = 1;
 			self.ismasstransport   = 1;
+			self.ismmemasstransport= 0;
 			self.isoceantransport  = 0;
 			self.isstressbalance   = 1;
 			self.isthermal         = 1;
@@ -69,7 +72,7 @@ classdef transient
 			self.isdamageevolution = 0;
 			self.ismovingfront     = 0;
 			self.ishydrology       = 0;
-			self.isdebris= 0;
+			self.isdebris          = 0;
 			self.issampling        = 0;
 			self.isslc             = 0;
 			self.isoceancoupling   = 0;
@@ -89,6 +92,7 @@ classdef transient
 			md = checkfield(md,'fieldname','transient.isage','numel',[1],'values',[0 1]);
 			md = checkfield(md,'fieldname','transient.issmb','numel',[1],'values',[0 1]);
 			md = checkfield(md,'fieldname','transient.ismasstransport','numel',[1],'values',[0 1]);
+			md = checkfield(md,'fieldname','transient.ismmemasstransport','numel',[1],'values',[0 1]);
 			md = checkfield(md,'fieldname','transient.isoceantransport','numel',[1],'values',[0 1]);
 			md = checkfield(md,'fieldname','transient.isstressbalance','numel',[1],'values',[0 1]);
 			md = checkfield(md,'fieldname','transient.isthermal','numel',[1],'values',[0 1]);
@@ -100,7 +104,7 @@ classdef transient
 			md = checkfield(md,'fieldname','transient.isdebris','numel',[1],'values',[0 1]);
 			md = checkfield(md,'fieldname','transient.requested_outputs','stringrow',1);
 			md = checkfield(md,'fieldname','transient.isslc','numel',[1],'values',[0 1]);
-			md = checkfield(md,'fieldname','transient.isoceancoupling','numel',[1],'values',[0 1]);
+			md = checkfield(md,'fieldname','transient.isoceancoupling','numel',[1],'values',[0 1 2]);
 			md = checkfield(md,'fieldname','transient.issampling','numel',[1],'values',[0 1]);  
 			md = checkfield(md,'fieldname','transient.amr_frequency','numel',[1],'>=',0,'NaN',1,'Inf',1);
 
@@ -117,6 +121,7 @@ classdef transient
 			fielddisplay(self,'isage','indicates whether an age model is used in the transient');
 			fielddisplay(self,'issmb','indicates whether a surface mass balance solution is used in the transient');
 			fielddisplay(self,'ismasstransport','indicates whether a masstransport solution is used in the transient');
+			fielddisplay(self,'ismmemasstransport','indicates whether an MME masstransport solution is used in the transient');
 			fielddisplay(self,'isoceantransport','indicates whether an ocean masstransport solution is used in the transient');
 			fielddisplay(self,'isstressbalance','indicates whether a stressbalance solution is used in the transient');
 			fielddisplay(self,'isthermal','indicates whether a thermal solution is used in the transient');
@@ -128,7 +133,7 @@ classdef transient
 			fielddisplay(self,'isdebris','indicates whether a debris model is used');
 			fielddisplay(self,'issampling','indicates whether sampling is used in the transient')
 			fielddisplay(self,'isslc','indicates whether a sea-level change solution is used in the transient');
-			fielddisplay(self,'isoceancoupling','indicates whether a coupling with an ocean model is used in the transient');
+			fielddisplay(self,'isoceancoupling','indicates whether a coupling with an ocean model is used in the transient (1 for cartesian coordinates, 2 for lat/long coordinates');
 			fielddisplay(self,'amr_frequency','frequency at which mesh is refined in simulations with multiple time_steps');
 			fielddisplay(self,'requested_outputs','list of additional outputs requested');
 
@@ -137,6 +142,7 @@ classdef transient
 			WriteData(fid,prefix,'object',self,'fieldname','isage','format','Boolean');
 			WriteData(fid,prefix,'object',self,'fieldname','issmb','format','Boolean');
 			WriteData(fid,prefix,'object',self,'fieldname','ismasstransport','format','Boolean');
+			WriteData(fid,prefix,'object',self,'fieldname','ismmemasstransport','format','Boolean');
 			WriteData(fid,prefix,'object',self,'fieldname','isoceantransport','format','Boolean');
 			WriteData(fid,prefix,'object',self,'fieldname','isstressbalance','format','Boolean');
 			WriteData(fid,prefix,'object',self,'fieldname','isthermal','format','Boolean');
@@ -148,7 +154,7 @@ classdef transient
 			WriteData(fid,prefix,'object',self,'fieldname','isdebris','format','Boolean');
 			WriteData(fid,prefix,'object',self,'fieldname','issampling','format','Boolean'); 
 			WriteData(fid,prefix,'object',self,'fieldname','isslc','format','Boolean');
-			WriteData(fid,prefix,'object',self,'fieldname','isoceancoupling','format','Boolean');
+			WriteData(fid,prefix,'object',self,'fieldname','isoceancoupling','format','Integer');
 			WriteData(fid,prefix,'object',self,'fieldname','amr_frequency','format','Integer');
 
 			%process requested outputs
@@ -162,23 +168,23 @@ classdef transient
 		end % }}}
 		function savemodeljs(self,fid,modelname) % {{{
 		
-			writejsdouble(fid,[modelname '.trans.isage'],self.isage);
-			writejsdouble(fid,[modelname '.trans.issmb'],self.issmb);
-			writejsdouble(fid,[modelname '.trans.ismasstransport'],self.ismasstransport);
-			writejsdouble(fid,[modelname '.trans.isoceantransport'],self.isoceantransport);
-			writejsdouble(fid,[modelname '.trans.isstressbalance'],self.isstressbalance);
-			writejsdouble(fid,[modelname '.trans.isthermal'],self.isthermal);
-			writejsdouble(fid,[modelname '.trans.isgroundingline'],self.isgroundingline);
-			writejsdouble(fid,[modelname '.trans.isesa'],self.isesa);
-			writejsdouble(fid,[modelname '.trans.isdamageevolution'],self.isdamageevolution);
-			writejsdouble(fid,[modelname '.trans.ismovingfront'],self.ismovingfront);
-			writejsdouble(fid,[modelname '.trans.ishydrology'],self.ishydrology);
-			writejsdouble(fid,[modelname '.trans.isdebris'],self.isdebris);
-			writejsdouble(fid,[modelname '.trans.issampling'],self.issampling); 
-			writejsdouble(fid,[modelname '.trans.isslc'],self.isslc);
-			writejsdouble(fid,[modelname '.trans.isoceancoupling'],self.isoceancoupling);
-			writejsdouble(fid,[modelname '.trans.amr_frequency'],self.amr_frequency);
-			writejscellstring(fid,[modelname '.trans.requested_outputs'],self.requested_outputs);
+			writejsdouble(fid,[modelname '.transient.isage'],self.isage);
+			writejsdouble(fid,[modelname '.transient.issmb'],self.issmb);
+			writejsdouble(fid,[modelname '.transient.ismasstransport'],self.ismasstransport);
+			writejsdouble(fid,[modelname '.transient.isoceantransport'],self.isoceantransport);
+			writejsdouble(fid,[modelname '.transient.isstressbalance'],self.isstressbalance);
+			writejsdouble(fid,[modelname '.transient.isthermal'],self.isthermal);
+			writejsdouble(fid,[modelname '.transient.isgroundingline'],self.isgroundingline);
+			writejsdouble(fid,[modelname '.transient.isesa'],self.isesa);
+			writejsdouble(fid,[modelname '.transient.isdamageevolution'],self.isdamageevolution);
+			writejsdouble(fid,[modelname '.transient.ismovingfront'],self.ismovingfront);
+			writejsdouble(fid,[modelname '.transient.ishydrology'],self.ishydrology);
+			writejsdouble(fid,[modelname '.transient.isdebris'],self.isdebris);
+			writejsdouble(fid,[modelname '.transient.issampling'],self.issampling); 
+			writejsdouble(fid,[modelname '.transient.isslc'],self.isslc);
+			writejsdouble(fid,[modelname '.transient.isoceancoupling'],self.isoceancoupling);
+			writejsdouble(fid,[modelname '.transient.amr_frequency'],self.amr_frequency);
+			writejscellstring(fid,[modelname '.transient.requested_outputs'],self.requested_outputs);
 
 		end % }}}
 	end

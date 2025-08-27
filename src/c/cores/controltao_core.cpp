@@ -82,7 +82,11 @@ void controltao_core(FemModel* femmodel){
 	TaoSetType(tao,algorithm);
 
 	/*Prepare all TAO parameters*/
+	#if PETSC_VERSION_LT(3,21,0)
 	TaoSetMonitor(tao,IssmMonitor,&user,NULL);
+	#else
+	TaoMonitorSet(tao,IssmMonitor,&user,NULL);
+	#endif
 	TaoSetMaximumFunctionEvaluations(tao,maxiter);
 	TaoSetMaximumIterations(tao,maxsteps);
 	#if PETSC_VERSION_LT(3,7,0)
@@ -97,8 +101,7 @@ void controltao_core(FemModel* femmodel){
 	#if PETSC_VERSION_LT(3,17,0)
 	TaoSetInitialVector(tao,X->pvector->vector);
 	#else
-	//TaoSetSolution(tao,X->pvector->vector);
-	_error_("not implemented yet");
+	TaoSetSolution(tao,X->pvector->vector);
 	#endif
 	TaoSetVariableBounds(tao,XL->pvector->vector,XU->pvector->vector);
 	delete XL;
@@ -106,6 +109,7 @@ void controltao_core(FemModel* femmodel){
 
 	user.J=xNewZeroInit<double>(maxiter+5);
 	user.femmodel=femmodel;
+	G=new Vector<IssmDouble>(0); VecFree(&G->pvector->vector);
 	#if PETSC_VERSION_LT(3,17,0)
 	TaoSetObjectiveAndGradientRoutine(tao,FormFunctionGradient,(void*)&user); 
 	#else
@@ -123,12 +127,10 @@ void controltao_core(FemModel* femmodel){
 	#else
 	TaoGetSolution(tao,&X->pvector->vector);
 	#endif
-	G=new Vector<IssmDouble>(0); VecFree(&G->pvector->vector);
 	#if PETSC_VERSION_LT(3,17,0)
 	TaoGetGradientVector(tao,&G->pvector->vector);
 	#else
-	//TaoGetGradient(tao,&G->pvector->vector);
-	_error_("not implemented yet");
+	TaoGetGradient(tao,&G->pvector->vector, NULL, NULL);
 	#endif
 	SetControlInputsFromVectorx(femmodel,X);
 	ControlInputSetGradientx(femmodel->elements,femmodel->nodes,femmodel->vertices,femmodel->loads,femmodel->materials,femmodel->parameters,G);

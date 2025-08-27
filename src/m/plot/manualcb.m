@@ -71,9 +71,17 @@ else
 
 	%New method
 	test=logspace(-10,10,21);
-	pos=find(test>=zmin & test<=zmax);
-	ztick= test(pos);
-	ytick= (log(ztick) - log(zmin))/(log(zmax) - log(zmin));
+	if zmax<0 %Negative log (RARE!!)
+		pos=find(test>=-zmax & test<=-zmin);
+		ztick= -test(pos);
+		ytick= (log(ztick) - log(zmin))/(log(zmax) - log(zmin));
+		ztick
+		ytick
+	else
+		pos=find(test>=zmin & test<=zmax);
+		ztick= test(pos);
+		ytick= (log(ztick) - log(zmin))/(log(zmax) - log(zmin));
+	end
 end
 
 %Display colorbar

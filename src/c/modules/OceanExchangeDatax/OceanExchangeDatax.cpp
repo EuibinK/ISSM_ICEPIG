@@ -21,19 +21,19 @@ void OceanExchangeDatax(FemModel* femmodel, bool init_stage){
 	if(!parcom)_error_("TransferForcing error message: could not find ToMITgcmCommEnum communicator");
 	tomitgcmcomm=parcom->GetParameterValue();
 
-	int oceangridnxsize,oceangridnysize,ngrids_ocean,nels_ocean;
+	int oceangridnxsize,oceangridnysize,ngrids_ocean,nels_ocean,isoceancoupling;
 	IssmDouble  oceantime,coupling_time,time,yts;
 	IssmDouble rho_ice;
 	IssmDouble *oceanmelt         = NULL;
 	IssmDouble *oceangridx;
 	IssmDouble *oceangridy;
-	IssmDouble *icebase_oceangrid = NULL;
+	IssmDouble *icethickness_oceangrid = NULL;
 	IssmDouble *icemask_oceangrid = NULL;
 	IssmDouble* x_ice             = NULL;
 	IssmDouble* y_ice             = NULL;
 	IssmDouble* lat_ice           = NULL;
 	IssmDouble* lon_ice           = NULL;
-	IssmDouble* icebase           = NULL;
+	IssmDouble* icethickness      = NULL;
 	IssmDouble* icemask           = NULL;
 	IssmDouble* melt_mesh         = NULL;
 	int*        index_ice         = NULL;
@@ -44,6 +44,7 @@ void OceanExchangeDatax(FemModel* femmodel, bool init_stage){
 	/*Recover fixed parameters and store them*/
 	femmodel->parameters->FindParam(&coupling_time,TimesteppingCouplingTimeEnum);
 	femmodel->parameters->FindParam(&time,TimeEnum);
+	femmodel->parameters->FindParam(&isoceancoupling,TransientIsoceancouplingEnum);
 
 	/*Exchange or recover mesh and inputs needed*/
 	if(init_stage==true){
@@ -56,7 +57,6 @@ void OceanExchangeDatax(FemModel* femmodel, bool init_stage){
 		ISSM_MPI_Bcast(&oceangridnxsize,1,ISSM_MPI_INT,0,IssmComm::GetComm());
 		ISSM_MPI_Bcast(&oceangridnysize,1,ISSM_MPI_INT,0,IssmComm::GetComm());
 		ISSM_MPI_Bcast(&ngrids_ocean,1,ISSM_MPI_INT,0,IssmComm::GetComm());
-		ISSM_MPI_Bcast(&oceantime,1,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
 		femmodel->parameters->SetParam(oceangridnxsize,OceanGridNxEnum);
 		femmodel->parameters->SetParam(oceangridnysize,OceanGridNyEnum);
 		oceangridx=xNew<IssmDouble>(ngrids_ocean);
@@ -64,27 +64,29 @@ void OceanExchangeDatax(FemModel* femmodel, bool init_stage){
 		if(my_rank==0){
 			ISSM_MPI_Recv(oceangridx,ngrids_ocean,ISSM_MPI_DOUBLE,0,10001005,tomitgcmcomm,&status);
 			ISSM_MPI_Recv(oceangridy,ngrids_ocean,ISSM_MPI_DOUBLE,0,10001006,tomitgcmcomm,&status);
-
-			/*Exchange varying parameters for the initialization*/
-			ISSM_MPI_Send(&time,1,ISSM_MPI_DOUBLE,0,10001001,tomitgcmcomm);
-			ISSM_MPI_Recv(&oceantime,1,ISSM_MPI_DOUBLE,0,10001002,tomitgcmcomm,&status);
 		}
-		
+
 		ISSM_MPI_Bcast(oceangridx,ngrids_ocean,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
 		ISSM_MPI_Bcast(oceangridy,ngrids_ocean,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
 		femmodel->parameters->SetParam(oceangridx,ngrids_ocean,OceanGridXEnum);
 		femmodel->parameters->SetParam(oceangridy,ngrids_ocean,OceanGridYEnum);
 	}
 	else{
+		/*Recoved ocean grid from parameters*/
 		femmodel->parameters->FindParam(&oceangridx,&ngrids_ocean,OceanGridXEnum);
 		femmodel->parameters->FindParam(&oceangridy,&ngrids_ocean,OceanGridYEnum);
 	}
 
-	/*Interpolate ice base and mask onto ocean grid*/
+	/*Interpolate ice thickness and mask onto ocean grid*/
 	femmodel->GetMesh(femmodel->vertices,femmodel->elements,&x_ice,&y_ice,&index_ice);
 	BamgTriangulatex(&index_ocean,&nels_ocean,oceangridx,oceangridy,ngrids_ocean);
-	femmodel->vertices->LatLonList(&lat_ice,&lon_ice);
-	GetVectorFromInputsx(&icebase,femmodel,BaseEnum,VertexSIdEnum);
+	if(isoceancoupling==2){
+		femmodel->vertices->LatLonList(&lat_ice,&lon_ice);
+	}
+	else{
+		femmodel->vertices->XYList(&lon_ice,&lat_ice);
+	}
+	GetVectorFromInputsx(&icethickness,femmodel,ThicknessEnum,VertexSIdEnum);
 	Options* options = new Options();
 	GenericOption<double> *odouble = new GenericOption<double>();
 	const char* name = "default";
@@ -94,10 +96,10 @@ void OceanExchangeDatax(FemModel* femmodel, bool init_stage){
 	odouble->size[0]=1;
 	odouble->size[1]=1;
 	options->AddOption(odouble);
-	InterpFromMeshToMesh2dx(&icebase_oceangrid,index_ice,lon_ice,lat_ice,ngrids_ice,nels_ice,
-					icebase,ngrids_ice,1,oceangridx,oceangridy,ngrids_ocean,options);
+	InterpFromMeshToMesh2dx(&icethickness_oceangrid,index_ice,lon_ice,lat_ice,ngrids_ice,nels_ice,
+					icethickness,ngrids_ice,1,oceangridx,oceangridy,ngrids_ocean,options);
 	delete options;
-	xDelete<IssmDouble>(icebase);
+	xDelete<IssmDouble>(icethickness);
 
 	GetVectorFromInputsx(&icemask,femmodel,MaskIceLevelsetEnum,VertexSIdEnum);
 	Options* options2 = new Options();
@@ -115,24 +117,25 @@ void OceanExchangeDatax(FemModel* femmodel, bool init_stage){
 	xDelete<IssmDouble>(icemask);
 
 	/*Put +9999 for places where there is no ice!*/
-	for(int i=0;i<ngrids_ocean;i++) if(icemask_oceangrid[i]>0.) icebase_oceangrid[i]=+9999.;
+	femmodel->parameters->FindParam(&rho_ice,MaterialsRhoIceEnum);
+	for(int i=0;i<ngrids_ocean;i++) icethickness_oceangrid[i]=icethickness_oceangrid[i]*rho_ice; //ocean needs ice mass in kg/m^2
+	for(int i=0;i<ngrids_ocean;i++) if(icemask_oceangrid[i]>0.) icethickness_oceangrid[i]=+9999.;
 	xDelete<IssmDouble>(icemask_oceangrid);
 
-	if(init_stage==true){ //just send icebase
+	if(init_stage==true){ //just send icethickness
 		if(my_rank==0){
-			ISSM_MPI_Send(icebase_oceangrid,ngrids_ocean,ISSM_MPI_DOUBLE,0,10001008,tomitgcmcomm);
+			ISSM_MPI_Send(icethickness_oceangrid,ngrids_ocean,ISSM_MPI_DOUBLE,0,10001008,tomitgcmcomm);
 		}
 	}
 	else{ //send and receive exchanged data
-		femmodel->parameters->FindParam(&rho_ice,MaterialsRhoIceEnum);
 		femmodel->parameters->FindParam(&yts,ConstantsYtsEnum);
 		if(my_rank==0){
+			ISSM_MPI_Send(icethickness_oceangrid,ngrids_ocean,ISSM_MPI_DOUBLE,0,10001008,tomitgcmcomm);
 			ISSM_MPI_Send(&time,1,ISSM_MPI_DOUBLE,0,10001001,tomitgcmcomm);
 			ISSM_MPI_Recv(&oceantime,1,ISSM_MPI_DOUBLE,0,10001002,tomitgcmcomm,&status);
 			if((oceantime - time > 0.1*yts) & (oceantime - time < -0.1*yts)) _error_("Ocean and ice time are starting to diverge");
 			oceanmelt = xNew<IssmDouble>(ngrids_ocean);
 			ISSM_MPI_Recv(oceanmelt,ngrids_ocean,ISSM_MPI_DOUBLE,0,10001007,tomitgcmcomm,&status);
-			ISSM_MPI_Send(icebase_oceangrid,ngrids_ocean,ISSM_MPI_DOUBLE,0,10001008,tomitgcmcomm);
 		}
 		ISSM_MPI_Bcast(&oceantime,1,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
 		if(my_rank!=0) oceanmelt=xNew<IssmDouble>(ngrids_ocean);
@@ -154,7 +157,7 @@ void OceanExchangeDatax(FemModel* femmodel, bool init_stage){
 	xDelete<IssmDouble>(lon_ice);
 	xDelete<IssmDouble>(x_ice);
 	xDelete<IssmDouble>(y_ice);
-	xDelete<IssmDouble>(icebase_oceangrid);
+	xDelete<IssmDouble>(icethickness_oceangrid);
 	xDelete<IssmDouble>(oceangridx);
 	xDelete<IssmDouble>(oceangridy);
 	xDelete<IssmDouble>(melt_mesh);

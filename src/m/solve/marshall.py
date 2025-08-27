@@ -4,7 +4,7 @@ from WriteData import WriteData
 
 
 def marshall(md):
-    """MARSHALL - outputs a compatible binary file from @model md, for certain solution type.
+    """marshall - outputs a compatible binary file from @model md, for certain solution type.
 
     The routine creates a compatible binary file from @model md
     his binary file will be used for parallel runs in JPL-package
@@ -14,13 +14,13 @@ def marshall(md):
     """
 
     if md.verbose.solution:
-        print("marshalling file {}.bin".format(md.miscellaneous.name))
+        print('marshalling file \'{}\'.bin'.format(md.miscellaneous.name))
 
     # Open file for binary writing
     try:
         fid = open(md.miscellaneous.name + '.bin', 'wb')
     except IOError as e:
-        raise IOError("marshall error message: could not open '%s.bin' file for binary writing. Due to: ".format(md.miscellaneous.name), e)
+        print('marshall error message: could not open \'{}.bin\' file for binary writing due to: {}'.format(md.miscellaneous.name, e))
 
     fields = md.properties()
     fields.sort() # sort fields so that comparison of binary files is easier
@@ -31,7 +31,7 @@ def marshall(md):
 
         # Check that current field is an object
         if not hasattr(getattr(md, field), 'marshall'):
-            raise TypeError("field '{}' is not an object.".format(field))
+            raise TypeError('field \'{}\' is not an object.'.format(field))
 
         # Marshall current object
         #print('marshalling {} ...'.format(field) # Uncomment for debugging
@@ -45,7 +45,7 @@ def marshall(md):
         fid.close()
 
     except IOError as e:
-        print('marshall error message: could not close file \'{}.bin\' due to:'.format(md.miscellaneous.name), e)
+        print('marshall error message: could not close \'{}.bin\' file for binary writing due to: {}'.format(md.miscellaneous.name, e))
 
     # Uncomment the following to make a copy of the binary input file for 
     # debugging purposes (can be fed into scripts/BinRead.py).

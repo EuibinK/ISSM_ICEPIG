@@ -9,8 +9,6 @@
 #include "./Definition.h"
 #include "./FemModel.h"
 
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,int output_enum);
-
 class Cflevelsetmisfit: public Object, public Definition{
 
 	public: 
@@ -20,10 +18,12 @@ class Cflevelsetmisfit: public Object, public Definition{
 		char       *name;
 		IssmDouble  datatime;
 		bool        timepassedflag;
+		IssmDouble  J;
 
 		/*Cflevelsetmisfit constructors, destructors :*/
 		Cflevelsetmisfit();
-		Cflevelsetmisfit(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime, bool timepassedflag);
+		Cflevelsetmisfit(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime);
+		Cflevelsetmisfit(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime, bool timepassedflag, IssmDouble in_J);
 		~Cflevelsetmisfit();
 
 		/*Object virtual function resolutoin: */

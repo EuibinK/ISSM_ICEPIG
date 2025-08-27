@@ -43,6 +43,7 @@ classdef materials < dynamicprops
 					self.addprop('thermal_exchange_velocity');
 					self.addprop('rheology_B');
 					self.addprop('rheology_n');
+					self.addprop('rheology_phi');
 					self.addprop('rheology_law');
 				case 'litho'
 					self.addprop('numlayers');
@@ -125,6 +126,7 @@ classdef materials < dynamicprops
 					%Rheology fields default: 
 					self.rheology_B   = 1 * 1e8;
 					self.rheology_n   = 3;
+					self.rheology_phi = 0.01;
 
 				case 'litho'
 					%we default to a configuration that enables running GIA solutions using giacaron and/or giaivins.
@@ -189,6 +191,7 @@ classdef materials < dynamicprops
 					fielddisplay(self,'thermal_exchange_velocity','thermal exchange velocity [m/s]');
 					fielddisplay(self,'rheology_B','flow law parameter [Pa s^(1/n)]');
 					fielddisplay(self,'rheology_n','Glen''s flow law exponent');
+					fielddisplay(self,'rheology_phi','rheology phi (dimensionless)');
 					fielddisplay(self,'rheology_law',['law for the temperature dependance of the rheology: ''None'', ''BuddJacka'', Cuffey'', ''CuffeyTemperate'', ''Paterson'', ''Arrhenius'', ''LliboutryDuval'', ''NyeCO2'', ''NyeH2O'', or ''GBSH2O''']);
 				case 'litho'
 					disp(sprintf('\n      Litho:'));
@@ -233,7 +236,7 @@ classdef materials < dynamicprops
 					md = checkfield(md,'fieldname','materials.mu_water','>',0);
 					md = checkfield(md,'fieldname','materials.rheology_B','>',0,'timeseries',1,'NaN',1,'Inf',1);
 					md = checkfield(md,'fieldname','materials.rheology_n','>',0,'size',[md.mesh.numberofelements 1]);
-					md = checkfield(md,'fieldname','materials.rheology_law','values',{'None' 'BuddJacka' 'Cuffey' 'CuffeyTemperate' 'Paterson' 'Arrhenius' 'LliboutryDuval' 'NyeCO2' 'NyeH2O' 'GBSH2O'});
+					md = checkfield(md,'fieldname','materials.rheology_law','values',{'None' 'BuddJacka' 'Cuffey' 'CuffeyTemperate' 'Paterson' 'Arrhenius' 'LliboutryDuval' 'NyeCO2' 'NyeH2O'});
 				case 'litho'
 					if ~ismember('LoveAnalysis',analyses), return; end
 					md = checkfield(md,'fieldname','materials.numlayers','NaN',1,'Inf',1,'>',0,'numel',1);
@@ -244,12 +247,16 @@ classdef materials < dynamicprops
 					md = checkfield(md,'fieldname','materials.density','NaN',1,'Inf',1,'size',[md.materials.numlayers 1],'>',0);
 					md = checkfield(md,'fieldname','materials.viscosity','NaN',1,'Inf',1,'size',[md.materials.numlayers 1],'>=',0);
 					md = checkfield(md,'fieldname','materials.rheologymodel','NaN',1,'Inf',1,'size',[md.materials.numlayers 1],'>=',0,'<=',2);
-					md = checkfield(md,'fieldname','materials.burgers_viscosity','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
-					md = checkfield(md,'fieldname','materials.burgers_mu','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
-					md = checkfield(md,'fieldname','materials.ebm_alpha','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
-					md = checkfield(md,'fieldname','materials.ebm_delta','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
-					md = checkfield(md,'fieldname','materials.ebm_taul','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
-					md = checkfield(md,'fieldname','materials.ebm_tauh','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
+					if any(self.rheologymodel==1)
+						md = checkfield(md,'fieldname','materials.burgers_viscosity','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
+						md = checkfield(md,'fieldname','materials.burgers_mu','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
+					end
+					if any(self.rheologymodel==2)
+						md = checkfield(md,'fieldname','materials.ebm_alpha','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
+						md = checkfield(md,'fieldname','materials.ebm_delta','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
+						md = checkfield(md,'fieldname','materials.ebm_taul','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
+						md = checkfield(md,'fieldname','materials.ebm_tauh','Inf',1,'size',[md.materials.numlayers 1],'>=',0);
+					end
 
 					for i=1:md.materials.numlayers,
 						if md.materials.rheologymodel(i)==1 & (isnan(md.materials.burgers_viscosity(i) | isnan(md.materials.burgers_mu(i)))),
@@ -303,6 +310,7 @@ classdef materials < dynamicprops
 					WriteData(fid,prefix,'object',self,'class','materials','fieldname','thermal_exchange_velocity','format','Double');
 					WriteData(fid,prefix,'object',self,'class','materials','fieldname','rheology_B','format','DoubleMat','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',md.constants.yts);
 					WriteData(fid,prefix,'object',self,'class','materials','fieldname','rheology_n','format','DoubleMat','mattype',2);
+					WriteData(fid,prefix,'object',self,'class','materials','fieldname','rheology_phi','format','Double');
 					WriteData(fid,prefix,'data',self.rheology_law,'name','md.materials.rheology_law','format','String');
 				case 'litho'
 					WriteData(fid,prefix,'object',self,'class','materials','fieldname','numlayers','format','Integer');
@@ -368,6 +376,7 @@ classdef materials < dynamicprops
 					writejsdouble(fid,[modelname '.materials.mixed_layer_capacity'],self.mixed_layer_capacity);
 					writejs1Darray(fid,[modelname '.materials.rheology_B'],self.rheology_B);
 					writejs1Darray(fid,[modelname '.materials.rheology_n'],self.rheology_n);
+					writejsdouble(fid,[modelname '.materials.rheology_phi'],self.rheology_phi);
 					writejsstring(fid,[modelname '.materials.rheology_law'],self.rheology_law);
 				case 'litho'
 					writejsdouble(fid,[modelname '.materials.numlayers'],self.numlayers);
@@ -501,7 +510,6 @@ classdef materials < dynamicprops
 			vs = 0.;
 
 			for i = 1:13
-
 				r1 = 0.;
 				r2 = 0.;
 				if ((rad(j) > r(i)) & (rad(j) <= r(i+1))) 

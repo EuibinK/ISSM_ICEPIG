@@ -37,7 +37,7 @@ WRAPPER(PropagateFlagsFromConnectivity_python){
 	/*write output datasets: */
 	WriteData(POOLOUT,pool,nel);
 
-	/*Free ressources: */
+	/*Free resources: */
 	xDelete<double>(connectivity);
 	xDelete<double>(pool);
 	xDelete<double>(flags);

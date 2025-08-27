@@ -301,7 +301,7 @@ void Inputs::AXPY(IssmDouble alpha, int xenum, int yenum ){/*{{{*/
 	this->inputs[index_y]->AXPY(this->inputs[index_x],alpha);
 }
 /*}}}*/
-void     Inputs::Shift(int xenum, IssmDouble alpha){/*{{{*/
+void Inputs::Shift(int xenum, IssmDouble alpha){/*{{{*/
 
 	_assert_(this);
 
@@ -313,6 +313,17 @@ void     Inputs::Shift(int xenum, IssmDouble alpha){/*{{{*/
 
 	/*Shift: */
 	this->inputs[index_x]->Shift(alpha);
+}
+/*}}}*/
+void Inputs::AverageAndReplace(int inputenum){/*{{{*/
+
+	_assert_(this);
+
+	/*Get indices from enums*/
+	int index = EnumToIndex(inputenum);
+	if(!this->inputs[index]) _error_("Input "<<EnumToStringx(inputenum)<<" not found");
+
+	this->inputs[index]->AverageAndReplace();
 }
 /*}}}*/
 int  Inputs::EnumToIndex(int enum_in){/*{{{*/

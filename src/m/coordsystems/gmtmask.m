@@ -39,9 +39,15 @@ function mask = gmtmask(lat,long,varargin)
 	dlmwrite(filename_all,[long lat (1:nv)'],'delimiter','\t','precision',10);
 
 	%figure out which vertices are on the ocean, which one on the continent:
-	gmt_select_options='-h0 -Df -R0/360/-90/90 -A0 -JQ180/200 -Nk/s/s/k/s';
+	%
+	% NOTE: Remove -Ve option to enable warnings if this method is not working 
+	%		expected
+	% 
+	gmt_select_options='-Ve -h0 -Df -R0/360/-90/90 -A0 -JQ180/200 -Nk/s/s/k/s';
 	[status,result]=system(['gmt select ./' filename_all ' ' gmt_select_options ' > ./' filename_oce]);
 	if status~=0,
+		%assume we are working with GMT 6.0.0
+		gmt_select_options='-h0 -Df -R0/360/-90/90 -A0 -JQ180/200 -Nk/s/s/k/s';
 		[status,result] = system(['gmtselect ./' filename_all ' ' gmt_select_options ' > ./' filename_oce]);
 		if status~=0,
 			error(result);

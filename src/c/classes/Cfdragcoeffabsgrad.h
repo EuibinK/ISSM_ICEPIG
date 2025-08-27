@@ -9,18 +9,20 @@
 #include "./Definition.h"
 #include "./FemModel.h"
 
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,int output_enum);
-
 class Cfdragcoeffabsgrad: public Object, public Definition{
 
 	public: 
 
-		int   definitionenum;
-		char *name;
+		int         definitionenum;
+		char       *name;
+		bool			firsttimepassed;
+		IssmDouble  J;
 
 		/*Cfdragcoeffabsgrad constructors, destructors :*/
 		Cfdragcoeffabsgrad();
 		Cfdragcoeffabsgrad(char* in_name, int in_definitionenum);
+		Cfdragcoeffabsgrad(char* in_name, int in_definitionenum, IssmDouble in_J);
+		Cfdragcoeffabsgrad(char* in_name, int in_definitionenum, IssmDouble in_J, bool in_firsttimepassed);
 		~Cfdragcoeffabsgrad();
 
 		/*Object virtual function resolutoin: */

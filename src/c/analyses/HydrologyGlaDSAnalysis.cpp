@@ -114,7 +114,7 @@ void HydrologyGlaDSAnalysis::UpdateElements(Elements* elements,Inputs* inputs,Io
 	iomodel->FindConstant(&hydrology_model,"md.hydrology.model");
 	int    meltflag;	
 	iomodel->FindConstant(&meltflag,"md.hydrology.melt_flag");
-	
+
 	/*Now, do we really want GlaDS?*/
 	if(hydrology_model!=HydrologyGlaDSEnum) return;
 
@@ -150,6 +150,8 @@ void HydrologyGlaDSAnalysis::UpdateElements(Elements* elements,Inputs* inputs,Io
 	iomodel->FetchDataToInput(inputs,elements,"md.hydrology.moulin_input",HydrologyMoulinInputEnum);
 	iomodel->FetchDataToInput(inputs,elements,"md.initialization.watercolumn",HydrologySheetThicknessEnum);
 	iomodel->FetchDataToInput(inputs,elements,"md.initialization.hydraulic_potential",HydraulicPotentialEnum);
+	iomodel->FetchDataToInput(inputs,elements,"md.hydrology.rheology_B_base",HydrologyRheologyBBaseEnum);
+
 	if(iomodel->domaintype==Domain2DhorizontalEnum){
 		iomodel->FetchDataToInput(inputs,elements,"md.initialization.vx",VxEnum);
 		iomodel->FetchDataToInput(inputs,elements,"md.initialization.vy",VyEnum);
@@ -182,6 +184,14 @@ void HydrologyGlaDSAnalysis::UpdateParameters(Parameters* parameters,IoModel* io
 	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.ischannels",HydrologyIschannelsEnum));
 	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.melt_flag",HydrologyMeltFlagEnum));
 	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.channel_sheet_width",HydrologyChannelSheetWidthEnum));
+	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.channel_alpha",HydrologyChannelAlphaEnum));
+	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.channel_beta",HydrologyChannelBetaEnum));
+	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.sheet_alpha",HydrologySheetAlphaEnum));
+	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.sheet_beta",HydrologySheetBetaEnum));
+	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.omega",HydrologyOmegaEnum));
+	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.istransition",HydrologyIsTransitionEnum));
+	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.isincludesheetthickness",HydrologyIsIncludeSheetThicknessEnum));
+	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.creep_open_flag",HydrologyCreepOpenFlagEnum));
 	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.englacial_void_ratio",HydrologyEnglacialVoidRatioEnum));
 
 	/*Friction*/
@@ -215,12 +225,9 @@ ElementMatrix* HydrologyGlaDSAnalysis::CreateKMatrix(Element* element){/*{{{*/
 
 	/*Intermediaries */
 	IssmDouble  Jdet,dphi[3],h,k;
+	IssmDouble  h_r;
 	IssmDouble  A,B,n,phi_old,phi,phi_0,H,b,v1;
 	IssmDouble* xyz_list = NULL;
-
-	/*Hard coded coefficients*/
-	const IssmPDouble alpha = 5./4.;
-	const IssmPDouble beta  = 3./2.;
 
 	/*Fetch number of nodes and dof for this finite element*/
 	int numnodes = element->GetNumberOfNodes();
@@ -234,18 +241,29 @@ ElementMatrix* HydrologyGlaDSAnalysis::CreateKMatrix(Element* element){/*{{{*/
 	element->GetVerticesCoordinates(&xyz_list);
 
 	/*Get all inputs and parameters*/
+	bool istransition;
+	bool isincludesheetthickness;
+	bool creep_open_flag;
+	element->FindParam(&istransition,HydrologyIsTransitionEnum);
+	element->FindParam(&isincludesheetthickness,HydrologyIsIncludeSheetThicknessEnum);
+	element->FindParam(&creep_open_flag,HydrologyCreepOpenFlagEnum);
+	IssmDouble alpha     = element->FindParam(HydrologySheetAlphaEnum);
+	IssmDouble beta      = element->FindParam(HydrologySheetBetaEnum);
+	IssmDouble omega     = element->FindParam(HydrologyOmegaEnum);
 	IssmDouble dt        = element->FindParam(TimesteppingTimeStepEnum);
 	IssmDouble rho_water = element->FindParam(MaterialsRhoFreshwaterEnum);
+	IssmDouble mu_water  = element->FindParam(MaterialsMuWaterEnum);
 	IssmDouble rho_ice   = element->FindParam(MaterialsRhoIceEnum);
 	IssmDouble g         = element->FindParam(ConstantsGEnum);
 	IssmDouble e_v       = element->FindParam(HydrologyEnglacialVoidRatioEnum);
+	Input* hr_input  = element->GetInput(HydrologyBumpHeightEnum);       _assert_(hr_input);
 	Input* k_input   = element->GetInput(HydrologySheetConductivityEnum);_assert_(k_input);
-	Input* phi_input = element->GetInput(HydraulicPotentialEnum);      _assert_(phi_input);
-	Input* h_input   = element->GetInput(HydrologySheetThicknessEnum); _assert_(h_input);
-	Input* H_input      = element->GetInput(ThicknessEnum); _assert_(H_input);
-	Input* b_input      = element->GetInput(BedEnum); _assert_(b_input);
-	Input* B_input      = element->GetInput(MaterialsRheologyBEnum);         _assert_(B_input);
-	Input* n_input      = element->GetInput(MaterialsRheologyNEnum);         _assert_(n_input);
+	Input* phi_input = element->GetInput(HydraulicPotentialEnum);        _assert_(phi_input);
+	Input* h_input   = element->GetInput(HydrologySheetThicknessEnum);   _assert_(h_input);
+	Input* H_input   = element->GetInput(ThicknessEnum);                 _assert_(H_input);
+	Input* b_input   = element->GetInput(BedEnum);                       _assert_(b_input);
+	Input* B_input   = element->GetInput(HydrologyRheologyBBaseEnum);    _assert_(B_input);
+	Input* n_input   = element->GetInput(MaterialsRheologyNEnum);        _assert_(n_input);	
 
 	/* Start  looping on the number of gaussian points: */
 	Gauss* gauss=element->NewGauss(2);
@@ -261,43 +279,61 @@ ElementMatrix* HydrologyGlaDSAnalysis::CreateKMatrix(Element* element){/*{{{*/
 		k_input->GetInputValue(&k,gauss);
 		B_input->GetInputValue(&B,gauss);
 		n_input->GetInputValue(&n,gauss);
+		hr_input->GetInputValue(&h_r,gauss);
 		b_input->GetInputValue(&b,gauss);
 		H_input->GetInputValue(&H,gauss);
-
-		/*Hard code B*/
-		B = Cuffey(273.15-2);
 
 		/*Get norm of gradient of hydraulic potential and make sure it is >0*/
 		IssmDouble normgradphi = sqrt(dphi[0]*dphi[0] + dphi[1]*dphi[1]);
 		if(normgradphi < AEPS) normgradphi = AEPS;
 
-		IssmDouble coeff = k*pow(h,alpha)*pow(normgradphi,beta-2.);
+		/*Use transition model if specified*/
+		IssmDouble nu = mu_water/rho_water;
+		IssmDouble coeff;
+		if(istransition==1 && omega>=AEPS){
+			IssmDouble hratio = fabs(h/h_r);
+			IssmDouble coarg = 1. + 4.*pow(hratio,3-2*alpha)*omega*k*pow(h,3)*normgradphi/nu;
+			coeff = nu/2./omega*pow(hratio,2*alpha-3) * (-1 + pow(coarg, 0.5))/normgradphi;
+		}
+		else {
+			/*If omega is zero, use standard model, otherwise transition model*/
+			coeff = k*pow(h,alpha)*pow(normgradphi,beta-2.);
+		}
 
 		/*Diffusive term*/
+		IssmDouble factor = gauss->weight*Jdet;
 		for(int i=0;i<numnodes;i++){
 			for(int j=0;j<numnodes;j++){
-				Ke->values[i*numnodes+j] += gauss->weight*Jdet*(
+				Ke->values[i*numnodes+j] += factor*(
 							coeff*dbasis[0*numnodes+i]*dbasis[0*numnodes+j]
 							+ coeff*dbasis[1*numnodes+i]*dbasis[1*numnodes+j]);
 			}
 		}
 
 		/*Closing rate term, see Gagliardini and Werder 2018 eq. A2 (v = v1*phi_i + v2(phi_{i+1}))*/
-		phi_0 = rho_water*g*b + rho_ice*g*H;
+		phi_0   = rho_water*g*b + rho_ice*g*H;
+		if(isincludesheetthickness) phi_0 += rho_water*g*h;
 		A=pow(B,-n);
 		v1 = 2./pow(n,n)*A*h*(pow(fabs(phi_0 - phi),n-1.)*( - n));
+		if (!creep_open_flag) {
+			if (phi_0-phi<0) {
+				v1 = 0;
+			}
+		}
+		factor = gauss->weight*Jdet*(-v1);
 		for(int i=0;i<numnodes;i++){
 			for(int j=0;j<numnodes;j++){
-				Ke->values[i*numnodes+j] += gauss->weight*Jdet*(-v1)*basis[i]*basis[j];
+				Ke->values[i*numnodes+j] += factor*basis[i]*basis[j];
 			}
 		}
 
 		/*Transient term if dt>0*/
 		if(dt>0.){
 			/*Diffusive term*/
+			factor = gauss->weight*Jdet*e_v/(rho_water*g*dt);
 			for(int i=0;i<numnodes;i++){
 				for(int j=0;j<numnodes;j++){
-					Ke->values[i*numnodes+j] += gauss->weight*Jdet*e_v/(rho_water*g*dt)*basis[i]*basis[j];
+					Ke->values[i*numnodes+j] += factor*basis[i]*basis[j];
 				}
 			}
 		}
@@ -332,6 +368,10 @@ ElementVector* HydrologyGlaDSAnalysis::CreatePVector(Element* element){/*{{{*/
 	IssmDouble*    basis = xNew<IssmDouble>(numnodes);
 
 	/*Retrieve all inputs and parameters*/
+	bool isincludesheetthickness;
+	bool creep_open_flag;
+	element->FindParam(&isincludesheetthickness,HydrologyIsIncludeSheetThicknessEnum);
+	element->FindParam(&creep_open_flag,HydrologyCreepOpenFlagEnum);
 	element->GetVerticesCoordinates(&xyz_list);
 	element->FindParam(&meltflag,HydrologyMeltFlagEnum);
 	IssmDouble L         = element->FindParam(MaterialsLatentheatEnum);
@@ -341,17 +381,17 @@ ElementVector* HydrologyGlaDSAnalysis::CreatePVector(Element* element){/*{{{*/
 	IssmDouble dt        = element->FindParam(TimesteppingTimeStepEnum);
 	IssmDouble g         = element->FindParam(ConstantsGEnum);
 	IssmDouble e_v       = element->FindParam(HydrologyEnglacialVoidRatioEnum);
-	Input* hr_input     = element->GetInput(HydrologyBumpHeightEnum);_assert_(hr_input);
-	Input* h_input      = element->GetInput(HydrologySheetThicknessEnum);_assert_(h_input);
-	Input* H_input      = element->GetInput(ThicknessEnum); _assert_(H_input);
-	Input* b_input      = element->GetInput(BedEnum); _assert_(b_input);
-	Input* G_input      = element->GetInput(BasalforcingsGeothermalfluxEnum);_assert_(G_input);
+	Input* hr_input     = element->GetInput(HydrologyBumpHeightEnum);                _assert_(hr_input);
+	Input* h_input      = element->GetInput(HydrologySheetThicknessEnum);            _assert_(h_input);
+	Input* H_input      = element->GetInput(ThicknessEnum);                          _assert_(H_input);
+	Input* b_input      = element->GetInput(BedEnum);                                _assert_(b_input);
+	Input* G_input      = element->GetInput(BasalforcingsGeothermalfluxEnum);        _assert_(G_input);
 	Input* melt_input   = element->GetInput(BasalforcingsGroundediceMeltingRateEnum);_assert_(melt_input);
 	Input* RO_input     = NULL;
-	Input* B_input      = element->GetInput(MaterialsRheologyBEnum);         _assert_(B_input);
-	Input* n_input      = element->GetInput(MaterialsRheologyNEnum);         _assert_(n_input);
-	Input* phiold_input = element->GetInput(HydraulicPotentialOldEnum);      _assert_(phiold_input);
-	Input* phi_input    = element->GetInput(HydraulicPotentialEnum);         _assert_(phi_input);
+	Input* B_input      = element->GetInput(HydrologyRheologyBBaseEnum);             _assert_(B_input);
+	Input* n_input      = element->GetInput(MaterialsRheologyNEnum);                 _assert_(n_input);
+	Input* phiold_input = element->GetInput(HydraulicPotentialOldEnum);              _assert_(phiold_input);
+	Input* phi_input    = element->GetInput(HydraulicPotentialEnum);                 _assert_(phi_input);
 
 	/*Build friction element, needed later: */
 	Friction* friction=new Friction(element,2);
@@ -373,9 +413,6 @@ ElementVector* HydrologyGlaDSAnalysis::CreatePVector(Element* element){/*{{{*/
 		b_input->GetInputValue(&b,gauss);
 		H_input->GetInputValue(&H,gauss);
 		melt_input->GetInputValue(&melt,gauss);
-
-		/*Hard code B*/
-		B = Cuffey(273.15-2);
 
 		/*Get basal velocity*/
 		friction->GetBasalSlidingSpeeds(&vx, &vy ,gauss);
@@ -403,16 +440,24 @@ ElementVector* HydrologyGlaDSAnalysis::CreatePVector(Element* element){/*{{{*/
 		}
 
 		/*Compute closing rate*/
-		phi_0 = rho_water*g*b + rho_ice*g*H;
+		phi_0   = rho_water*g*b + rho_ice*g*H;
+		if(isincludesheetthickness) phi_0 += rho_water*g*h;
 		A=pow(B,-n);
 		v2 = 2./pow(n,n)*A*h*(pow(fabs(phi_0 - phi),n-1.)*(phi_0 +(n-1.)*phi));
+		if (!creep_open_flag) {
+			if (phi_0-phi<0) {
+				v2 = 0.;
+			}
+		}
 
-		for(int i=0;i<numnodes;i++) pe->values[i]+= - Jdet*gauss->weight*(w-v2-m)*basis[i];
+		IssmDouble factor = - Jdet*gauss->weight*(w-v2-m);
+		for(int i=0;i<numnodes;i++) pe->values[i]+= factor*basis[i];
 
 		/*Transient term if dt>0*/
 		if(dt>0.){
 			phiold_input->GetInputValue(&phi_old,gauss);
-			for(int i=0;i<numnodes;i++) pe->values[i] += gauss->weight*Jdet*e_v/(rho_water*g*dt)*phi_old*basis[i];
+			factor = gauss->weight*Jdet*e_v/(rho_water*g*dt)*phi_old;
+			for(int i=0;i<numnodes;i++) pe->values[i] += factor*basis[i];
 		}
 	}
 
@@ -434,44 +479,53 @@ void           HydrologyGlaDSAnalysis::GradientJ(Vector<IssmDouble>* gradient,El
 void           HydrologyGlaDSAnalysis::InputUpdateFromSolution(IssmDouble* solution,Element* element){/*{{{*/
 	element->InputUpdateFromSolutionOneDof(solution,HydraulicPotentialEnum);
 
-	/*Compute Hydrology Vx and Vy for time stepping purposes (These inputs do not affect GlaDS)*/
+	/*Compute Hydrology Vx and Vy for time stepping purposes, and Sheet Discharge as an optional output (These inputs do not affect GlaDS)*/
 
 	/*Intermediaries*/
    IssmDouble  dphi[3],h,k,phi;
+	IssmDouble  h_r;
 	IssmDouble  oceanLS,iceLS;
 	IssmDouble* xyz_list = NULL;
-
-	/*Hard coded coefficients*/
-	const IssmPDouble alpha = 5./4.;
-	const IssmPDouble beta  = 3./2.;
 
 	/*Fetch number vertices for this element*/
 	int numvertices = element->GetNumberOfVertices();
 
-	/*Initialize new sheet thickness*/
+	/*Initialize water sheet velocity and discharge*/
 	IssmDouble* vx = xNew<IssmDouble>(numvertices);
 	IssmDouble* vy = xNew<IssmDouble>(numvertices);
+	IssmDouble* d = xNew<IssmDouble>(numvertices);
 
 	/*Set to 0 if inactive element*/
 	if(element->IsAllFloating() || !element->IsIceInElement()){
 		for(int iv=0;iv<numvertices;iv++) vx[iv] = 0.;
 		for(int iv=0;iv<numvertices;iv++) vy[iv] = 0.;
+		for(int iv=0;iv<numvertices;iv++) d[iv] = 0.;
 		element->AddInput(HydrologyWaterVxEnum,vx,P1DGEnum);
 		element->AddInput(HydrologyWaterVyEnum,vy,P1DGEnum);
+		element->AddInput(HydrologySheetDischargeEnum,d,P1DGEnum);
 		xDelete<IssmDouble>(vx);
 		xDelete<IssmDouble>(vy);
+		xDelete<IssmDouble>(d);
 		return;
 	}
 
 	/*Retrieve all inputs and parameters*/
+	bool istransition;
+	element->FindParam(&istransition,HydrologyIsTransitionEnum);
+	IssmDouble alpha     = element->FindParam(HydrologySheetAlphaEnum);
+	IssmDouble beta      = element->FindParam(HydrologySheetBetaEnum);
+	IssmDouble omega     = element->FindParam(HydrologyOmegaEnum);
 	element->GetVerticesCoordinates(&xyz_list);
+	IssmDouble rho_water = element->FindParam(MaterialsRhoFreshwaterEnum);
+	IssmDouble mu_water  = element->FindParam(MaterialsMuWaterEnum);
 	Input *k_input       = element->GetInput(HydrologySheetConductivityEnum); _assert_(k_input);
 	Input *phi_input     = element->GetInput(HydraulicPotentialEnum);         _assert_(phi_input);
+	Input *hr_input      = element->GetInput(HydrologyBumpHeightEnum);        _assert_(hr_input);
 	Input *h_input       = element->GetInput(HydrologySheetThicknessEnum);    _assert_(h_input);
 	Input *oceanLS_input = element->GetInput(MaskOceanLevelsetEnum);          _assert_(oceanLS_input);
 	Input *iceLS_input   = element->GetInput(MaskIceLevelsetEnum);            _assert_(iceLS_input);
 
-	/* Start  looping on the number of gaussian points: */
+	/* Start looping on the number of gaussian points: */
 	Gauss* gauss=element->NewGauss();
 	for(int iv=0;iv<numvertices;iv++){
 		gauss->GaussVertex(iv);
@@ -480,14 +534,16 @@ void           HydrologyGlaDSAnalysis::InputUpdateFromSolution(IssmDouble* solut
       phi_input->GetInputDerivativeValue(&dphi[0],xyz_list,gauss);
       phi_input->GetInputValue(&phi,gauss);
       h_input->GetInputValue(&h,gauss);
+      hr_input->GetInputValue(&h_r,gauss); 
       k_input->GetInputValue(&k,gauss);
 		oceanLS_input->GetInputValue(&oceanLS,gauss);
 		iceLS_input->GetInputValue(&iceLS,gauss);
 
-		/*Set sheet thickness to zero if floating or no ice*/
+		/*Set to zero if floating or no ice*/
 		if(oceanLS<0. || iceLS>0.){
 			vx[iv] = 0.;
          vy[iv] = 0.;
+			d[iv] = 0.;
 		}
 		else{
 
@@ -495,20 +551,34 @@ void           HydrologyGlaDSAnalysis::InputUpdateFromSolution(IssmDouble* solut
          IssmDouble normgradphi = sqrt(dphi[0]*dphi[0] + dphi[1]*dphi[1]);
          if(normgradphi < AEPS) normgradphi = AEPS;
 
-         IssmDouble coeff = k*pow(h,alpha)*pow(normgradphi,beta-2.)/max(AEPS,h); // divide by h to get speed instead of discharge
+         /*If omega is zero, use standard model, otherwise transition model*/
+         IssmDouble nu = mu_water/rho_water;
+			IssmDouble coeff;
+			if(istransition==1 && omega>=AEPS){
+				IssmDouble hratio = fabs(h/h_r);
+				IssmDouble coarg = 1. + 4.*pow(hratio,3-2*alpha)*omega*k*pow(h,3)*normgradphi/nu;
+				coeff = nu/2./omega*pow(hratio,2*alpha-3) * (-1 + pow(coarg, 0.5))/normgradphi;  // coeff gives discharge; divide by h to get speed instead of discharge
+			}
+			else {
+			coeff = k*pow(h,alpha)*pow(normgradphi,beta-2.);  // coeff gives discharge; divide by h to get speed instead of discharge
+			}
 
-			vx[iv] = -coeff*dphi[0];
-			vy[iv] = -coeff*dphi[1];
+			vx[iv] = -coeff/max(AEPS,h)*dphi[0];
+			vy[iv] = -coeff/max(AEPS,h)*dphi[1];
+
+			d[iv] = coeff*normgradphi;
 		}
 	}
 
 	element->AddInput(HydrologyWaterVxEnum,vx,P1DGEnum);
 	element->AddInput(HydrologyWaterVyEnum,vy,P1DGEnum);
+	element->AddInput(HydrologySheetDischargeEnum,d,P1DGEnum);
 
 	/*Clean up and return*/
 	xDelete<IssmDouble>(xyz_list);
 	xDelete<IssmDouble>(vx);
 	xDelete<IssmDouble>(vy);
+	xDelete<IssmDouble>(d);
 	delete gauss;
 }/*}}}*/
 void           HydrologyGlaDSAnalysis::UpdateConstraints(FemModel* femmodel){/*{{{*/
@@ -581,7 +651,7 @@ void HydrologyGlaDSAnalysis::UpdateSheetThickness(FemModel* femmodel){/*{{{*/
 void HydrologyGlaDSAnalysis::UpdateSheetThickness(Element* element){/*{{{*/
 
 	/*Intermediaries */
-	IssmDouble  Jdet,vx,vy,ub,h_old,N,h_r,H,b;
+	IssmDouble  vx,vy,ub,h_old,N,h_r,H,b;
 	IssmDouble  A,B,n,phi,phi_0;
 	IssmDouble  alpha,beta;
 	IssmDouble  oceanLS,iceLS;
@@ -594,30 +664,36 @@ void HydrologyGlaDSAnalysis::UpdateSheetThickness(Element* element){/*{{{*/
 
 	/*Set to 0 if inactive element*/
 	if(element->IsAllFloating() || !element->IsIceInElement()){
-		for(int iv=0;iv<numvertices;iv++) h_new[iv] = 0.;
+		for(int iv=0;iv<numvertices;iv++) {
+			h_new[iv] = 0.;
+		}
 		element->AddInput(HydrologySheetThicknessEnum,h_new,P1Enum);
 		xDelete<IssmDouble>(h_new);
 		return;
 	}
 
 	/*Retrieve all inputs and parameters*/
+	bool isincludesheetthickness;
+	bool creep_open_flag;
+	bool ishydrologyslope;
+	element->FindParam(&isincludesheetthickness,HydrologyIsIncludeSheetThicknessEnum);
+	element->FindParam(&creep_open_flag,HydrologyCreepOpenFlagEnum);
 	IssmDouble  dt       = element->FindParam(TimesteppingTimeStepEnum);
 	IssmDouble  l_r      = element->FindParam(HydrologyCavitySpacingEnum);
 	IssmDouble rho_ice   = element->FindParam(MaterialsRhoIceEnum);
 	IssmDouble rho_water = element->FindParam(MaterialsRhoFreshwaterEnum);
 	IssmDouble g         = element->FindParam(ConstantsGEnum);
-	Input* hr_input = element->GetInput(HydrologyBumpHeightEnum);_assert_(hr_input);
-	Input* vx_input = element->GetInput(VxBaseEnum);_assert_(vx_input);
-	Input* vy_input = element->GetInput(VyBaseEnum);_assert_(vy_input);
-	Input* H_input  = element->GetInput(ThicknessEnum); _assert_(H_input);
-	Input* b_input  = element->GetInput(BedEnum); _assert_(b_input);
-	Input* hold_input  = element->GetInput(HydrologySheetThicknessOldEnum);_assert_(hold_input);
-	Input* B_input  = element->GetInput(MaterialsRheologyBEnum);         _assert_(B_input);
-	Input* n_input  = element->GetInput(MaterialsRheologyNEnum);         _assert_(n_input);
+	Input* hr_input = element->GetInput(HydrologyBumpHeightEnum);         _assert_(hr_input);
+	Input* vx_input = element->GetInput(VxBaseEnum);                      _assert_(vx_input);
+	Input* vy_input = element->GetInput(VyBaseEnum);                      _assert_(vy_input);
+	Input* H_input = element->GetInput(ThicknessEnum);                    _assert_(H_input);
+	Input* b_input = element->GetInput(BedEnum);                          _assert_(b_input);
+	Input* hold_input = element->GetInput(HydrologySheetThicknessOldEnum);_assert_(hold_input);
+	Input* B_input = element->GetInput(HydrologyRheologyBBaseEnum);       _assert_(B_input);
+	Input* n_input = element->GetInput(MaterialsRheologyNEnum);           _assert_(n_input);
 	Input* phi_input = element->GetInput(HydraulicPotentialEnum);         _assert_(phi_input);
-	Input* oceanLS_input = element->GetInput(MaskOceanLevelsetEnum); _assert_(oceanLS_input);
-	Input* iceLS_input = element->GetInput(MaskIceLevelsetEnum); _assert_(iceLS_input);
-
+	Input* oceanLS_input = element->GetInput(MaskOceanLevelsetEnum);      _assert_(oceanLS_input);
+	Input* iceLS_input = element->GetInput(MaskIceLevelsetEnum);          _assert_(iceLS_input);
 
 	/* Start  looping on the number of gaussian points: */
 	Gauss* gauss=element->NewGauss();
@@ -637,9 +713,6 @@ void HydrologyGlaDSAnalysis::UpdateSheetThickness(Element* element){/*{{{*/
 		oceanLS_input->GetInputValue(&oceanLS,gauss);
 		iceLS_input->GetInputValue(&iceLS,gauss);
 
-		/*Hard code B*/
-		B = Cuffey(273.15-2);
-
 		/*Set sheet thickness to zero if floating or no ice*/
 		if(oceanLS<0. || iceLS>0.){
 			h_new[iv] = 0.;
@@ -647,7 +720,8 @@ void HydrologyGlaDSAnalysis::UpdateSheetThickness(Element* element){/*{{{*/
 		else{
 
 		/*Get values for a few potentials*/
-		phi_0 = rho_water*g*b + rho_ice*g*H;
+		phi_0   = rho_water*g*b + rho_ice*g*H;
+		if(isincludesheetthickness) phi_0 += rho_water*g*h_old;
 		N = phi_0 - phi;
 
 		/*Get basal velocity*/
@@ -659,10 +733,20 @@ void HydrologyGlaDSAnalysis::UpdateSheetThickness(Element* element){/*{{{*/
 		/*Define alpha and beta*/
 		if(h_old<h_r){
 			alpha = -ub/l_r - 2./pow(n,n)*A*pow(fabs(N),n-1.)*N;
+			if (!creep_open_flag) {
+				if (N<0) {
+					alpha = -ub/l_r;
+				}
+			}
 			beta  = ub*h_r/l_r;
 		}
 		else{
 			alpha = - 2./pow(n,n)*A*pow(fabs(N),n-1.)*N;
+			if (!creep_open_flag) {
+				if (N<0) {
+					alpha = 0.;
+				}
+			}
 			beta  = 0.;
 		}
 
@@ -671,7 +755,9 @@ void HydrologyGlaDSAnalysis::UpdateSheetThickness(Element* element){/*{{{*/
 
 		/*Make sure it is positive*/
 		if(h_new[iv]<AEPS) h_new[iv] = AEPS;
-	}
+		
+		}
+
 	}
 
 	element->AddInput(HydrologySheetThicknessEnum,h_new,P1Enum);
@@ -692,12 +778,15 @@ void HydrologyGlaDSAnalysis::UpdateEffectivePressure(Element* element){/*{{{*/
 
 	/*Intermediary*/
 	IssmDouble phi_0, phi_m, p_i;
-	IssmDouble H,b,phi;
+	IssmDouble H,b,phi,h;
 	IssmDouble oceanLS,iceLS;
 
 	int numnodes = element->GetNumberOfNodes();
 
 	/*Get thickness and base on nodes to apply cap on water head*/
+	bool isincludesheetthickness;
+	element->FindParam(&isincludesheetthickness,HydrologyIsIncludeSheetThicknessEnum);
+	Input *h_input       = element->GetInput(HydrologySheetThicknessEnum);    _assert_(h_input);
    IssmDouble* N = xNew<IssmDouble>(numnodes);
 	IssmDouble  rho_ice   = element->FindParam(MaterialsRhoIceEnum);
 	IssmDouble  rho_water = element->FindParam(MaterialsRhoFreshwaterEnum);
@@ -727,6 +816,7 @@ void HydrologyGlaDSAnalysis::UpdateEffectivePressure(Element* element){/*{{{*/
 		phi_input->GetInputValue(&phi,gauss);
 		oceanLS_input->GetInputValue(&oceanLS,gauss);
 		iceLS_input->GetInputValue(&iceLS,gauss);
+		h_input->GetInputValue(&h,gauss);
 
 		/*Elevation potential*/
 		phi_m = rho_water*g*b;
@@ -736,6 +826,8 @@ void HydrologyGlaDSAnalysis::UpdateEffectivePressure(Element* element){/*{{{*/
 
 		/*Compute overburden potential*/
 		phi_0 = phi_m + p_i;
+		phi_0   = rho_water*g*b + rho_ice*g*H;
+		if(isincludesheetthickness) phi_0 += rho_water*g*h;
 
 		/*Calculate effective pressure*/
 		N[iv] = phi_0 - phi;
@@ -749,7 +841,7 @@ void HydrologyGlaDSAnalysis::UpdateEffectivePressure(Element* element){/*{{{*/
 	}
 
 	element->AddInput(EffectivePressureEnum,N,element->FiniteElement());
-	
+
 	/*Clean up and return*/
 	delete gauss;
 	xDelete<IssmDouble>(N);

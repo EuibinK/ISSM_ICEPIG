@@ -71,7 +71,7 @@ function InterpFromMeshToMesh2d(indexin,xin,yin,datain,x_interpin,y_interpin){
 	data_interp = Module.HEAPF64.slice(data_interpptr /8, data_interpptr/8 + nods_interp);
 	/*}}}*/
 
-	/*Free ressources: */
+	/*Free resources: */
 	Module._free(pdata_interp); 
 
 	return data_interp;

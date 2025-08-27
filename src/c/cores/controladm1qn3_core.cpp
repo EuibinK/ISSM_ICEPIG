@@ -10,9 +10,8 @@
 #include "../modules/modules.h"
 #include "../solutionsequences/solutionsequences.h"
 
-#ifdef _HAVE_CODIPACK_
-extern CoDi_global codi_global;
-#include <sstream> // for output of the CoDiPack tape
+#if _HAVE_CODIPACK_
+#include "../toolkits/codipack/CoDiPackGlobal.h"
 #include <fenv.h>
 double transient_ad(FemModel* femmodel, double* G,double* Jlist);
 #endif
@@ -69,38 +68,7 @@ void simul_starttrace(FemModel* femmodel){/*{{{*/
 	#elif defined(_HAVE_CODIPACK_)
 
 		//fprintf(stderr, "*** Codipack IoModel::StartTrace\n");
-		/*
-		 * FIXME codi
-		 * - ADOL-C variant uses fine grained tracing with various arguments
-		 * - ADOL-C variant sets a garbage collection parameter for its tape
-		 * -> These parameters are not read for the CoDiPack ISSM version!
-		 */
-		#if _CODIPACK_MAJOR_==2
-		auto& tape_codi = IssmDouble::getTape();
-		#elif _CODIPACK_MAJOR_==1
-		auto& tape_codi = IssmDouble::getGlobalTape();
-		#else
-		#error "_CODIPACK_MAJOR_ not supported"
-		#endif
-
-		tape_codi.setActive();
-		#if _AD_TAPE_ALLOC_
-		//alloc_profiler.Tag(StartInit, true);
-		IssmDouble x_t(1.0), y_t(1.0);
-		tape_codi.registerInput(y_t);
-		int codi_allocn = 0;
-		femmodel->parameters->FindParam(&codi_allocn,AutodiffTapeAllocEnum);
-		for(int i = 0;i < codi_allocn;++i) {
-			x_t = y_t * y_t;
-		}
-		/*
-		std::stringstream out_s;
-		IssmDouble::getTape().printStatistics(out_s);
-		_printf0_("StartTrace::Tape Statistics	   : TapeAlloc count=[" << codi_allocn << "]\n" << out_s.str());
-		*/
-		//alloc_profiler.Tag(FinishInit, true);
-		#endif
-
+		codi_global.start();
 	#else
 	_error_("not implemented");
 	#endif
@@ -154,40 +122,14 @@ void simul_stoptrace(){/*{{{*/
 		}
 		delete [] sstats;
 		#endif
-
-		#ifdef _HAVE_CODIPACK_
-		#ifdef _AD_TAPE_ALLOC_
-		//_printf_("Allocation time  P(" << my_rank << "): " << alloc_profiler.DeltaTime(StartInit, FinishInit) << "\n");
-		#endif
-		std::stringstream out_s;
-		#if _CODIPACK_MAJOR_==2
-		IssmDouble::getTape().printStatistics(out_s);
-		#elif _CODIPACK_MAJOR_==1
-		IssmDouble::getGlobalTape().printStatistics(out_s);
-		#else
-		#error "_CODIPACK_MAJOR_ not supported"
-		#endif
-		_printf0_("CoDiPack Profiling::Tape Statistics :\n" << out_s.str());
-		#endif
 	} /*}}}*/
 
 	#elif defined(_HAVE_CODIPACK_)
 
-	/*Get Tape*/
-	#if _CODIPACK_MAJOR_==2
-	auto& tape_codi = IssmDouble::getTape();
-	#elif _CODIPACK_MAJOR_==1
-	auto& tape_codi = IssmDouble::getGlobalTape();
-	#else
-	#error "_CODIPACK_MAJOR_ not supported"
-	#endif
-
-	tape_codi.setPassive();
+	codi_global.stop();
 	if(VerboseAutodiff()){
 		int my_rank=IssmComm::GetRank();
 		if(my_rank == 0) {
-			// FIXME codi "just because" for now
-			tape_codi.printStatistics(std::cout);
 			codi_global.print(std::cout);
 		}
 	}
@@ -207,8 +149,8 @@ void simul_ad(long* indic,long* n,double* X,double* pf,double* G,long izs[1],flo
 	int num_responses,num_controls,solution_type;
 	femmodel->parameters->FindParam(&solution_type,SolutionTypeEnum);
 
-	/*In transient, we need to make sure we do not modify femmodel at each iteration, make a copy*/
-	if(solution_type == TransientSolutionEnum) femmodel = input_struct->femmodel->copy();
+	/*we need to make sure we do not modify femmodel at each iteration, make a copy*/
+	femmodel = input_struct->femmodel->copy();
 
 	IssmPDouble*  Jlist  = input_struct->Jlist;
 	int           JlistM = input_struct->M;
@@ -274,28 +216,10 @@ void simul_ad(long* indic,long* n,double* X,double* pf,double* G,long izs[1],flo
 		}
 		#elif defined(_HAVE_CODIPACK_)
 
-		/*Get tape*/
-		#if _CODIPACK_MAJOR_==2
-		auto& tape_codi = IssmDouble::getTape();
-		#elif _CODIPACK_MAJOR_==1
-		auto& tape_codi = IssmDouble::getGlobalTape();
-		#else
-		#error "_CODIPACK_MAJOR_ not supported"
-		#endif
-
-		codi_global.input_indices.clear();
 		if(my_rank==0){
 			for (int i=0;i<intn;i++) {
 				aX[i]=X[i];
-				tape_codi.registerInput(aX[i]);
-				#if _CODIPACK_MAJOR_==2
-				codi_global.input_indices.push_back(aX[i].getIdentifier());
-				#elif _CODIPACK_MAJOR_==1
-				codi_global.input_indices.push_back(aX[i].getGradientData());
-				#else
-				#error "_CODIPACK_MAJOR_ not supported"
-				#endif
-
+				codi_global.registerInput(aX[i]);
 			}
 		}
 		#else
@@ -312,7 +236,6 @@ void simul_ad(long* indic,long* n,double* X,double* pf,double* G,long izs[1],flo
 		solutioncore(femmodel);
 
 		/*Get Dependents*/
-		IssmDouble   output_value;
 		int          num_dependents;
 		IssmPDouble *dependents;
 		IssmDouble   J = 0.;
@@ -321,35 +244,26 @@ void simul_ad(long* indic,long* n,double* X,double* pf,double* G,long izs[1],flo
 
 		/*Go through our dependent variables, and compute the response:*/
 		dependents=xNew<IssmPDouble>(num_dependents);
-		#if defined(_HAVE_CODIPACK_)
-		codi_global.output_indices.clear();
-		#endif
 		int i=-1;
 		for(Object* & object:dependent_objects->objects){
 			i++;
 			DependentObject* dep=xDynamicCast<DependentObject*>(object);
-			if(solution_type==TransientSolutionEnum) output_value = dep->GetValue();
-			if(solution_type!=TransientSolutionEnum) dep->Responsex(&output_value,femmodel);
 
-			#if defined(_HAVE_CODIPACK_)
-			tape_codi.registerOutput(output_value);
+			/*Get cost function for this dependent*/
+			dep->RecordResponsex(femmodel);
+			IssmDouble output_value = dep->GetValue();
 			dependents[i] = output_value.getValue();
-			#if _CODIPACK_MAJOR_==2
-			codi_global.output_indices.push_back(output_value.getIdentifier());
-			#elif _CODIPACK_MAJOR_==1
-			codi_global.output_indices.push_back(output_value.getGradientData());
-			#else
-			#error "_CODIPACK_MAJOR_ not supported"
-			#endif
-
-			#elif defined(_HAVE_ADOLC_)
+			#if defined(_HAVE_ADOLC_)
 			output_value>>=dependents[i];
-
-			#else
-			_error_("not suppoted");
 			#endif
+
 			J+=output_value;
 		}
+
+		#if defined(_HAVE_CODIPACK_)
+		// TODO: Registration of output values is more fine grained for ADOL-c.
+		codi_global.registerOutput(J);
+		#endif
 
 		/*Turning off trace tape*/
 		simul_stoptrace();
@@ -419,37 +333,12 @@ void simul_ad(long* indic,long* n,double* X,double* pf,double* G,long izs[1],flo
 		#elif defined(_HAVE_CODIPACK_)
 		/*Get gradient for CoDiPack{{{*/
 		if(VerboseAutodiff())_printf0_("   CoDiPack fos_reverse\n");
-
-		/* call the fos_reverse in a loop on the index, from 0 to num_dependents, so
-		 * as to generate num_dependents gradients: */
-		for(int dep_index=0;dep_index<num_dependents_old;dep_index++){
-
-			/*initialize direction index in the weights vector: */
-			if(my_rank==0){
-				if(dep_index<0 || dep_index>=num_dependents || codi_global.output_indices.size() <= dep_index){
-					_error_("index value for dependent index should be in [0,num_dependents-1]");
-				}
-				tape_codi.setGradient(codi_global.output_indices[dep_index],1.0);
-			}
-			//feclearexcept(FE_ALL_EXCEPT);
-			//feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);
-			tape_codi.evaluate();
-
-			/*Get gradient for this dependent */
-			weightVectorTimesJac=xNew<IssmPDouble>(num_independents);
-			auto in_size = codi_global.input_indices.size();
-			for(size_t i = 0; i < in_size; ++i){
-				_assert_(i<num_independents);
-				weightVectorTimesJac[i] = tape_codi.getGradient(codi_global.input_indices[i]);
-			}
-			if(my_rank==0) for(int i=0;i<num_independents;i++){
-				totalgradient[i]+=weightVectorTimesJac[i];
-			}
-			xDelete(weightVectorTimesJac);
-		}
+		if(my_rank==0) codi_global.setGradient(0, 1.0);
+		codi_global.evaluate();
+		codi_global.getFullGradient(totalgradient, num_independents);
 
 		/*Clear tape*/
-		tape_codi.reset();
+		codi_global.clear();
 		/*}}}*/
 		#else
 		_error_("not suppoted");
@@ -472,12 +361,7 @@ void simul_ad(long* indic,long* n,double* X,double* pf,double* G,long izs[1],flo
 
 		if(*indic==0){
 			/*dry run, no gradient required*/
-
-			/*Retrieve objective functions independently*/
-			_printf0_("f(x) = "<<setw(9)<<setprecision(4)<<*pf<<"  |  ");
-			_printf0_("            N/A |\n");
-			for(int i=0;i<num_responses;i++) _printf0_(" "<<setw(8)<<setprecision(3)<<Jlist[(*Jlisti)*JlistN+i]);
-			_printf0_("\n");
+			InversionStatsIter( (*Jlisti)+1, *pf, NAN, &Jlist[(*Jlisti)*JlistN], num_responses);
 
 			*Jlisti = (*Jlisti) +1;
 			xDelete<double>(XU);
@@ -508,15 +392,13 @@ void simul_ad(long* indic,long* n,double* X,double* pf,double* G,long izs[1],flo
 	}
 	Gnorm = sqrt(Gnorm);
 	_assert_(!xIsNan(Gnorm));
+	_assert_(!xIsInf(Gnorm));
 
 	/*Print info*/
-	_printf0_("f(x) = "<<setw(12)<<setprecision(7)<<*pf<<"  |  ");
-	_printf0_("       "<<setw(12)<<setprecision(7)<<Gnorm<<" |");
-	for(int i=0;i<num_responses;i++) _printf0_(" "<<setw(12)<<setprecision(7)<<Jlist[(*Jlisti)*JlistN+i]);
-	_printf0_("\n");
+	InversionStatsIter( (*Jlisti)+1, *pf, reCast<double>(Gnorm), &Jlist[(*Jlisti)*JlistN], num_responses);
 
 	/*Clean-up and return*/
-	if(solution_type == TransientSolutionEnum) delete femmodel;
+	delete femmodel;
 	*Jlisti = (*Jlisti) +1;
 	xDelete<double>(XU);
 	xDelete<double>(XL);
@@ -527,10 +409,9 @@ void simul_ad(long* indic,long* n,double* X,double* pf,double* G,long izs[1],flo
 }/*}}}*/
 void controladm1qn3_core(FemModel* femmodel){/*{{{*/
 
-
 	/*Intermediaries*/
 	long    omode;
-	double  f,dxmin,gttol;
+	double  f,dxmin,dfmin_frac,gttol;
 	int     maxsteps,maxiter;
 	int     intn ,num_controls,num_cost_functions,solution_type;
 	double *scaling_factors = NULL;
@@ -547,6 +428,7 @@ void controladm1qn3_core(FemModel* femmodel){/*{{{*/
 	femmodel->parameters->FindParam(&maxsteps,InversionMaxstepsEnum);
 	femmodel->parameters->FindParam(&maxiter,InversionMaxiterEnum);
 	femmodel->parameters->FindParamAndMakePassive(&dxmin,InversionDxminEnum);
+	femmodel->parameters->FindParamAndMakePassive(&dfmin_frac,InversionDfminFracEnum);
 	femmodel->parameters->FindParamAndMakePassive(&gttol,InversionGttolEnum);
 	femmodel->parameters->FindParamAndMakePassive(&scaling_factors,NULL,InversionControlScalingFactorsEnum);
 	femmodel->parameters->FindParam(&control_enum,NULL,InversionControlParametersEnum);
@@ -594,9 +476,7 @@ void controladm1qn3_core(FemModel* femmodel){/*{{{*/
 	long      ndz = 4*n+m*(2*n+1);
 	double*   dz  = xNew<double>(ndz);
 	if(VerboseControl())_printf0_("   Computing initial solution\n");
-	_printf0_("\n");
-	_printf0_("Cost function f(x)   | Gradient norm |g(x)| |  List of contributions\n");
-	_printf0_("____________________________________________________________________\n");
+	InversionStatsHeader(num_cost_functions);
 
 	/*Prepare structure for m1qn3*/
 	m1qn3_struct mystruct;
@@ -608,24 +488,30 @@ void controladm1qn3_core(FemModel* femmodel){/*{{{*/
 	/*Initialize Gradient and cost function of M1QN3*/
 	indic = 4; /*gradient required*/
 	simul_ad(&indic,&n,X,&f,G,izs,rzs,(void*)&mystruct);
+
 	/*Estimation of the expected decrease in f during the first iteration*/
-	double df1=f;
+	if(dfmin_frac==0.) dfmin_frac=1.;
+	double df1=dfmin_frac*f;
 
 	/*Call M1QN3 solver*/
 	m1qn3_(simul_ptr,prosca,&ctonbe_,&ctcabe_,
 				&n,X,&f,G,&dxmin,&df1,
 				&gttol,normtype,&impres,&io,imode,&omode,&niter,&nsim,iz,dz,&ndz,
 				&reverse,&indic,izs,rzs,(void*)&mystruct);
+
+	/*Print exit flag*/
+	InversionStatsFooter(num_cost_functions);
+	_printf0_("   Exit code "<<int(omode));
 	switch(int(omode)){
-		case 0:  _printf0_("   Stop requested (indic = 0)\n"); break;
-		case 1:  _printf0_("   Convergence reached (gradient satisfies stopping criterion)\n"); break;
-		case 2:  _printf0_("   Bad initialization\n"); break;
-		case 3:  _printf0_("   Line search failure\n"); break;
-		case 4:  _printf0_("   Maximum number of iterations exceeded\n");break;
-		case 5:  _printf0_("   Maximum number of function calls exceeded\n"); break;
-		case 6:  _printf0_("   stopped on dxmin during line search\n"); break;
-		case 7:  _printf0_("   <g,d> > 0  or  <y,s> <0\n"); break;
-		default: _printf0_("   Unknown end condition\n");
+		case 0:  _printf0_(": Stop requested (indic = 0)\n"); break;
+		case 1:  _printf0_(": Convergence reached (gradient satisfies stopping criterion)\n"); break;
+		case 2:  _printf0_(": Bad initialization\n"); break;
+		case 3:  _printf0_(": Line search failure\n"); break;
+		case 4:  _printf0_(": Maximum number of iterations exceeded\n");break;
+		case 5:  _printf0_(": Maximum number of function calls exceeded\n"); break;
+		case 6:  _printf0_(": stopped on dxmin during line search\n"); break;
+		case 7:  _printf0_(": <g,d> > 0  or  <y,s> <0\n"); break;
+		default: _printf0_(": Unknown end condition\n");
 	}
 
 	/*Constrain solution vector*/
@@ -656,20 +542,19 @@ void controladm1qn3_core(FemModel* femmodel){/*{{{*/
 
 	ControlInputSetGradientx(femmodel->elements,femmodel->nodes,femmodel->vertices,femmodel->loads,femmodel->materials,femmodel->parameters,aG);
 	SetControlInputsFromVectorx(femmodel,aX);
-
 	xDelete(aX);
 
 	if (solution_type == TransientSolutionEnum){
 		int step = 1;
 		femmodel->parameters->SetParam(step,StepEnum);
-		femmodel->results->AddObject(new GenericExternalResult<IssmPDouble*>(femmodel->results->Size()+1,JEnum,mystruct.Jlist,(*mystruct.i),mystruct.N,1,0));
+		femmodel->results->AddObject(new GenericExternalResult<IssmPDouble*>(femmodel->results->Size()+1,JEnum,mystruct.Jlist,(*mystruct.i),mystruct.N));
 
 		int offset = 0;
 		for(int i=0;i<num_controls;i++){
 
 			/*Disect results*/
-			GenericExternalResult<IssmPDouble*>* G_output = new GenericExternalResult<IssmPDouble*>(femmodel->results->Size()+1,Gradient1Enum+i,&G[offset],N[i],M[i],1,0.);
-			GenericExternalResult<IssmPDouble*>* X_output = new GenericExternalResult<IssmPDouble*>(femmodel->results->Size()+1,control_enum[i],&X[offset],N[i],M[i],1,0.);
+			GenericExternalResult<IssmPDouble*>* G_output = new GenericExternalResult<IssmPDouble*>(femmodel->results->Size()+1,Gradient1Enum+i,&G[offset],N[i],M[i]);
+			GenericExternalResult<IssmPDouble*>* X_output = new GenericExternalResult<IssmPDouble*>(femmodel->results->Size()+1,control_enum[i],&X[offset],N[i],M[i]);
 
 			/*transpose for consistency with MATLAB's formating*/
 			G_output->Transpose();
@@ -683,8 +568,8 @@ void controladm1qn3_core(FemModel* femmodel){/*{{{*/
 		}
 	}
 	else{
+		//FIXME: merge with code above?
 		femmodel->results->AddObject(new GenericExternalResult<IssmPDouble*>(femmodel->results->Size()+1,JEnum,mystruct.Jlist,(*mystruct.i),mystruct.N,0,0));
-
 		femmodel->OutputControlsx(&femmodel->results);
 	}
 	femmodel->results->AddObject(new GenericExternalResult<int>(femmodel->results->Size()+1,InversionStopFlagEnum,int(omode)));
@@ -696,6 +581,7 @@ void controladm1qn3_core(FemModel* femmodel){/*{{{*/
 	/*Finalize*/
 	if(VerboseControl()) _printf0_("   preparing final solution\n");
 	femmodel->parameters->SetParam(true,SaveResultsEnum);
+	femmodel->parameters->SetParam(0,SettingsCheckpointFrequencyEnum);
 	void (*solutioncore)(FemModel*)=NULL;
 	CorePointerFromSolutionEnum(&solutioncore,femmodel->parameters,solution_type);
 	solutioncore(femmodel);

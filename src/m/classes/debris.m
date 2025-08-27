@@ -11,6 +11,7 @@ classdef debris
 		packingfraction          = 0;
 		removalmodel             = 0;
 		displacementmodel        = 0;
+		max_displacementvelocity = 0;
 		removal_slope_threshold  = 0;
 		removal_stress_threshold = 0;
 		vertex_pairing           = NaN;
@@ -65,7 +66,7 @@ classdef debris
 		end % }}}
 		function list = defaultoutputs(self,md) % {{{
 
-			list = {'DebrisThickness'};
+			list = {'DebrisThickness','DebrisMaskNodeActivation','VxDebris','VyDebris'};
 
 		end % }}}
 		function self = setdefaultparameters(self) % {{{
@@ -91,6 +92,9 @@ classdef debris
 			%Stress threshold for removalmodel (2)
 			self.removal_stress_threshold=0;
 
+			%Max velocity for displacementmodel (1)
+			self.max_displacementvelocity=0;
+
 			%default output
 			self.requested_outputs={'default'};
 		end % }}}
@@ -100,11 +104,12 @@ classdef debris
 			if ~ismember('MasstransportAnalysis',analyses) | (strcmp(solution,'TransientSolution') & md.transient.isdebris==0), return; end
 
 			md = checkfield(md,'fieldname','debris.spcthickness');
-			md = checkfield(md,'fieldname','debris.stabilization','values',[0 1 2 3]);
+			md = checkfield(md,'fieldname','debris.stabilization','values',[0 1 2 3 4 5]);
 			md = checkfield(md,'fieldname','debris.min_thickness','>=',0);
 			md = checkfield(md,'fieldname','debris.packingfraction','>=',0);
 			md = checkfield(md,'fieldname','debris.removalmodel','values',[0 1 2]);
 			md = checkfield(md,'fieldname','debris.displacementmodel','values',[0 1 2]);
+			md = checkfield(md,'fieldname','debris.max_displacementvelocity','>=',0);
 			md = checkfield(md,'fieldname','debris.removal_slope_threshold','>=',0);
 			md = checkfield(md,'fieldname','debris.removal_stress_threshold','>=',0);
 			md = checkfield(md,'fieldname','debris.requested_outputs','stringrow',1);
@@ -119,7 +124,8 @@ classdef debris
 			fielddisplay(self,'packingfraction','fraction of debris covered in the ice');
 			fielddisplay(self,'stabilization','0: no stabilization, 1: artificial diffusion, 2: streamline upwinding, 3: streamline upwind Petrov-Galerkin (SUPG)');
 			fielddisplay(self,'removalmodel','frontal removal of debris. 0: no removal, 1: Slope-triggered debris removal, 2: driving-stress triggered debris removal');
-			fielddisplay(self,'displacementmodel','debris displacement. 0: no displacement, 1: ...');
+			fielddisplay(self,'displacementmodel','debris displacement. 0: no displacement, 1: additional debris velocity above the critical slope/stress threshold');
+			fielddisplay(self,'max_displacementvelocity','maximum velocity of debris transport (v_ice + v_displacement) (m/a)');
 			fielddisplay(self,'removal_slope_threshold','critical slope (degrees) for removalmodel (1)');
 			fielddisplay(self,'removal_stress_threshold','critical stress (Pa) for removalmodel (2)');
 
@@ -134,6 +140,7 @@ classdef debris
 			WriteData(fid,prefix,'object',self,'fieldname','stabilization','format','Integer');
 			WriteData(fid,prefix,'object',self,'fieldname','removalmodel','format','Integer');
 			WriteData(fid,prefix,'object',self,'fieldname','displacementmodel','format','Integer');
+			WriteData(fid,prefix,'object',self,'fieldname','max_displacementvelocity','format','Double');
 			WriteData(fid,prefix,'object',self,'fieldname','removal_slope_threshold','format','Double');
 			WriteData(fid,prefix,'object',self,'fieldname','removal_stress_threshold','format','Double');
 			WriteData(fid,prefix,'object',self,'fieldname','packingfraction','format','Double');
@@ -149,18 +156,21 @@ classdef debris
 			WriteData(fid,prefix,'data',outputs,'name','md.debris.requested_outputs','format','StringArray');
 		end % }}}
 		function savemodeljs(self,fid,modelname) % {{{
+			% NOTE: Commented out for now as class is not currently included in 
+			% issm.js
+			%
 
-			writejs1Darray(fid,[modelname '.debris.spcthickness'],self.spcthickness);
-			writejsdouble(fid,[modelname '.debris.min_thickness'],self.min_thickness);
-			writejsdouble(fid,[modelname '.debris.stabilization'],self.stabilization);
-			writejsdouble(fid,[modelname '.debris.removalmodel'],self.removalmodel);
-			writejsdouble(fid,[modelname '.debris.displacementmodel'],self.displacementmodel);
-			writejsdouble(fid,[modelname '.debris.removal_slope_threshold'],self.removal_slope_threshold);
-			writejsdouble(fid,[modelname '.debris.removal_stress_threshold'],self.removal_stress_threshold);
-			writejsdouble(fid,[modelname '.debris.packingfraction'],self.packingfraction);
-			writejs2Darray(fid,[modelname '.debris.vertex_pairing'],self.vertex_pairing);
-			writejsdouble(fid,[modelname '.debris.penalty_factor'],self.penalty_factor);
-			writejscellstring(fid,[modelname '.debris.requested_outputs'],self.requested_outputs);
+			% writejs1Darray(fid,[modelname '.debris.spcthickness'],self.spcthickness);
+			% writejsdouble(fid,[modelname '.debris.min_thickness'],self.min_thickness);
+			% writejsdouble(fid,[modelname '.debris.stabilization'],self.stabilization);
+			% writejsdouble(fid,[modelname '.debris.packingfraction'],self.packingfraction);
+			% writejsdouble(fid,[modelname '.debris.removalmodel'],self.removalmodel);
+			% writejsdouble(fid,[modelname '.debris.displacementmodel'],self.displacementmodel);
+			% writejsdouble(fid,[modelname '.debris.max_displacementvelocity'],self.max_displacementvelocity);
+			% writejsdouble(fid,[modelname '.debris.removal_slope_threshold'],self.removal_slope_threshold);
+			% writejsdouble(fid,[modelname '.debris.removal_stress_threshold'],self.removal_stress_threshold);
+			% writejs2Darray(fid,[modelname '.debris.vertex_pairing'],self.vertex_pairing);
+			% writejscellstring(fid,[modelname '.debris.requested_outputs'],self.requested_outputs);
 
 		end % }}}
 	end

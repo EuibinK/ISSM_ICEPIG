@@ -33,7 +33,7 @@ function NodeConnectivity(elementsin,nods){
 	connectivity = ListToMatrix(connectivitylinear,width);
 	/*}}}*/
 
-	/*Free ressources: */
+	/*Free resources: */
 	Module._free(pconnectivity); 
 	Module._free(connectivitylinear); 
 	Module._free(pwidth); 

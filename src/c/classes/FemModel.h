@@ -115,6 +115,7 @@ class FemModel {
 		void IceMassx(IssmDouble* pV, bool scaled);
 		void IceVolumex(IssmDouble* pV, bool scaled);
 		void IceVolumeAboveFloatationx(IssmDouble* pV, bool scaled);
+		void InputToP0(int inputenum,int outputenum);
 		void InputMakeDiscontinuous(int enum_in);
 		void MassFluxx(IssmDouble* presponse);
 		void MaxAbsVxx(IssmDouble* presponse);
@@ -142,6 +143,8 @@ class FemModel {
 		void TotalFloatingBmbx(IssmDouble* pFbmb, bool scaled);
 		void TotalGroundedBmbx(IssmDouble* pGbmb, bool scaled);
 		void TotalSmbx(IssmDouble* pSmb, bool scaled);
+		void TotalSmbMeltx(IssmDouble* pSmbMelt, bool scaled);
+		void TotalSmbRefreezex(IssmDouble* pSmbRefreeze, bool scaled);
 		#ifdef  _HAVE_DAKOTA_
 		void DakotaResponsesx(double* d_responses,char** responses_descriptors,int numresponsedescriptors,int d_numresponses);
 		#endif
@@ -159,8 +162,8 @@ class FemModel {
 		void ThicknessAbsGradientx( IssmDouble* pJ);
 		void ThicknessPositivex(IssmDouble* pJ);
 		#ifdef _HAVE_ESA_
-		void EsaGeodetic2D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth, Vector<IssmDouble>* pEast, Vector<IssmDouble>* pX, Vector<IssmDouble>* pY, IssmDouble* xx, IssmDouble* yy);
-		void EsaGeodetic3D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth, Vector<IssmDouble>* pEast, IssmDouble* latitude, IssmDouble* longitude, IssmDouble* radius, IssmDouble* xx, IssmDouble* yy, IssmDouble* zz);
+		void EsaGeodetic2D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth, Vector<IssmDouble>* pEast, Vector<IssmDouble>* pGravity, Vector<IssmDouble>* pX, Vector<IssmDouble>* pY, IssmDouble* xx, IssmDouble* yy);
+      void EsaGeodetic3D(Vector<IssmDouble>* pUp, Vector<IssmDouble>* pNorth, Vector<IssmDouble>* pEast, Vector<IssmDouble>* pGravity, IssmDouble* latitude, IssmDouble* longitude, IssmDouble* radius, IssmDouble* xx, IssmDouble* yy, IssmDouble* zz);
 		#endif
 		void HydrologyEPLupdateDomainx(IssmDouble* pEplcount);
 		void HydrologyIDSupdateDomainx(IssmDouble* pIDScount);

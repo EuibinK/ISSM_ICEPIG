@@ -22,7 +22,7 @@ disp([' ']);
 disp(['Build date: ' IssmConfig('PACKAGE_BUILD_DATE')]);
 disp(['Compiled on ' IssmConfig('HOST_VENDOR') ' ' IssmConfig('HOST_OS') ' ' IssmConfig('HOST_ARCH') ' by ' IssmConfig('USER_NAME')]);
 disp([' ']);
-disp(['Copyright (c) 2009-2023 California Institute of Technology']);
+disp(['Copyright (c) 2009-2024 California Institute of Technology']);
 disp([' ']);
 disp(['    to get started type: issmdoc']);
 disp([' ']);

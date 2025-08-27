@@ -11,7 +11,7 @@ function clicktoflowline(index,x,y,u,v,filename)
 %      clicktoflowline(md.mesh.elements,md.mesh.x,md.mesh.y,md.inversion.vx_obs,md.inversion.vy_obs,'flowline.exp')
 
 %Get click position
-[x0,y0]=exp_ginput(1,options);
+[x0,y0]=exp_ginput(1,pairoptions());
 
 %Get flowline
 line=flowlines(index,x,y,u,v,x0,y0);

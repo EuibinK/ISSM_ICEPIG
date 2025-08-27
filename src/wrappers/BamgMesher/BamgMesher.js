@@ -241,7 +241,7 @@ function BamgMesher(bamgmesh_in, bamggeom_in, bamgopts) {
 
     var return_array=[bamgmeshout, bamggeomout];
 
-    /*Free ressources: */
+    /*Free resources: */
     Module._free(pVerticesSize_mesh_out);
     Module._free(pVertices_mesh_out);
     Module._free(pEdgesSize_mesh_out);

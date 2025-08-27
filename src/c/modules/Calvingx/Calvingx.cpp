@@ -38,6 +38,9 @@ void Calvingx(FemModel* femmodel){
 		case CalvingDev2Enum:
 			femmodel->ElementOperationx(&Element::CalvingRateVonmises);
 			break;
+		case CalvingVonmisesADEnum:
+			femmodel->ElementOperationx(&Element::CalvingRateVonmisesAD);
+			break;
 		case CalvingTestEnum:
 			femmodel->ElementOperationx(&Element::CalvingRateTest);
 			break;
@@ -46,6 +49,9 @@ void Calvingx(FemModel* femmodel){
 			break;
 		case CalvingPollardEnum:
 			femmodel->ElementOperationx(&Element::CalvingPollard);
+			break;
+		case CalvingCalvingMIPEnum:
+			femmodel->ElementOperationx(&Element::CalvingRateCalvingMIP);
 			break;
 		default:
 			_error_("Caving law "<<EnumToStringx(calvinglaw)<<" not supported yet");

@@ -100,10 +100,10 @@ Friction::Friction(Element* element_in){/*{{{*/
 }
 /*}}}*/
 Friction::Friction(Element* element_in,int dim) : Friction(element_in) {/*{{{*/
-	this->apply_dim = reCast<IssmDouble>(dim);
+	this->apply_dim = reCast<IssmPDouble>(dim);
 }
 /*}}}*/
-Friction::Friction(Element* element_in,IssmDouble dim) : Friction(element_in) {/*{{{*/
+Friction::Friction(Element* element_in,IssmPDouble dim) : Friction(element_in) {/*{{{*/
 	this->apply_dim = dim;
 }
 /*}}}*/
@@ -126,7 +126,7 @@ void Friction::GetAlphaComplement(IssmDouble* palpha_complement, Gauss* gauss){/
 	if(this->linearize==0){
 		switch(this->law){
 			case 1:
-				GetAlphaViscousComplement(palpha_complement,gauss);
+				GetAlphaBuddComplement(palpha_complement,gauss);
 				break;
 			case 2:
 				GetAlphaWeertmanComplement(palpha_complement, gauss);
@@ -218,7 +218,7 @@ void Friction::GetAlphaTempComplement(IssmDouble* palpha_complement, Gauss* gaus
 	IssmDouble  alpha_complement;
 
 	/*Get viscous part*/
-	this->GetAlphaViscousComplement(&alpha_complement,gauss);
+	this->GetAlphaBuddComplement(&alpha_complement,gauss);
 
 	/*Get pressure melting point (Tpmp) for local pressure and get current temperature*/
 	element->GetInputValue(&T,gauss,TemperatureEnum);
@@ -232,7 +232,7 @@ void Friction::GetAlphaTempComplement(IssmDouble* palpha_complement, Gauss* gaus
 	/*Assign output pointers:*/
 	*palpha_complement=alpha_complement;
 }/*}}}*/
-void Friction::GetAlphaViscousComplement(IssmDouble* palpha_complement, Gauss* gauss){/*{{{*/
+void Friction::GetAlphaBuddComplement(IssmDouble* palpha_complement, Gauss* gauss){/*{{{*/
 
 	/* FrictionGetAlpha2 computes alpha2= drag^2 * Neff ^r * vel ^(s-1), with Neff=rho_ice*g*thickness+rho_ice*g*base, r=q/p and s=1/p.
 	 * FrictionGetAlphaComplement is used in control methods on drag, and it computes:
@@ -393,7 +393,7 @@ void Friction::GetAlpha2(IssmDouble* palpha2, Gauss* gauss){/*{{{*/
 	if(this->linearize==0){
 		switch(this->law){
 			case 1:
-				GetAlpha2Viscous(palpha2,gauss);
+				GetAlpha2Budd(palpha2,gauss);
 				break;
 			case 2:
 				GetAlpha2Weertman(palpha2,gauss);
@@ -499,7 +499,7 @@ void Friction::GetAlpha2Coulomb(IssmDouble* palpha2, Gauss* gauss){/*{{{*/
       /*Compute effective pressure directly*/
       Neff = EffectivePressure(gauss);
    }
-	
+
 	/*Get velocity magnitude*/
 	IssmDouble vmag = VelMag(gauss);
 
@@ -617,7 +617,7 @@ void Friction::GetAlpha2Temp(IssmDouble* palpha2, Gauss* gauss){/*{{{*/
 	IssmDouble  alpha2;
 
 	/*Get viscous part*/
-	this->GetAlpha2Viscous(&alpha2,gauss);
+	this->GetAlpha2Budd(&alpha2,gauss);
 
 	/*Get pressure melting point (Tpmp) for local pressure and get current temperature*/
 	element->GetInputValue(&T,gauss,TemperatureEnum);
@@ -645,7 +645,7 @@ void Friction::GetAlpha2Josh(IssmDouble* palpha2, Gauss* gauss){/*{{{*/
 	const IssmDouble yts = 365*24*3600.;
 
 	/*Get viscous part*/
-	this->GetAlpha2Viscous(&alpha2,gauss);
+	this->GetAlpha2Budd(&alpha2,gauss);
 
 	/*Get delta Refs*/
 	element->GetInputValue(&deltaTref,gauss,FrictionPressureAdjustedTemperatureEnum);
@@ -676,7 +676,7 @@ void Friction::GetAlpha2Josh(IssmDouble* palpha2, Gauss* gauss){/*{{{*/
 	/*Assign output pointers:*/
 	*palpha2=alp_new;
 }/*}}}*/
-void Friction::GetAlpha2Viscous(IssmDouble* palpha2, Gauss* gauss){/*{{{*/
+void Friction::GetAlpha2Budd(IssmDouble* palpha2, Gauss* gauss){/*{{{*/
 
 	/*This routine calculates the basal friction coefficient
 	  alpha2= drag^2 * Neff ^r * | vel | ^(s-1), with Neff=rho_ice*g*thickness+rho_ice*g*base, r=q/p and s=1/p**/
@@ -913,7 +913,6 @@ void Friction::GetAlpha2Schoof(IssmDouble* palpha2, Gauss* gauss){/*{{{*/
 	element->GetInputValue(&Cmax,gauss,FrictionCmaxEnum);
 	element->GetInputValue(&C,gauss,FrictionCEnum);
 	element->GetInputValue(&m,gauss,FrictionMEnum);
-
 
 	/*Get effective pressure*/
 	bool ispwStochastic;
@@ -1377,10 +1376,6 @@ void FrictionUpdateInputs(Elements* elements,Inputs* inputs,IoModel* iomodel){/*
 			_error_("friction law "<< frictionlaw <<" not supported");
 	}
 
-#ifdef _HAVE_ANDROID_
-	inputs->DuplicateInput(FrictionCoefficientEnum,AndroidFrictionCoefficientEnum);
-#endif
-
 }/*}}}*/
 void FrictionUpdateParameters(Parameters* parameters,IoModel* iomodel){/*{{{*/
 
@@ -1424,7 +1419,7 @@ void FrictionUpdateParameters(Parameters* parameters,IoModel* iomodel){/*{{{*/
 		case 9:
 			parameters->AddObject(iomodel->CopyConstantObject("md.friction.gamma",FrictionGammaEnum));
 			parameters->AddObject(iomodel->CopyConstantObject("md.friction.effective_pressure_limit",FrictionEffectivePressureLimitEnum));
-			parameters->AddObject(new IntParam(FrictionCouplingEnum,0));
+			parameters->AddObject(new IntParam(FrictionCouplingEnum,2));/*comment this line to use effective pressure from Beuler and Pelt (2015)*/
 			break;
 		case 10:
 			parameters->AddObject(new IntParam(FrictionCouplingEnum,2)); /*comment this line to use effective pressure from Beuler and Pelt (2015)*/

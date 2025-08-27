@@ -329,7 +329,7 @@ for i=1:length(strings),
 	end
 end
 if counter==-1, 
-	error('cound not find input model name matching base workspace names!');
+	error('could not find input model name matching base workspace names!');
 end
 
 set(hObject,'String',strings);

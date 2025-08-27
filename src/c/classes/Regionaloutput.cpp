@@ -142,6 +142,12 @@ IssmDouble Regionaloutput::Response(FemModel* femmodel){/*{{{*/
 			case TotalSmbScaledEnum:
 				val_t+=element->TotalSmb(this->mask,true);
 				break;
+			case TotalSmbMeltEnum:
+				val_t+=element->TotalSmbMelt(this->mask,true);
+				break;
+			case TotalSmbRefreezeEnum:
+				val_t+=element->TotalSmbRefreeze(this->mask,true);
+				break;
 			default:
 				_error_("Regional output type " << this->outputname << " not supported yet!");
 		}

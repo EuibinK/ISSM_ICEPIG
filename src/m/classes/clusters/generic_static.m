@@ -2,6 +2,12 @@
 %
 %   Usage:
 %      cluster=generic_static('name','astrid','np',3);
+%      cluster=generic('name',oshostname(),'np',3,'login','username');
+%
+%   TODO:
+%   - Add support for restart to Windows (under MSYS2), then activate tests 125 
+%   and 126 in test suite
+%
 
 classdef generic_static
 	properties (SetAccess=public)
@@ -16,6 +22,7 @@ classdef generic_static
 	end
 	methods
 		function cluster=generic_static(varargin) % {{{
+
 			%use provided options to change fields
 			options=pairoptions(varargin{:});
 
@@ -68,21 +75,33 @@ classdef generic_static
 				executable='issm_ocean.exe';
 			end
 
-			% Check that executable exists at the right path
-			if ~exist([cluster.codepath '/' executable],'file'),
-				error(['File ' cluster.codepath '/' executable ' does not exist']);
+			if ~ispc(),
+				% Check that executable exists at the right path
+				if ~exist([cluster.codepath '/' executable],'file'),
+					error(['File ' cluster.codepath '/' executable ' does not exist']);
+				end
+
+				% Process codepath and prepend empty spaces with \ to avoid errors in queuing script
+				codepath=strrep(cluster.codepath,' ','\ ');
+
+				% Write queuing script
+				fid=fopen([modelname '.queue'],'w');
+				fprintf(fid,'#!%s\n',cluster.shell);
+				fprintf(fid,['%s/mpiexec -np %i %s/%s %s %s %s \n'],codepath,cluster.np,codepath,executable,solution,'./',modelname);
+				fclose(fid);
+			else % Windows
+				fid=fopen([modelname '.bat'],'w');
+				fprintf(fid,'@echo off\n');
+
+				if cluster.np>1,
+					fprintf(fid,'"%s\\mpiexec.exe" -n %i "%s/%s" %s ./ %s',cluster.codepath,cluster.np,cluster.codepath,executable,solution,modelname);
+				else
+					fprintf(fid,'"%s\\%s" %s ./ %s',cluster.codepath,executable,solution,modelname);
+				end
+				fclose(fid);
 			end
 
-			% Process codepath and prepend empty spaces with \ to avoid errors in queuing script
-			codepath=strrep(cluster.codepath,' ','\ ');
-
-			% Write queuing script
-			fid=fopen([modelname '.queue'],'w');
-			fprintf(fid,'#!%s\n',cluster.shell);
-			fprintf(fid,['%s/mpiexec -np %i %s/%s %s %s %s \n'],codepath,cluster.np,codepath,executable,solution,'./',modelname);
-			fclose(fid);
-
-			% Create an errlog and outlog file
+			%Create an errlog and outlog file
 			fid=fopen([modelname '.errlog'],'w');
 			fclose(fid);
 			fid=fopen([modelname '.outlog'],'w');

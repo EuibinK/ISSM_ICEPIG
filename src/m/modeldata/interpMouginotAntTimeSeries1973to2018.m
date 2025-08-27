@@ -67,9 +67,10 @@ year2 = ncread(nc,'YEAR2');
 % get the positions related to T
 if nargin==3
 	% initial checks %{{{
-	if size(T,2)>2 | size(T,1)<1 | size(T,2)<1,
+	if ~isvector(T)
 		error('Size of input T not supported!');
 	end
+	T=T(:);
 	if size(T,2)==1 & any(T(:,1)==1973),
 		disp(' ');
 		disp('   Found year=1973 in T (array). Please, specify the data series using a second index.');

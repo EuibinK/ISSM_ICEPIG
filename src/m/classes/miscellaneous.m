@@ -30,8 +30,8 @@ classdef miscellaneous
 			issmver = num2str(issmversion());
 			today   = date();
 			host    =  oshostname();
-			self.notes = [' Model created on ' today ' by ' username ' on ' host newline() ...
-				' ISSM version: ' issmver newline() ...
+			self.notes = [' Model created on ' today ' by ' username ' on ' host sprintf('\n') ...
+				' ISSM version: ' issmver sprintf('\n') ...
 				' (path: ' pwd() ')'];
 
 		end % }}}
@@ -48,7 +48,7 @@ classdef miscellaneous
 		end % }}}
 		function savemodeljs(self,fid,modelname) % {{{
 
-			writejsstring(fid,[modelname '.miscellaneous.notes'],self.notes);
+			writejsstring(fid,[modelname '.miscellaneous.notes'],regexprep(self.notes,newline,';'));
 			writejsstring(fid,[modelname '.miscellaneous.name'],self.name);
 			if strcmpi(class(self.dummy),'double'),
 				if size(self.dummy,2)==1,

@@ -4,9 +4,9 @@ function map = getcolormap(options)
 %   Usage:
 %      map = getcolormap(options)
 
-%default is jet
+%default is turbo
 if ~exist(options,'colormap'),
-	map = jet;
+	map = turbo();
 	return
 end
 

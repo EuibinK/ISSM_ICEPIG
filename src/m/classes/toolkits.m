@@ -92,6 +92,7 @@ classdef toolkits < dynamicprops
 					case 'DefaultAnalysis'
 					case 'RecoveryAnalysis'
 					case 'StressbalanceAnalysis'
+					case 'StressbalanceVerticalAnalysis'
 					case 'GLheightadvectionAnalysis'
 					case 'MasstransportAnalysis'
 					case 'ThermalAnalysis'

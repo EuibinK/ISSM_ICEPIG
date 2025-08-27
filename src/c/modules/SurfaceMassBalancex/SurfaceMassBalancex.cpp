@@ -66,7 +66,6 @@ void SmbGradientsx(FemModel* femmodel){/*{{{*/
 				smb[v]=Smbref[v]+b_neg[v]*(s[v]-Href[v]);
 			}
 
-			smb[v]=smb[v]/1000*rho_water/rho_ice;      // SMB in m/y ice
 		}  //end of the loop over the vertices
 
 		/*Add input to element and Free memory*/
@@ -503,147 +502,11 @@ void SmbMeltComponentsx(FemModel* femmodel){/*{{{*/
 	}
 
 }/*}}}*/
-void SmbDebrisMLx(FemModel* femmodel){/*{{{*/
-
-	//      The function is based on:
-	//      Evatt GW, Abrahams ID, Heil M, Mayer C, Kingslake J, Mitchell SL, et al. Glacial melt under a porous debris layer. Journal of Glaciology 61 (2015) 825–836, doi:10.3189/2
-	//      Constants/Values are taken from Mayer, Licciulli (2021): https://www.frontiersin.org/articles/10.3389/feart.2021.710276/full#B7
-	//      function taken from https://github.com/carlolic/DebrisExp/blob/main/USFs/USF_DebrisCoverage.f90
-
-	/*Intermediaries*/
-	// altitude gradients of the crucial parameters (radiation from Marty et al., TaAClimat; 2002)
-	IssmDouble LW=2.9;          // W/m^2 /100m                       2.9
-	IssmDouble SW=1.3;          // W/m^2 /100m                       1.3
-	IssmDouble HumidityG=0;     // % /100m         rough estimate
-	IssmDouble AirTemp=0.7;     // C /100m
-	IssmDouble WindSpeed=0.02;  // m/s /100m       rough estimate    0.2
-
-	// accumulation follows a linear increase above the ELA up to a plateau
-	IssmDouble AccG=0.1;                    // m w.e. /100m
-	IssmDouble AccMax=1.;                    // m w.e.
-	IssmDouble ReferenceElevation; 
-	IssmDouble AblationDays=120.;            //
-
-	IssmDouble In=100.;                 // Wm^-2        incoming long wave
-	IssmDouble Q=500.;                  // Wm^-2        incoming short wave
-	IssmDouble K=0.585;                // Wm^-1K^-1    thermal conductivity          0.585
-	IssmDouble Qm=0.0012;              // kg m^-3      measured humiditiy level
-	IssmDouble Qh=0.006 ;              // kg m^-3      saturated humidity level
-	IssmDouble Tm=2.;                   // C            air temperature
-	IssmDouble Rhoaa=1.22;             // kgm^-3       air densitiy
-	IssmDouble Um=1.5;                 // ms^-1        measured wind speed
-	IssmDouble Xm=1.5;                 // ms^-1        measurement height
-        IssmDouble Xr=0.01;                // ms^-1        surface roughness             0.01
-        IssmDouble Alphad=0.07;            //              debris albedo                 0.07
-        IssmDouble Alphai=0.4;             //              ice ablbedo
-        IssmDouble Alphaeff;
-        IssmDouble Ustar=0.16;             // ms^-1        friction velocity             0.16
-        IssmDouble Ca=1000.;                // jkg^-1K^-1   specific heat capacity of air
-        IssmDouble Lm;//=3.34E+05;            // jkg^-1K^-1   latent heat of ice melt
-        IssmDouble Lv=2.50E+06;            // jkg^-1K^-1   latent heat of evaporation
-        IssmDouble Tf=273.;                 // K            water freeezing temperature
-        IssmDouble Eps=0.95;               //              thermal emissivity
-        IssmDouble Rhoi=900.;               // kgm^-3       ice density
-        IssmDouble Sigma=5.67E-08;         // Wm^-2K^-4    Stefan Boltzmann constant
-        IssmDouble Kstar=0.4;              //              von kármán constant
-        IssmDouble Gamma=180.;              // m^-1         wind speed attenuation        234
-	IssmDouble PhiD;//=0.005;              //              debris packing fraction       0.01
-	IssmDouble Humidity=0.2;           //              relative humidity
-
-	IssmDouble smb,yts,z,debris;
-	IssmDouble MassBalanceCmDayDebris,MassBalanceMYearDebris;
-	bool isdebris;
-	int domaintype;
-	femmodel->parameters->FindParam(&isdebris,TransientIsdebrisEnum);
-
-	/*Get material parameters and constants */
-	//femmodel->parameters->FindParam(&Rhoi,MaterialsRhoIceEnum); // Note Carlo's model used as  benchmark was run with different densities for debris and FS
-	femmodel->parameters->FindParam(&Lm,MaterialsLatentheatEnum);
-	femmodel->parameters->FindParam(&yts,ConstantsYtsEnum); 
-	PhiD=0.;
-	if(isdebris) femmodel->parameters->FindParam(&PhiD,DebrisPackingFractionEnum);
-
-	/* Loop over all the elements of this partition */
-	for(Object* & object : femmodel->elements->objects){
-		Element* element=xDynamicCast<Element*>(object);
-
-		/* Allocate all arrays */
-		int         numvertices=element->GetNumberOfVertices();
-		IssmDouble* surfacelist=xNew<IssmDouble>(numvertices);
-		IssmDouble* smb=xNew<IssmDouble>(numvertices);
-		IssmDouble* debriscover=xNew<IssmDouble>(numvertices);
-		element->GetInputListOnVertices(surfacelist,SurfaceEnum);
-
-		/* Get inputs */
-		element->GetInputListOnVertices(debriscover,DebrisThicknessEnum);
-		element->FindParam(&domaintype,DomainTypeEnum);		
-
-		/*Loop over all vertices of element and calculate SMB as function of Debris Cover and z */
-		for(int v=0;v<numvertices;v++){
-
-			/*Get vertex elevation */
-			z=surfacelist[v];
-
-			/*Get top element*/
-			//if(domaintype==Domain3DEnum){
-
-			//}else{
-			//	Alphaeff=Alphad;
-			//	ReferenceElevation=2200.;     // m M&L                        	
-			//}
-
-			/* compute smb */
-			for (int ismb=0;ismb<2;ismb++){
-				if(ismb==0){
-					// calc a reference smb to identify accum and melt region; debris only develops in ablation area
-					debris=0.;
-					PhiD=0.;
-				}else{
-					// only in the meltregime debris develops
-					if(-MassBalanceCmDayDebris<1e-14) debris=debriscover[v]; 
-				}
-				if(debris<=0.) debris=0.;
-				IssmDouble dk=1e-5; // TODO make Alphad and Alphai a user input
-				IssmDouble n=debris/dk;
-				IssmDouble nmax=1000;
-				IssmDouble Alphaeff;
-				if(n>nmax){
-					Alphaeff=Alphad;
-				} else {
-					Alphaeff=Alphai+n*(Alphad-Alphai)/nmax;
-				}
-				ReferenceElevation=3200.;     // m HEF
-
-
-				Alphaeff=Alphad;
-				ReferenceElevation=2200.;     // m M&L  
-
-				MassBalanceCmDayDebris=(((In-(z-ReferenceElevation)*LW/100.)-(Eps*Sigma*(Tf*Tf*Tf*Tf))+ 
-							(Q+(z-ReferenceElevation)*SW/100.)*(1.-Alphaeff)+ 
-							(Rhoaa*Ca*Ustar*Ustar)/((Um-(z-ReferenceElevation)* 
-									WindSpeed/100.)-Ustar*(2.-(exp(Gamma*Xr))))*(Tm-(z- 
-										ReferenceElevation)*AirTemp/100.))/((1-PhiD)*Rhoi*Lm)/(1.+ 
-									((Rhoaa*Ca*Ustar*Ustar)/((Um-(z-ReferenceElevation)* 
-											WindSpeed/100.)-Ustar*(2.-(exp(Gamma*Xr))))+4.*Eps*Sigma*(Tf*Tf*Tf))/ 
-									K*debris)-(Lv*Ustar*Ustar*(Qh-(Qh*(Humidity-(z- 
-														ReferenceElevation)*HumidityG/100.)))*(exp(-Gamma*Xr)))/((1.-PhiD)* 
-											Rhoi*Lm*Ustar)/((((Um-(z-ReferenceElevation)*WindSpeed/100.) 
-                                    -2.*Ustar)*exp(-Gamma*Xr))/Ustar+exp(Gamma*debris)))*100.*24.*60.*60.;
-                        }
-
-                        /* account form ablation days, and convert to m/s */
-			MassBalanceMYearDebris=-MassBalanceCmDayDebris/100.*AblationDays/yts;
-
-			/*Update array accordingly*/
-			smb[v]=MassBalanceMYearDebris;
-		}
-
-		/*Add input to element and Free memory*/
-		element->AddInput(SmbMassBalanceEnum,smb,P1Enum);
-		xDelete<IssmDouble>(surfacelist);
-		xDelete<IssmDouble>(smb);
-		xDelete<IssmDouble>(debriscover);
-	}
+void SmbDebrisEvattx(FemModel* femmodel){/*{{{*/
+        for(Object* & object : femmodel->elements->objects){
+                Element* element=xDynamicCast<Element*>(object);
+                element->SmbDebrisEvatt();
+        }
 }/*}}}*/
 void SmbGradientsComponentsx(FemModel* femmodel){/*{{{*/
 

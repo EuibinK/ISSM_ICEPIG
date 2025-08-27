@@ -1,7 +1,6 @@
 #include <math.h>
 #include <float.h>
 #include <cstring>
-#define _IS_MULTI_ICE_
 
 #include "../../Enum/EnumDefinitions.h"
 #include "../../MemOps/MemOps.h"
@@ -168,6 +167,11 @@ void FieldAndEnumFromCode(int* out_enum,char** pfield,const char* string_in){/*{
 		input_enum        = CalvingStressThresholdGroundediceEnum;
 		fieldname=xNew<char>((strlen(field)+1)); xMemCpy<char>(fieldname,field,(strlen(field)+1));
 	}
+	else if(strcmp(string_in,"CalvingADStressThresholdGroundedice")==0){
+		const char* field = "md.calving.stress_threshold_groundedice";
+		input_enum        = CalvingADStressThresholdGroundediceEnum;
+		fieldname=xNew<char>((strlen(field)+1)); xMemCpy<char>(fieldname,field,(strlen(field)+1));
+	}
 	else if(strcmp(string_in,"DamageDbar")==0){
 		const char* field = "md.damage.D";
 		input_enum        = DamageDbarEnum;
@@ -228,6 +232,11 @@ void FieldAndEnumFromCode(int* out_enum,char** pfield,const char* string_in){/*{
 		input_enum        = BasalforcingsSpatialDeepwaterMeltingRateEnum;
 		fieldname=xNew<char>((strlen(field)+1)); xMemCpy<char>(fieldname,field,(strlen(field)+1));
 	}
+	else if(strcmp(string_in,"BasalforcingsDeepwaterMeltingRate")==0){
+		const char* field = "md.basalforcings.deepwater_melting_rate";
+		input_enum        = BasalforcingsDeepwaterMeltingRateEnum;
+		fieldname=xNew<char>((strlen(field)+1)); xMemCpy<char>(fieldname,field,(strlen(field)+1));
+	}
 	else{
 		_error_("Field \""<<string_in<<"\" not supported yet");
 	}
@@ -252,7 +261,7 @@ int IoCodeToEnumSMB(int enum_in){/*{{{*/
 		case 11: return SMBgradientscomponentsEnum;
 		case 12: return SMBsemicEnum;	 
 		case 13: return SMBarmaEnum;
-		case 14: return SMBdebrisMLEnum;
+		case 14: return SMBdebrisEvattEnum;
 		default: _error_("Marshalled SMB code \""<<enum_in<<"\" not supported yet");
 	}
 }/*}}}*/
@@ -282,6 +291,8 @@ int IoCodeToEnumCalving(int enum_in){/*{{{*/
 		case 8:  return CalvingTestEnum;
 		case 9:  return CalvingParameterizationEnum;
 		case 10: return CalvingPollardEnum;
+		case 11: return CalvingVonmisesADEnum;
+		case 12:  return CalvingCalvingMIPEnum;
 		default: _error_("Marshalled Calving law code \""<<enum_in<<"\" not supported yet");
 	}
 }/*}}}*/
@@ -314,9 +325,6 @@ int IoCodeToEnumMaterials(int enum_in){/*{{{*/
 		case 5: return MaterialsEnum; //This should not happen anymore??
 		case 6: return MatlithoEnum;
 		case 7: return MathydroEnum;
-		#ifdef _IS_MULTI_ICE_
-		case 8: return MatMultiIceEnum;  
-		#endif
 		default: _error_("Marshalled materials code \""<<enum_in<<"\" not supported yet");
 	}
 }/*}}}*/
@@ -329,9 +337,6 @@ int IoCodeToEnumNature(int enum_in){/*{{{*/
 		case 5: return MaterialsEnum;
 		case 6: return MatlithoEnum;
 		case 7: return MathydroEnum;
-		#ifdef _IS_MULTI_ICE_
-		case 8: return MatMultiIceEnum;  
-		#endif
 		default: _error_("Marshalled materials nature code \""<<enum_in<<"\" not supported yet");
 	}
 }/*}}}*/

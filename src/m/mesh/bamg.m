@@ -28,7 +28,7 @@ function md=bamg(md,varargin)
 %   - NoBoundaryRefinement: do not refine boundary, only follow contour provided (default 0). Allow subdomain boundary refinement though.
 %   - NoBoundaryRefinementAllBoundaries: do not refine boundary, only follow contour provided (default 0)
 %   - maxnbv :            maximum number of vertices used to allocate memory (default is 10^6)
-%   - maxsubdiv :         maximum subdivision of exisiting elements (default is 10)
+%   - maxsubdiv :         maximum subdivision of existing elements (default is 10)
 %   - metric :            matrix (numberofnodes x 3) used as a metric
 %   - Metrictype :        0 -> absolute error          c/(err coeff^2) * Abs(H)        (default)
 %                         1 -> relative error          c/(err coeff^2) * Abs(H)/max(s,cutoff*max(s))
@@ -57,14 +57,14 @@ function md=bamg(md,varargin)
 options=pairoptions(varargin{:});
 options=deleteduplicates(options,1);
 
-%initialize the structures required as input of Bamg
+%initialize the structures required as input of BAMG
 bamg_options=struct();
 bamg_geometry=bamggeom();
 bamg_mesh=bamgmesh();
 
 subdomain_ref = 1;
 hole_ref = 1;
-% Bamg Geometry parameters {{{
+% BAMG Geometry parameters {{{
 if exist(options,'domain'),
 
 	%Check that file exists
@@ -452,7 +452,7 @@ else
 	%do nothing...
 end
 %}}}
-% Bamg Mesh parameters {{{
+% BAMG Mesh parameters {{{
 if (~exist(options,'domain') & md.mesh.numberofvertices~=0 & strcmp(elementtype(md.mesh),'Tria')),
 
 	if isstruct(md.private.bamg) & isfield(md.private.bamg,'mesh'),
@@ -467,23 +467,23 @@ if (~exist(options,'domain') & md.mesh.numberofvertices~=0 & strcmp(elementtype(
 	end
 end
 %}}}
-% Bamg Options {{{
+% BAMG Options {{{
 bamg_options.Crack=getfieldvalue(options,'Crack',0);
-bamg_options.anisomax=getfieldvalue(options,'anisomax',10.^30);
+bamg_options.anisomax=getfieldvalue(options,'anisomax',1e30);
 bamg_options.coeff=getfieldvalue(options,'coeff',1.);
-bamg_options.cutoff=getfieldvalue(options,'cutoff',10.^-5);
+bamg_options.cutoff=getfieldvalue(options,'cutoff',1e-5);
 bamg_options.err=getfieldvalue(options,'err',0.01);
 bamg_options.errg=getfieldvalue(options,'errg',0.1);
 bamg_options.field=getfieldvalue(options,'field',[]);
 bamg_options.gradation=getfieldvalue(options,'gradation',1.5);
 bamg_options.Hessiantype=getfieldvalue(options,'Hessiantype',0);
-bamg_options.hmin=getfieldvalue(options,'hmin',10.^-100);
-bamg_options.hmax=getfieldvalue(options,'hmax',10.^100);
+bamg_options.hmin=getfieldvalue(options,'hmin',1e-100);
+bamg_options.hmax=getfieldvalue(options,'hmax',1e100);
 bamg_options.hminVertices=getfieldvalue(options,'hminVertices',[]);
 bamg_options.hmaxVertices=getfieldvalue(options,'hmaxVertices',[]);
 bamg_options.hVertices=getfieldvalue(options,'hVertices',[]);
 bamg_options.KeepVertices=getfieldvalue(options,'KeepVertices',1);
-bamg_options.maxnbv=getfieldvalue(options,'maxnbv',10^6);
+bamg_options.maxnbv=getfieldvalue(options,'maxnbv',1e6);
 bamg_options.maxsubdiv=getfieldvalue(options,'maxsubdiv',10.);
 bamg_options.metric=getfieldvalue(options,'metric',[]);
 bamg_options.Metrictype=getfieldvalue(options,'Metrictype',0);
@@ -495,7 +495,7 @@ bamg_options.splitcorners=getfieldvalue(options,'splitcorners',1);
 bamg_options.verbose=getfieldvalue(options,'verbose',1);
 %}}}
 
-%call Bamg
+%call BAMG
 [bamgmesh_out bamggeom_out]=BamgMesher(bamg_mesh,bamg_geometry,bamg_options);
 
 if getfieldvalue(options,'vertical',0),
@@ -549,7 +549,7 @@ else
 	md.mesh.vertexonboundary(md.mesh.segments(:,1:2))=1;
 end
 
-%Bamg private fields
+%BAMG private fields
 md.private.bamg=struct();
 md.private.bamg.mesh=bamgmesh(bamgmesh_out);
 md.private.bamg.geometry=bamggeom(bamggeom_out);

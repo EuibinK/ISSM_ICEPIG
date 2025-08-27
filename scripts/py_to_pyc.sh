@@ -13,10 +13,10 @@ if [ "$#" -gt 0 ]; then
 fi
 
 echo "Compiling Python source files"
-python3 -m compileall -q ${TARGET} > ${COMPILE_LOG}
+python3 -m compileall -f -q -b ${TARGET}
 
 if [ -s ${COMPILE_LOG} ]; then
-	echo "Error(s) occured while compiling Python scripts!"
+	echo "Error(s) occurred while compiling Python scripts!"
 	echo "--------------- start: ${COMPILE_LOG} ---------------"
 	cat ${COMPILE_LOG}
 	echo "---------------- end: ${COMPILE_LOG} ----------------"

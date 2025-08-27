@@ -174,6 +174,43 @@ void Vertices::LatLonList(IssmDouble** plat,IssmDouble** plon){/*{{{*/
 	delete lon;
 }
 /*}}}*/
+void Vertices::XYList(IssmDouble** pxcoords,IssmDouble** pycoords){/*{{{*/
+
+	/*output: */
+	IssmDouble* xyz_serial=NULL;
+
+	/*recover my_rank:*/
+	int my_rank=IssmComm::GetRank();
+
+	/*First, figure out number of vertices: */
+	int num_vertices=this->NumberOfVertices();
+
+	/*Now, allocate vectors*/
+	Vector<IssmDouble>* xlist = new Vector<IssmDouble>(num_vertices);
+	Vector<IssmDouble>* ylist = new Vector<IssmDouble>(num_vertices);
+
+	/*Go through vertices, and for each vertex, object, report it cpu: */
+	for(Object* & object : this->objects){
+      Vertex* vertex = xDynamicCast<Vertex*>(object);
+		xlist->SetValue(vertex->sid,vertex->GetX() ,INS_VAL);
+		ylist->SetValue(vertex->sid,vertex->GetY(),INS_VAL);
+	}
+
+	/*Assemble:*/
+	xlist->Assemble();
+	ylist->Assemble();
+
+	/*gather on cpu 0: */
+	IssmDouble* x_serial=xlist->ToMPISerial();
+	IssmDouble* y_serial=ylist->ToMPISerial();
+
+	/*Free resources: */
+	*pxcoords = x_serial;
+	*pycoords = y_serial;
+	delete xlist;
+	delete ylist;
+}
+/*}}}*/
 
 void Vertices::Finalize(IoModel* iomodel){/*{{{*/
 

@@ -187,7 +187,6 @@ end
 %standard plot:
 if exist(options,'asymsubplot')
 	id=getfieldvalue(options,'asymsubplot',i);
-	subplot(nlines,ncols,id);
 	subplotmodel(nlines,ncols,id,options);
 else
 	subplotmodel(nlines,ncols,i,options);

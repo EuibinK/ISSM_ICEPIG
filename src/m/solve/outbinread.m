@@ -132,6 +132,10 @@ else
 		field = field/10.^12*yts; %(GigaTon/year)
 	elseif strcmp(fieldname,'TotalSmb'),
 		field = field/10.^12*yts; %(GigaTon/year)
+	elseif strcmp(fieldname,'TotalMelt'),
+		field = field/10.^12*yts; %(GigaTon/year)
+	elseif strcmp(fieldname,'TotalRefreeze'),
+		field = field/10.^12*yts; %(GigaTon/year)
 	elseif strcmp(fieldname,'SmbMassBalance'),
 		field = field*yts;
 	elseif strcmp(fieldname,'SmbPrecipitation'),

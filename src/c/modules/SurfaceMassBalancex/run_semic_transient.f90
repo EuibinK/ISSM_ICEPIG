@@ -7,8 +7,8 @@ subroutine run_semic_transient(nx, ntime, nloop, sf_in, rf_in, swd_in, lwd_in, w
       alb_scheme, alb_smax, alb_smin, albi, albl, &
       Tamp, &
       tmin, tmax, tmid, mcrit, w_crit, tau_a, tau_f, afac, verbose, &
-      tsurf_out, smb_out, smbi_out, smbs_out, saccu_out, smelt_out, alb_out, & 
-      alb_snow_out,hsnow_out,hice_out,qmr_out) !{{{
+      tsurf_out, smb_out, smbi_out, smbs_out, saccu_out, smelt_out,  refr_out, alb_out, & 
+      alb_snow_out,hsnow_out,hice_out,qmr_out, runoff_out, subl_out) !{{{
 
    use utils
    use surface_physics
@@ -54,11 +54,14 @@ subroutine run_semic_transient(nx, ntime, nloop, sf_in, rf_in, swd_in, lwd_in, w
    double precision, intent(out), dimension(nx):: smbs_out     ! SMB snow [water equivalent m/s]
    double precision, intent(out), dimension(nx):: saccu_out    ! accumulation [m/s]
    double precision, intent(out), dimension(nx):: smelt_out    ! ablation [m/s]
+   double precision, intent(out), dimension(nx):: refr_out     ! freezing [m/s]
    double precision, intent(out), dimension(nx):: alb_out      ! grid-averaged albedo [no unit] 
    double precision, intent(out), dimension(nx):: alb_snow_out 
    double precision, intent(out), dimension(nx):: hice_out    
    double precision, intent(out), dimension(nx):: hsnow_out   
    double precision, intent(out), dimension(nx):: qmr_out     
+   double precision, intent(out), dimension(nx):: runoff_out
+   double precision, intent(out), dimension(nx):: subl_out
 
    double precision :: total_time, start, finish
 
@@ -131,6 +134,8 @@ subroutine run_semic_transient(nx, ntime, nloop, sf_in, rf_in, swd_in, lwd_in, w
       surface%par%alb_scheme = "denby"
    else if (alb_scheme == 3) then
       surface%par%alb_scheme = "isba"
+   else if (alb_scheme == 4) then
+      surface%par%alb_scheme = "alex"
    else
       print*, "ERROR: current albedo scheme is not available."
       call exit(1)
@@ -231,11 +236,14 @@ subroutine run_semic_transient(nx, ntime, nloop, sf_in, rf_in, swd_in, lwd_in, w
             smbs_out          =surface%now%smb_snow ! smb_snow = snowfall - sublimiation - melted_snow + refrozen_snow
             saccu_out         =surface%now%acc      ! acc      = snowfall - sublimiation - refreezing 
             smelt_out         =surface%now%melt     ! potential surface melt = melt_ice + melt_snow
+            refr_out          =surface%now%refr     ! refreezing values. [m/sec]
             alb_out           =surface%now%alb
             alb_snow_out      =surface%now%alb_snow
             hsnow_out         =surface%now%hsnow
             hice_out          =surface%now%hice
             qmr_out           =surface%now%qmr_res
+            runoff_out        =surface%now%runoff   ! runoff values. [m/sec]
+            subl_out          =surface%now%subl     ! subl values. [m/sec]
          end if
       end do
    end do

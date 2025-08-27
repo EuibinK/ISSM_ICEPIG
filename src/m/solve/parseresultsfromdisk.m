@@ -240,6 +240,10 @@ else
 		field = field*yts;
 	elseif strcmp(fieldname,'VyAverage'),
 		field = field*yts;
+	elseif strcmp(fieldname,'VxDebris'),
+		field = field*yts;
+	elseif strcmp(fieldname,'VyDebris'),
+		field = field*yts;
 	elseif strcmp(fieldname,'BasalforcingsGroundediceMeltingRate'),
 		field = field*yts;
 	elseif strcmp(fieldname,'BasalforcingsFloatingiceMeltingRate'),
@@ -259,6 +263,10 @@ else
 	elseif strcmp(fieldname,'TotalSmb'),
 		field = field/10.^12*yts; %(GigaTon/year)
 	elseif strcmp(fieldname,'TotalSmbScaled'),
+		field = field/10.^12*yts; %(GigaTon/year)
+	elseif strcmp(fieldname,'TotalSmbMelt'),
+		field = field/10.^12*yts; %(GigaTon/year)
+	elseif strcmp(fieldname,'TotalSmbRefreeze'),
 		field = field/10.^12*yts; %(GigaTon/year)
 	elseif strcmp(fieldname,'GroundinglineMassFlux'),
 		field = field/10.^12*yts; %(GigaTon/year)

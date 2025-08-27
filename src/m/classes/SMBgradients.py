@@ -1,21 +1,21 @@
+import numpy as np
 from fielddisplay import fielddisplay
 from checkfield import checkfield
 from WriteData import WriteData
 
 
 class SMBgradients(object):
-    """
-    SMBgradients Class definition
+    """SMBgradients Class definition
 
-       Usage:
-          SMBgradients = SMBgradients();
+    Usage:
+        SMBgradients = SMBgradients();
     """
 
     def __init__(self):  # {{{
-        self.href = float('NaN')
-        self.smbref = float('NaN')
-        self.b_pos = float('NaN')
-        self.b_neg = float('NaN')
+        self.href = np.nan
+        self.smbref = np.nan
+        self.b_pos = np.nan
+        self.b_neg = np.nan
         self.steps_per_step = 1
         self.averaging = 0
         self.requested_outputs = []
@@ -25,25 +25,24 @@ class SMBgradients(object):
     # }}}
 
     def __repr__(self):  # {{{
-        string = "   surface forcings parameters:"
+        s = '   surface forcings parameters:\n'
+        s += '{}\n'.format(fielddisplay(self, 'issmbgradients', 'is smb gradients method activated (0 or 1, default is 0)'))
+        s += '{}\n'.format(fielddisplay(self, 'href', 'reference elevation from which deviation is used to calculate SMB adjustment in smb gradients method'))
+        s += '{}\n'.format(fielddisplay(self, 'smbref', 'reference smb from which deviation is calculated in smb gradients method [m/yr ice equiv]'))
+        s += '{}\n'.format(fielddisplay(self, 'b_pos', 'slope of hs - smb regression line for accumulation regime required if smb gradients is activated'))
+        s += '{}\n'.format(fielddisplay(self, 'b_neg', 'slope of hs - smb regression line for ablation regime required if smb gradients is activated'))
+        s += '{}\n'.format(fielddisplay(self, 'steps_per_step', 'number of smb steps per time step'))
+        s += '{}\n'.format(fielddisplay(self, 'averaging', 'averaging methods from short to long steps'))
+        s += '\t\t{}\n'.format('0: Arithmetic (default)')
+        s += '\t\t{}\n'.format('1: Geometric')
+        s += '\t\t{}\n'.format('2: Harmonic')
+        s += '{}\n'.format(fielddisplay(self, 'requested_outputs', 'additional outputs requested'))
 
-        string = "%s\n%s" % (string, fielddisplay(self, 'issmbgradients', 'is smb gradients method activated (0 or 1, default is 0)'))
-        string = "%s\n%s" % (string, fielddisplay(self, 'href', ' reference elevation from which deviation is used to calculate SMB adjustment in smb gradients method'))
-        string = "%s\n%s" % (string, fielddisplay(self, 'smbref', ' reference smb from which deviation is calculated in smb gradients method'))
-        string = "%s\n%s" % (string, fielddisplay(self, 'b_pos', ' slope of hs - smb regression line for accumulation regime required if smb gradients is activated'))
-        string = "%s\n%s" % (string, fielddisplay(self, 'b_neg', ' slope of hs - smb regression line for ablation regime required if smb gradients is activated'))
-        string = "%s\n%s" % (string, fielddisplay(self, 'steps_per_step', 'number of smb steps per time step'))
-        string = "%s\n%s" % (string, fielddisplay(self, 'averaging', 'averaging methods from short to long steps'))
-        string = "%s\n\t\t%s" % (string, '0: Arithmetic (default)')
-        string = "%s\n\t\t%s" % (string, '1: Geometric')
-        string = "%s\n\t\t%s" % (string, '2: Harmonic')
-        string = "%s\n%s" % (string, fielddisplay(self, 'requested_outputs', 'additional outputs requested'))
-
-        return string
+        return s
     # }}}
 
     def extrude(self, md):  # {{{
-        #Nothing for now
+        # Nothing for now
         return self
     # }}}
 
@@ -58,14 +57,16 @@ class SMBgradients(object):
     # }}}
 
     def initialize(self, md):  # {{{
-        #Nothing for now
+        # Nothing for now
         return self
     # }}}
 
-    def checkconsistency(self, md, solution, analyses):    # {{{
+    def checkconsistency(self, md, solution, analyses):  # {{{
         if 'MasstransportAnalysis' in analyses:
             md = checkfield(md, 'fieldname', 'smb.href', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
             md = checkfield(md, 'fieldname', 'smb.smbref', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
+            if np.max(np.max(np.abs(md.smb.smbref[0:-1,]))) < 1:
+                print('!!! Warning: SMBgradients now expects smbref to be in m/yr ice eq. instead of mm/yr water eq.')
             md = checkfield(md, 'fieldname', 'smb.b_pos', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
             md = checkfield(md, 'fieldname', 'smb.b_neg', 'timeseries', 1, 'NaN', 1, 'Inf', 1)
 
@@ -75,7 +76,7 @@ class SMBgradients(object):
         return md
     # }}}
 
-    def marshall(self, prefix, md, fid):    # {{{
+    def marshall(self, prefix, md, fid):  # {{{
         yts = md.constants.yts
 
         WriteData(fid, prefix, 'name', 'md.smb.model', 'data', 6, 'format', 'Integer')
@@ -86,12 +87,11 @@ class SMBgradients(object):
         WriteData(fid, prefix, 'object', self, 'fieldname', 'steps_per_step', 'format', 'Integer')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'averaging', 'format', 'Integer')
 
-        #process requested outputs
+        # Process requested outputs
         outputs = self.requested_outputs
         indices = [i for i, x in enumerate(outputs) if x == 'default']
         if len(indices) > 0:
             outputscopy = outputs[0:max(0, indices[0] - 1)] + self.defaultoutputs(md) + outputs[indices[0] + 1:]
             outputs = outputscopy
         WriteData(fid, prefix, 'data', outputs, 'name', 'md.smb.requested_outputs', 'format', 'StringArray')
-
     # }}}

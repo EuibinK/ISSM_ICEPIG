@@ -24,16 +24,24 @@ if [ $# -gt 0 ]; then
 	fi
 fi
 
-# Get content of page that hosts datasets, reduce to just datasets list, then 
+# Get content of page that hosts datasets, reduce to just datasets list, then
 # parse out dataset links
+#
+# NOTE: Clear DYLD_LIBRARY_PATH in case we have installed our own copy of cURL
+#		and $ISSM_DIR/etc/environment.sh has been sourced as there may be a
+#		conflict between versions of cURL executable and libcurl
+#
 dataset_urls=$(\
-	curl -Ls ${DATASETS_URL} |\
+	DYLD_LIBRARY_PATH=""; \
+	/usr/bin/curl -Lks ${DATASETS_URL} |\
 	sed '/<!--DATASETS LIST START-->/,/<!--DATASETS LIST END-->/ !d' |\
 	sed -n 's/.*<li><a href="\([^"]*\)">.*/\1/p'
 )
 
 # Get datasets
-wget --no-clobber --directory-prefix="${DIRECTORY_PREFIX}" -i - <<< "${dataset_urls}"
+#
+echo "Downloading examples datasets..."
+wget --quiet --no-clobber --directory-prefix="${DIRECTORY_PREFIX}" -i - <<< "${dataset_urls}"
 
 # Expand zip files
 unzip -n -d "${DIRECTORY_PREFIX}" "${DIRECTORY_PREFIX}/*.zip"

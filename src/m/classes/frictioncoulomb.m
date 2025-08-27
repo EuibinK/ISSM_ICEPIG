@@ -5,12 +5,12 @@
 
 classdef frictioncoulomb
 	properties (SetAccess=public) 
-		coefficient        = NaN;
-		p                  = NaN;
-		q                  = NaN;
-		coefficientcoulomb = NaN;
-		coupling	= 0;
-		effective_pressure = NaN;
+		coefficient              = NaN;
+		p                        = NaN;
+		q                        = NaN;
+		coefficientcoulomb       = NaN;
+		coupling                 = 0;
+		effective_pressure       = NaN;
 		effective_pressure_limit = 0;
 	end
 	methods
@@ -26,7 +26,7 @@ classdef frictioncoulomb
 				case 2
 					error('not implemented yet');
 				otherwise
-					error('not supported yet');		
+					error('not supported yet');
 			end
 		end % }}}
 		function self = frictioncoulomb(varargin) % {{{
@@ -51,7 +51,8 @@ classdef frictioncoulomb
 			md = checkfield(md,'fieldname','friction.q','NaN',1,'Inf',1,'size',[md.mesh.numberofelements 1]);
 			md = checkfield(md,'fieldname','friction.p','NaN',1,'Inf',1,'size',[md.mesh.numberofelements 1]);
 			md = checkfield(md,'fieldname','friction.coupling','numel',[1],'values',[0 1 2]);
-			md = checkfield(md,'fieldname','friction.effective_pressure_limit','numel',[1],'>=',0);			
+			md = checkfield(md,'fieldname','friction.effective_pressure_limit','numel',[1],'>=',0);
+
 			switch self.coupling
 				case 0
 				case 1
@@ -59,7 +60,7 @@ classdef frictioncoulomb
 				case 2
 					error('not implemented yet');
 				otherwise
-					error('not supported yet');		
+					error('not supported yet');
 			end
 		end % }}}
 		function disp(self) % {{{
@@ -70,12 +71,13 @@ classdef frictioncoulomb
 			fielddisplay(self,'q','q exponent');
 			fielddisplay(self,'effective_pressure','Effective Pressure for the forcing if not coupled [Pa]');
 			fielddisplay(self,'coupling','Coupling flag: 0 for default, 1 for forcing(provide md.friction.effective_pressure)  and 2 for coupled(not implemented yet)');
-			fielddisplay(self,'effective_pressure_limit','Neff do not allow to fall below a certain limit: effective_pressure_limit*rho_ice*g*thickness (default 0)');	
+			fielddisplay(self,'effective_pressure_limit','Neff do not allow to fall below a certain limit: effective_pressure_limit*rho_ice*g*thickness (default 0)');
 			end % }}}
 		function marshall(self,prefix,md,fid) % {{{
+			yts=md.constants.yts;
 
 			WriteData(fid,prefix,'name','md.friction.law','data',7,'format','Integer');
-			WriteData(fid,prefix,'object',self,'fieldname','coefficient','format','DoubleMat','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',md.constants.yts);
+			WriteData(fid,prefix,'object',self,'fieldname','coefficient','format','DoubleMat','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',yts);
 			WriteData(fid,prefix,'object',self,'fieldname','coefficientcoulomb','format','DoubleMat','mattype',1);
 			WriteData(fid,prefix,'object',self,'fieldname','p','format','DoubleMat','mattype',2);
 			WriteData(fid,prefix,'object',self,'fieldname','q','format','DoubleMat','mattype',2);
@@ -84,11 +86,11 @@ classdef frictioncoulomb
 			switch self.coupling
 				case 0
 				case 1
-					WriteData(fid,prefix,'class','friction','object',self,'fieldname','effective_pressure','format','DoubleMat','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',md.constants.yts);
+					WriteData(fid,prefix,'class','friction','object',self,'fieldname','effective_pressure','format','DoubleMat','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',yts);
 				case 2
 					error('not implemented yet');
 				otherwise
-					error('not supported yet');		
+					error('not supported yet');
 			end
 
 		end % }}}

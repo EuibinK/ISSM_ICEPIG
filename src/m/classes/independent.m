@@ -65,7 +65,7 @@ classdef independent
 
 			fielddisplay(self,'name','variable name (must match corresponding String)');
 			fielddisplay(self,'type','type of variable (''vertex'' or ''scalar'')');
-			fielddisplay(self,'nods','size of dependent variables');
+			fielddisplay(self,'nods','size of independent variables');
 			fielddisplay(self,'control_size','number of timesteps');
 			fielddisplay(self,'min_parameters','absolute minimum acceptable value of the inversed parameter on each vertex');
 			fielddisplay(self,'max_parameters','absolute maximum acceptable value of the inversed parameter on each vertex');
@@ -81,6 +81,8 @@ classdef independent
 			if strcmpi(self.type,'scalar'),
 				scalartype=0;
 			elseif strcmpi(self.type,'vertex'),
+				scalartype=1;
+			elseif strcmpi(self.type,'element'),
 				scalartype=1;
 			elseif strcmpi(self.type,'matrix'),
 				scalartype=1;

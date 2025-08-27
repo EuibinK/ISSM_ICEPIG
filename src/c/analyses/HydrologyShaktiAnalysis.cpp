@@ -126,6 +126,7 @@ void HydrologyShaktiAnalysis::UpdateElements(Elements* elements,Inputs* inputs,I
 	iomodel->FetchDataToInput(inputs,elements,"md.hydrology.bump_height",HydrologyBumpHeightEnum);
 	iomodel->FetchDataToInput(inputs,elements,"md.hydrology.reynolds",HydrologyReynoldsEnum);
 	iomodel->FetchDataToInput(inputs,elements,"md.hydrology.neumannflux",HydrologyNeumannfluxEnum);
+	iomodel->FetchDataToInput(inputs,elements,"md.hydrology.storage",HydrologyStorageEnum);
 	iomodel->FetchDataToInput(inputs,elements,"md.initialization.vx",VxEnum);
 	iomodel->FetchDataToInput(inputs,elements,"md.initialization.vy",VyEnum);
 	if(iomodel->domaintype==Domain2DhorizontalEnum){
@@ -149,7 +150,6 @@ void HydrologyShaktiAnalysis::UpdateParameters(Parameters* parameters,IoModel* i
 
 	parameters->AddObject(new IntParam(HydrologyModelEnum,hydrology_model));
    parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.relaxation",HydrologyRelaxationEnum));
-	parameters->AddObject(iomodel->CopyConstantObject("md.hydrology.storage",HydrologyStorageEnum));
 
   /*Requested outputs*/
   iomodel->FindConstant(&requestedoutputs,&numoutputs,"md.hydrology.requested_outputs");
@@ -185,7 +185,7 @@ ElementMatrix* HydrologyShaktiAnalysis::CreateKMatrix(Element* element){/*{{{*/
 	/*Intermediaries */
 	IssmDouble Jdet;
 	IssmDouble* xyz_list = NULL;
-	IssmDouble  gap,bed,thickness,head,g,rho_ice,rho_water,A,B,n;
+	IssmDouble  gap,bed,thickness,head,g,rho_ice,rho_water,A,B,n,storage;
 
 	/*Fetch number of nodes and dof for this finite element*/
 	int numnodes = basalelement->GetNumberOfNodes();
@@ -201,21 +201,21 @@ ElementMatrix* HydrologyShaktiAnalysis::CreateKMatrix(Element* element){/*{{{*/
 	/*Get conductivity from inputs*/
 	IssmDouble conductivity = GetConductivity(basalelement);
 
-	/*Get englacial storage coefficient*/
-	IssmDouble storage,dt;
-	basalelement->FindParam(&storage,HydrologyStorageEnum);
+	/*Get Params*/
+	IssmDouble dt;
 	basalelement->FindParam(&dt,TimesteppingTimeStepEnum);
 
 	/*Get all inputs and parameters*/
 	basalelement->FindParam(&rho_water,MaterialsRhoFreshwaterEnum);
 	basalelement->FindParam(&rho_ice,MaterialsRhoIceEnum);
 	basalelement->FindParam(&g,ConstantsGEnum);
-	Input* B_input = basalelement->GetInput(MaterialsRheologyBEnum);         _assert_(B_input);
-	Input* n_input = basalelement->GetInput(MaterialsRheologyNEnum);         _assert_(n_input);
-	Input* gap_input = basalelement->GetInput(HydrologyGapHeightEnum);         _assert_(gap_input);
-	Input* thickness_input = basalelement->GetInput(ThicknessEnum);                  _assert_(thickness_input);
-	Input* head_input = basalelement->GetInput(HydrologyHeadEnum);              _assert_(head_input);
-	Input* base_input = basalelement->GetInput(BaseEnum);                      _assert_(base_input);
+	Input* B_input = basalelement->GetInput(MaterialsRheologyBEnum);      _assert_(B_input);
+	Input* n_input = basalelement->GetInput(MaterialsRheologyNEnum);      _assert_(n_input);
+	Input* gap_input = basalelement->GetInput(HydrologyGapHeightEnum);    _assert_(gap_input);
+	Input* thickness_input = basalelement->GetInput(ThicknessEnum);       _assert_(thickness_input);
+	Input* head_input = basalelement->GetInput(HydrologyHeadEnum);        _assert_(head_input);
+	Input* base_input = basalelement->GetInput(BaseEnum);                 _assert_(base_input);
+	Input* storage_input = basalelement->GetInput(HydrologyStorageEnum);  _assert_(storage_input);
 
 	/* Start  looping on the number of gaussian points: */
 	Gauss* gauss=basalelement->NewGauss(1);
@@ -229,6 +229,7 @@ ElementMatrix* HydrologyShaktiAnalysis::CreateKMatrix(Element* element){/*{{{*/
 		thickness_input->GetInputValue(&thickness,gauss);
 		gap_input->GetInputValue(&gap,gauss);
 		head_input->GetInputValue(&head,gauss);
+		storage_input->GetInputValue(&storage, gauss);
 
 		/*Get ice A parameter*/
 		B_input->GetInputValue(&B,gauss);
@@ -240,11 +241,12 @@ ElementMatrix* HydrologyShaktiAnalysis::CreateKMatrix(Element* element){/*{{{*/
 		IssmDouble pressure_water = rho_water*g*(head-bed);
 		if(pressure_water>pressure_ice) pressure_water = pressure_ice;
 
+		IssmDouble factor = conductivity*gauss->weight*Jdet;
+		IssmDouble factor2 = gauss->weight*Jdet*storage/dt + gauss->weight*Jdet*A*(n)*(pow(fabs(pressure_ice-pressure_water),(n-1))*rho_water*g)*gap;
 		for(int i=0;i<numnodes;i++){
 			for(int j=0;j<numnodes;j++){
-				Ke->values[i*numnodes+j] += conductivity*gauss->weight*Jdet*(dbasis[0*numnodes+i]*dbasis[0*numnodes+j] + dbasis[1*numnodes+i]*dbasis[1*numnodes+j])
-				  + gauss->weight*Jdet*storage/dt*basis[i]*basis[j]
-				  +gauss->weight*Jdet*A*(n)*(pow(fabs(pressure_ice-pressure_water),(n-1))*rho_water*g)*gap*basis[i]*basis[j];
+				Ke->values[i*numnodes+j] += factor*(dbasis[0*numnodes+i]*dbasis[0*numnodes+j] + dbasis[1*numnodes+i]*dbasis[1*numnodes+j])
+				  + factor2*basis[i]*basis[j];
 			}
 		}
 	}
@@ -266,7 +268,7 @@ ElementVector* HydrologyShaktiAnalysis::CreatePVector(Element* element){/*{{{*/
 
 	/*Intermediaries */
 	IssmDouble  Jdet,meltrate,G,dh[2],B,A,n;
-	IssmDouble  gap,bed,thickness,head,ieb,head_old;
+	IssmDouble  gap,bed,thickness,head,ieb,head_old,storage;
 	IssmDouble  lr,br,vx,vy,beta,lc;
 	IssmDouble  alpha2,frictionheat;
    IssmDouble  PMPheat,dissipation,dpressure_water[2],dbed[2];	
@@ -296,13 +298,13 @@ ElementVector* HydrologyShaktiAnalysis::CreatePVector(Element* element){/*{{{*/
 	Input* lr_input             = basalelement->GetInput(HydrologyBumpSpacingEnum);       _assert_(lr_input);
 	Input* br_input             = basalelement->GetInput(HydrologyBumpHeightEnum);        _assert_(br_input);
    Input* headold_input        = basalelement->GetInput(HydrologyHeadOldEnum);           _assert_(headold_input);
+	Input* storage_input        = basalelement->GetInput(HydrologyStorageEnum);           _assert_(storage_input);
 
 	/*Get conductivity from inputs*/
 	IssmDouble conductivity = GetConductivity(basalelement);
 
-	/*Get englacial storage coefficient*/
-	IssmDouble storage,dt;
-   basalelement->FindParam(&storage,HydrologyStorageEnum);
+	/*Get Params*/
+	IssmDouble dt;
    basalelement->FindParam(&dt,TimesteppingTimeStepEnum);
 
 	/*Build friction basalelement, needed later: */
@@ -324,7 +326,8 @@ ElementVector* HydrologyShaktiAnalysis::CreatePVector(Element* element){/*{{{*/
 		englacial_input->GetInputValue(&ieb,gauss);
 		lr_input->GetInputValue(&lr,gauss);
 		br_input->GetInputValue(&br,gauss);
-                headold_input->GetInputValue(&head_old,gauss);
+		headold_input->GetInputValue(&head_old,gauss);
+		storage_input->GetInputValue(&storage,gauss);
 
 		/*Get ice A parameter*/
 		B_input->GetInputValue(&B,gauss);
@@ -357,15 +360,14 @@ ElementVector* HydrologyShaktiAnalysis::CreatePVector(Element* element){/*{{{*/
 
 		meltrate = 1/latentheat*(G+frictionheat+rho_water*g*conductivity*(dh[0]*dh[0]+dh[1]*dh[1]));
 
-		for(int i=0;i<numnodes;i++) pe->values[i]+=Jdet*gauss->weight*
-		 (
-		  meltrate*(1/rho_water-1/rho_ice)
+		IssmDouble factor = Jdet*gauss->weight*
+		 (meltrate*(1/rho_water-1/rho_ice)
 		  +A*pow(fabs(pressure_ice - pressure_water),n-1)*(pressure_ice + rho_water*g*bed)*gap
 		  +(n-1)*A*pow(fabs(pressure_ice - pressure_water),n-1)*(rho_water*g*head)*gap
 		  -beta*sqrt(vx*vx+vy*vy)
 		  +ieb
-		  +storage*head_old/dt
-		 )*basis[i];
+		  +storage*head_old/dt);
+		for(int i=0;i<numnodes;i++) pe->values[i]+=factor*basis[i];
 
 	}
 
@@ -621,17 +623,16 @@ void HydrologyShaktiAnalysis::UpdateGapHeight(Element* element){/*{{{*/
 
 		meltrate = 1/latentheat*(G+frictionheat+rho_water*g*conductivity*(dh[0]*dh[0]+dh[1]*dh[1]));
 
-		//element->AddBasalInput(DummyEnum,&meltrate,P0Enum);
-		//element->AddBasalInput(EsaEmotionEnum,&frictionheat,P0Enum);
-		//element->AddBasalInput(EsaNmotionEnum,&dissipation,P0Enum);
-		//element->AddBasalInput(EsaUmotionEnum,&PMPheat,P0Enum);
+		element->AddBasalInput(HydrologyMeltRateEnum,&meltrate,P0Enum);
+		element->AddBasalInput(HydrologyFrictionHeatEnum,&frictionheat,P0Enum);
+		element->AddBasalInput(HydrologyDissipationEnum,&dissipation,P0Enum);
+		element->AddBasalInput(HydrologyPmpHeatEnum,&PMPheat,P0Enum);
 
 		newgap += gauss->weight*Jdet*(gap+dt*(
 						meltrate/rho_ice
 						-A*pow(fabs(pressure_ice-pressure_water),n-1)*(pressure_ice-pressure_water)*gap
 						+beta*sqrt(vx*vx+vy*vy)
 						));
-
 
 		totalweights +=gauss->weight*Jdet;
 

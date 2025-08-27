@@ -9,11 +9,11 @@
 #include <cmath>
 
 IssmDouble PddSurfaceMassBalance(IssmDouble* monthlytemperatures, IssmDouble* monthlyprec,
-				 IssmDouble* pdds, IssmDouble* pds, IssmDouble* melt, IssmDouble* accu, 
-				 IssmDouble signorm, IssmDouble yts, IssmDouble h, IssmDouble s, IssmDouble desfac,
-				 IssmDouble s0t,IssmDouble s0p, IssmDouble rlaps,IssmDouble rlapslgm,
-				 IssmDouble TdiffTime,IssmDouble sealevTime, IssmDouble pddsnowfac,IssmDouble pddicefac,
-				 IssmDouble rho_water,IssmDouble rho_ice){
+         IssmDouble* pdds, IssmDouble* pds, IssmDouble* melt, IssmDouble* accu, 
+         IssmDouble signorm, IssmDouble yts, IssmDouble h, IssmDouble s, IssmDouble desfac,
+         IssmDouble s0t,IssmDouble s0p, IssmDouble rlaps,IssmDouble rlapslgm,
+         IssmDouble TdiffTime,IssmDouble sealevTime, IssmDouble pddsnowfac,IssmDouble pddicefac,
+         IssmDouble rho_water,IssmDouble rho_ice){
 
   // output:
   IssmDouble B;    // surface mass balance, melt+accumulation
@@ -135,20 +135,20 @@ IssmDouble PddSurfaceMassBalance(IssmDouble* monthlytemperatures, IssmDouble* mo
   snowfac=pddsnowfac0;
   icefac=pddicefac0;
   if (pddsnowfac>0) {
-	  if (pddsnowfac<1.65) {
-		  _printf0_("WARNING: Pdd snow factor input, " << pddsnowfac << ", results in a negative value. It will be ignored. \n");
-	  }
-	  else{
-		snowfac=pddsnowfac;
-	  }
+    if (pddsnowfac<1.65) {
+      _printf0_("WARNING: Pdd snow factor input, " << pddsnowfac << ", results in a negative value. It will be ignored. \n");
+    }
+    else{
+    snowfac=pddsnowfac;
+    }
   }
   if (pddicefac>0) {
-	  if (pddicefac>17.22) {
-		  _printf0_("WARNING: Pdd ice factor input, " << pddicefac << ", results in a negative value. It will be ignored. \n");
-	  }
-	  else{
-	    icefac=pddicefac;
-	  }
+    if (pddicefac>17.22) {
+      _printf0_("WARNING: Pdd ice factor input, " << pddicefac << ", results in a negative value. It will be ignored. \n");
+    }
+    else{
+      icefac=pddicefac;
+    }
   }
 
   /***** determine PDD factors *****/
@@ -157,9 +157,9 @@ IssmDouble PddSurfaceMassBalance(IssmDouble* monthlytemperatures, IssmDouble* mo
     smf=17.22*0.001;    //  ablation factor for ice per pdd (Braithwaite 1995 from tarasov 2002)
   } 
   else if(Tsum< 10){
-	  snwmf = (0.15*(Tsum+1) + (2.65+snowfac-pddsnowfac0))*0.001;
-	  smf = (((17.22-icefac)/(pow(11,3)))*pow((10.-Tsum),3) + pddicefac0)*0.001;
-	  //JC,smf = (((icefac-pddicefac0)/(Tsum+1))*pow((10.-Tsum),3) + pddicefac0)*0.001;
+    snwmf = (0.15*(Tsum+1) + (2.65+snowfac-pddsnowfac0))*0.001;
+    smf = (((17.22-icefac)/(pow(11,3)))*pow((10.-Tsum),3) + pddicefac0)*0.001;
+    //JC,smf = (((icefac-pddicefac0)/(Tsum+1))*pow((10.-Tsum),3) + pddicefac0)*0.001;
   }
   else{
     snwmf=snowfac*0.001;

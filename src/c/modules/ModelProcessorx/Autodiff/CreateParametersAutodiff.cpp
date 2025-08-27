@@ -9,6 +9,7 @@
 
 void CreateParametersAutodiff(Parameters* parameters,IoModel* iomodel){
 
+	#if defined(_HAVE_AD_) 
 	int         i;
 	bool        isautodiff;
 	int         num_dependent_objects;
@@ -30,75 +31,73 @@ void CreateParametersAutodiff(Parameters* parameters,IoModel* iomodel){
 	iomodel->FindConstant(&isautodiff,"md.autodiff.isautodiff");
 
 	#ifdef _HAVE_ADOLC_
-		/*initialize a placeholder to store solver pointers: {{{*/
-		GenericParam<Adolc_edf> *theAdolcEDF_p=new GenericParam<Adolc_edf>(AdolcParamEnum);
+	/*initialize a placeholder to store solver pointers*/
+	GenericParam<Adolc_edf> *theAdolcEDF_p=new GenericParam<Adolc_edf>(AdolcParamEnum);
 
-		/*Solver pointers depend on what type of solver we are implementing: */
-		options=OptionsFromAnalysis(&toolkit,parameters,DefaultAnalysisEnum);
-		ToolkitOptions::Init(toolkit,options);
-		xDelete<char>(toolkit);
+	/*Solver pointers depend on what type of solver we are implementing: */
+	options=OptionsFromAnalysis(&toolkit,parameters,DefaultAnalysisEnum);
+	ToolkitOptions::Init(toolkit,options);
+	xDelete<char>(toolkit);
 
-		switch(IssmSolverTypeFromToolkitOptions()){
-			case MumpsEnum:{
-				#ifdef _HAVE_MUMPS_
-				theAdolcEDF_p->GetParameterValue().myEDF_for_solverx_p=reg_ext_fct(mumpsSolveEDF);
-				#else
-				_error_("requesting mumps solver without MUMPS being compiled in!");
-				#endif
-				break;
+	switch(IssmSolverTypeFromToolkitOptions()){
+		case MumpsEnum:{
+								#ifdef _HAVE_MUMPS_
+								theAdolcEDF_p->GetParameterValue().myEDF_for_solverx_p=reg_ext_fct(mumpsSolveEDF);
+								#else
+								_error_("requesting mumps solver without MUMPS being compiled in!");
+								#endif
+								break;
 							}
-			case GslEnum: {
-				#ifdef _HAVE_GSL_
-				theAdolcEDF_p->GetParameterValue().myEDF_for_solverx_p=reg_ext_fct(EDF_for_solverx);
-				#else
-				_error_("requesting GSL solver without GSL being compiled in!");
-				#endif
-			    break;
+		case GslEnum: {
+							  #ifdef _HAVE_GSL_
+							  theAdolcEDF_p->GetParameterValue().myEDF_for_solverx_p=reg_ext_fct(EDF_for_solverx);
+							  #else
+							  _error_("requesting GSL solver without GSL being compiled in!");
+							  #endif
+							  break;
 						  }
-			default:
-				_error_("solver type not supported yet!");
-		}
+		default:
+						_error_("solver type not supported yet!");
+	}
 
-		// to save some space:
-		// we know we won't use adolc inside of  the solver:
-		theAdolcEDF_p->GetParameterValue().myEDF_for_solverx_p->nestedAdolc=false;
-		// the solution vector is just allocated and doesn't have a meaningful prior value
-		theAdolcEDF_p->GetParameterValue().myEDF_for_solverx_p->dp_y_priorRequired=false;
-		// the solver wrapper makes sure the matrix and the right hand side don't change
-		theAdolcEDF_p->GetParameterValue().myEDF_for_solverx_p->dp_x_changes=false;
-		parameters->AddObject(theAdolcEDF_p);
+	// to save some space:
+	// we know we won't use adolc inside of  the solver:
+	theAdolcEDF_p->GetParameterValue().myEDF_for_solverx_p->nestedAdolc=false;
+	// the solution vector is just allocated and doesn't have a meaningful prior value
+	theAdolcEDF_p->GetParameterValue().myEDF_for_solverx_p->dp_y_priorRequired=false;
+	// the solver wrapper makes sure the matrix and the right hand side don't change
+	theAdolcEDF_p->GetParameterValue().myEDF_for_solverx_p->dp_x_changes=false;
+	parameters->AddObject(theAdolcEDF_p);
 
-		/*Free resources: */
-		xDelete<char>(options);
-		/*}}}*/
-		#elif _HAVE_CODIPACK_
-		//fprintf(stderr, "*** Codipack CreateParametersAutodiff()\n");
-		/*initialize a placeholder to store solver pointers: {{{*/
-		/*Solver pointers depend on what type of solver we are implementing: */
-		options=OptionsFromAnalysis(&toolkit,parameters,DefaultAnalysisEnum);
-		ToolkitOptions::Init(toolkit,options);
-		xDelete<char>(toolkit);
+	/*Free resources: */
+	xDelete<char>(options);
 
-		switch(IssmSolverTypeFromToolkitOptions()){
-			case MumpsEnum:{
-				#ifndef _HAVE_MUMPS_
-				_error_("CoDiPack: requesting mumps solver without MUMPS being compiled in!");
-				#endif
-				break;
-				}
-			case GslEnum: {
-				#ifndef _HAVE_GSL_
-				_error_("CoDiPack: requesting GSL solver without GSL being compiled in!");
-				#endif
-				break;
-				}
-			default:
-							_error_("solver type not supported yet!");
-		}
-		/*Free resources: */
-		xDelete<char>(options);
-		#endif
-		#if defined(_HAVE_AD_) 
+	#elif _HAVE_CODIPACK_
+	/*initialize a placeholder to store solver pointers*/
+	/*Solver pointers depend on what type of solver we are implementing: */
+	options=OptionsFromAnalysis(&toolkit,parameters,DefaultAnalysisEnum);
+	ToolkitOptions::Init(toolkit,options);
+	xDelete<char>(toolkit);
+
+	switch(IssmSolverTypeFromToolkitOptions()){
+		case MumpsEnum:{
+								#ifndef _HAVE_MUMPS_
+								_error_("CoDiPack: requesting mumps solver without MUMPS being compiled in!");
+								#endif
+								break;
+							}
+		case GslEnum: {
+							  #ifndef _HAVE_GSL_
+							  _error_("CoDiPack: requesting GSL solver without GSL being compiled in!");
+							  #endif
+							  break;
+						  }
+		default:
+						_error_("solver type not supported yet!");
+	}
+	/*Free resources: */
+	xDelete<char>(options);
+	#endif
 
 	if(isautodiff){
 		#if defined(_HAVE_ADOLC_)
@@ -112,12 +111,15 @@ void CreateParametersAutodiff(Parameters* parameters,IoModel* iomodel){
 
 		#elif defined(_HAVE_CODIPACK_)
 		parameters->AddObject(iomodel->CopyConstantObject("md.autodiff.tapeAlloc",AutodiffTapeAllocEnum));
+		parameters->AddObject(iomodel->CopyConstantObject("md.autodiff.outputTapeMemory",AutodiffOutputTapeMemoryEnum));
+		parameters->AddObject(iomodel->CopyConstantObject("md.autodiff.outputTime",AutodiffOutputTimeEnum));
+		parameters->AddObject(iomodel->CopyConstantObject("md.autodiff.enablePreaccumulation",AutodiffEnablePreaccumulationEnum));
 
 		#else
 		_error_("not supported yet");
 		#endif
 
-		/*retrieve driver: {{{*/
+		/*retrieve driver:*/
 		iomodel->FindConstant(&autodiff_driver,"md.autodiff.driver");
 		parameters->AddObject(iomodel->CopyConstantObject("md.autodiff.driver",AutodiffDriverEnum));
 
@@ -142,18 +144,18 @@ void CreateParametersAutodiff(Parameters* parameters,IoModel* iomodel){
 			xDelete<int>(indices);
 		}
 		xDelete<char>(autodiff_driver);
-		/*}}}*/
-		/*Deal with dependents first: {{{*/
+
+		/*Deal with dependents first:*/
+
 		iomodel->FindConstant(&num_dependent_objects,"md.autodiff.num_dependent_objects");
 		dependent_objects=new DataSet();
 		num_dep=0;
 
 		if(num_dependent_objects){
 			iomodel->FindConstant(&names,&dummy,"md.autodiff.dependent_object_names");
-			iomodel->FetchData(&indices,&dummy,&dummy,"md.autodiff.dependent_object_indices");
 
 			for(i=0;i<num_dependent_objects;i++){
-				DependentObject* dep=new DependentObject(names[i],indices[i]);
+				DependentObject* dep=new DependentObject(names[i]);
 				dependent_objects->AddObject(dep);
 				num_dep++;
 			}
@@ -163,14 +165,12 @@ void CreateParametersAutodiff(Parameters* parameters,IoModel* iomodel){
 				char* string=names[i]; xDelete<char>(string);
 			}
 			xDelete<char*>(names);
-			xDelete<int>(indices);
 		}
 		parameters->AddObject(new DataSetParam(AutodiffDependentObjectsEnum,dependent_objects));
 		parameters->AddObject(new IntParam(AutodiffNumDependentsEnum,num_dep));
-
 		delete dependent_objects;
-		/*}}}*/
-		/*Deal with independents: {{{*/
+
+		/*Deal with independents*/
 
 		/*Independents have already been recovered in iomodel->DeclareIndependents. Just do some more processing. 
 		 *In particular, figure out num_independents, and create the state vector xp, or size num_independents x 1 :*/
@@ -183,7 +183,13 @@ void CreateParametersAutodiff(Parameters* parameters,IoModel* iomodel){
 			parameters->AddObject(new DoubleVecParam(AutodiffXpEnum,xp,num_ind));
 			xDelete<IssmDouble>(xp);
 		}
-		/*}}}*/
 	}
+
+	#if _HAVE_CODIPACK_
+	if(isautodiff){
+		/* Setup CoDiPack driver*/
+		codi_global.init(parameters);
+	}
+	#endif
 	#endif
 }

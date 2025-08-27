@@ -15,7 +15,7 @@
 #include "../../classes/Inputs/TriaInput.h"
 #include "./MmeToInputFromIdx.h"
 
-void MmeToInputFromIdx(Inputs* inputs, Elements* elements, int id, int rootenum, int interpolationenum){
+void MmeToInputFromIdx(Inputs* inputs, Elements* elements, Parameters* parameters, int id, int rootenum, int interpolationenum){
 
 	TransientInput* transientinput  = NULL;
 	TransientInput* transientinput2 = NULL;
@@ -33,6 +33,7 @@ void MmeToInputFromIdx(Inputs* inputs, Elements* elements, int id, int rootenum,
 	transientinput->GetAllTimes(&times,&N);
 	inputs->SetTransientInput(DummyEnum,times,N);
 	transientinput2 = inputs->GetTransientInput(DummyEnum);
+	if(parameters)transientinput2->Configure(parameters);
 
 	for(Object* & object : elements->objects){
 		Tria*   element=xDynamicCast<Tria*>(object);

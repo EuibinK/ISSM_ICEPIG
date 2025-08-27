@@ -31,8 +31,10 @@ ylim=getfieldvalue(options,'ylim',[min(y) max(y)]);
 isAxis = exist(options, 'axis');
 if isAxis
 	myaxis = getfieldvalue(options,'axis');
-	xlim = [myaxis(1), myaxis(2)];
-	ylim = [myaxis(3), myaxis(4)];
+	if ~ischar(myaxis)
+		xlim = [myaxis(1), myaxis(2)];
+		ylim = [myaxis(3), myaxis(4)];
+	end
 end
 
 postx=getfieldvalue(options,'posting',diff(xlim)/1000);

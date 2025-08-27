@@ -18,99 +18,51 @@ from shpread import shpread
 
 
 def bamg(md, *args):
-    """BAMG - mesh generation
+    """bamg - mesh generation
 
     Available options (for more details see ISSM website http://issm.jpl.nasa.gov/):
 
-    - domain :                              followed by an ARGUS file that
-                                            prescribes the domain outline
-    - holes :                               followed by an ARGUS file that
-                                            prescribes the holes
-    - subdomains :                          followed by an ARGUS file that
-                                            prescribes the list of subdomains
-                                            (that need to be inside domain)
+    - domain :                              followed by an ARGUS file that prescribes the domain outline
+    - holes :                               followed by an ARGUS file that prescribes the holes
+    - subdomains :                          followed by an ARGUS file that prescribes the list of subdomains (that need to be inside domain)
 
-    - hmin :                                minimum edge length (default is
-                                            1.0e-100)
-    - hmax :                                maximum edge length (default is
-                                            1.0e100)
-    - hVertices :                           imposed edge length for each vertex
-                                            (geometry or mesh)
-    - hminVertices :                        minimum edge length for each vertex
-                                            (mesh)
-    - hmaxVertices :                        maximum edge length for each vertex
-                                            (mesh)
+    - hmin :                                minimum edge length (default is 1.0e-100)
+    - hmax :                                maximum edge length (default is 1.0e100)
+    - hVertices :                           imposed edge length for each vertex (geometry or mesh)
+    - hminVertices :                        minimum edge length for each vertex (mesh)
+    - hmaxVertices :                        maximum edge length for each vertex (mesh)
 
-    - anisomax :                            maximum ratio between the smallest
-                                            and largest edges (default is
-                                            1.0e30)
-    - coeff :                               coefficient applied to the metric
-                                            (2 -> twice as many elements,
-                                            default is 1)
-    - cutoff :                              scalar used to compute the metric
-                                            when metric type 2 or 3 are applied
-    - err :                                 error used to generate the metric
-                                            from a field
+    - anisomax :                            maximum ratio between the smallest and largest edges (default is 1.0e30)
+    - coeff :                               coefficient applied to the metric (2 -> twice as many elements, default is 1)
+    - cutoff :                              scalar used to compute the metric when metric type 2 or 3 are applied
+    - err :                                 error used to generate the metric from a field
     - errg :                                geometric error (default is 0.1)
-    - field :                               field of the model that will be
-                                            used to compute the metric to apply
-                                            several fields, use one column per
-                                            field
-    - gradation :                           maximum ratio between two adjacent
-                                            edges
-    - Hessiantype :                         0 -> use double P2 projection
-                                            (default)
+    - field :                               field of the model that will be used to compute the metric to apply several fields, use one column per field
+    - gradation :                           maximum ratio between two adjacent edges
+    - Hessiantype :                         0 -> use double P2 projection (default)
                                             1 -> use Green formula
-    - KeepVertices :                        try to keep initial vertices when
-                                            adaptation is done on an existing
-                                            mesh (default 1)
-    - NoBoundaryRefinement :                do not refine boundary, only follow
-                                            contour provided (default 0). Allow
-                                            subdomain boundary refinement
-                                            though
-    - NoBoundaryRefinementAllBoundaries :   do not refine boundary, only follow
-                                            contour provided (default 0)
-    - maxnbv :                              maximum number of vertices used to
-                                            allocate memory (default is 1.0e6)
-    - maxsubdiv :                           maximum subdivision of exisiting
-                                            elements (default is 10)
-    - metric :                              matrix (numberofnodes x 3) used as
-                                            a metric
-    - Metrictype :                          1 -> absolute error
-                                            c/(err coeff^2) * Abs(H) (default)
-                                            2 -> relative error
-                                            c / (err coeff^2) * Abs(H) /
-                                            max(s, cutoff * max(s))
-                                            3 -> rescaled absolute error
-                                            c / (err coeff^2) * Abs(H) /
-                                            (smax - smin)
-    - nbjacoby :                            correction used by Hessiantype = 1
-                                            (default is 1)
-    - nbsmooth :                            number of metric smoothing
-                                            procedure (default is 3)
-    - omega :                               relaxation parameter of the
-                                            smoothing procedure (default is
-                                            1.8)
-    - power :                               power applied to the metric
-                                            (default is 1)
-    - splitcorners :                        split triangles which have 3
-                                            vertices on the outline (default is
-                                            1)
+    - KeepVertices :                        try to keep initial vertices when adaptation is done on an existing mesh (default 1)
+    - NoBoundaryRefinement :                do not refine boundary, only follow contour provided (default 0). Allow subdomain boundary refinement though
+    - NoBoundaryRefinementAllBoundaries :   do not refine boundary, only follow contour provided (default 0)
+    - maxnbv :                              maximum number of vertices used to allocate memory (default is 1.0e6)
+    - maxsubdiv :                           maximum subdivision of existing elements (default is 10)
+    - metric :                              matrix (numberofnodes x 3) used as a metric
+    - Metrictype :                          1 -> absolute error          c/(err coeff^2) * Abs(H)        (default)
+                                            2 -> relative error          c / (err coeff^2) * Abs(H) / max(s, cutoff * max(s))
+                                            3 -> rescaled absolute error c / (err coeff^2) * Abs(H) / (smax - smin)
+    - nbjacoby :                            correction used by Hessiantype = 1 (default is 1)
+    - nbsmooth :                            number of metric smoothing procedure (default is 3)
+    - omega :                               relaxation parameter of the smoothing procedure (default is 1.8)
+    - power :                               power applied to the metric (default is 1)
+    - splitcorners :                        split triangles which have 3 vertices on the outline (default is 1)
     - verbose :                             level of verbosity (default is 1)
 
-    - rifts :                               followed by an ARGUS file that
-                                            prescribes the rifts
-    - toltip :                              tolerance to move tip on an
-                                            existing point of the domain
-                                            outline
-    - tracks :                              followed by an ARGUS file that
-                                            prescribes the tracks that the mesh
-                                            will stick to
-    - RequiredVertices :                    mesh vertices that are required.
-                                            [x, y, ref]; ref is optional
-    - tol :                                 if the distance between 2 points of
-                                            the domain outline is less than
-                                            tol, they will be merged
+    - vertical :                            is this a 2d vertical mesh (flowband, default is 0)
+    - rifts :                               followed by an ARGUS file that prescribes the rifts
+    - toltip :                              tolerance to move tip on an existing point of the domain outline
+    - tracks :                              followed by an ARGUS file that prescribes the tracks that the mesh will stick to
+    - RequiredVertices :                    mesh vertices that are required. [x, y, ref]; ref is optional
+    - tol :                                 if the distance between 2 points of the domain outline is less than tol, they will be merged
 
     Examples:
         md = bamg(md, 'domain', 'DomainOutline.exp', 'hmax', 3000)
@@ -125,7 +77,7 @@ def bamg(md, *args):
     options = pairoptions(*args)
     #options = deleteduplicates(options, 1)
 
-    # Initialize the structures required as input of Bamg
+    # Initialize the structures required as input of BAMG
     bamg_options = OrderedDict()
     bamg_geometry = bamggeom()
     bamg_mesh = bamgmesh()
@@ -133,7 +85,7 @@ def bamg(md, *args):
     subdomain_ref = 1
     hole_ref = 1
 
-    # Bamg Geometry parameters {{{
+    # BAMG Geometry parameters {{{
     if options.exist('domain'):
         #Check that file exists
         domainfile = options.getfieldvalue('domain')
@@ -531,10 +483,10 @@ def bamg(md, *args):
     elif isinstance(md.private.bamg, dict) and 'geometry' in md.private.bamg:
         bamg_geometry = bamggeom(md.private.bamg['geometry'].__dict__)
     else:
-        #do nothing...
+        # Do nothing...
         pass
     # }}}
-    # Bamg mesh parameters {{{
+    # BAMG mesh parameters {{{
     if not options.exist('domain') and md.mesh.numberofvertices and md.mesh.elementtype() == 'Tria':
         if isinstance(md.private.bamg, dict) and 'mesh' in md.private.bamg:
             bamg_mesh = bamgmesh(md.private.bamg['mesh'].__dict__)
@@ -547,25 +499,25 @@ def bamg(md, *args):
             bamg_mesh.Triangles = np.hstack((md.mesh.elements, np.ones((md.mesh.numberofelements, 1))))
 
         if isinstance(md.rifts.riftstruct, dict):
-            raise TypeError("bamg error message: rifts not supported yet. Do meshprocessrift AFTER bamg")
+            raise TypeError('bamg error message: rifts not supported yet. Do meshprocessrift AFTER bamg')
     # }}}
-    # Bamg options {{{
+    # BAMG options {{{
     bamg_options['Crack'] = options.getfieldvalue('Crack', 0)
-    bamg_options['anisomax'] = options.getfieldvalue('anisomax', pow(10.0, 18))
+    bamg_options['anisomax'] = options.getfieldvalue('anisomax', 1e30)
     bamg_options['coeff'] = options.getfieldvalue('coeff', 1.0)
-    bamg_options['cutoff'] = options.getfieldvalue('cutoff', pow(10.0, -5))
-    bamg_options['err'] = options.getfieldvalue('err', np.array([[0.01]]))
+    bamg_options['cutoff'] = options.getfieldvalue('cutoff', 1e-5)
+    bamg_options['err'] = options.getfieldvalue('err', 0.01)
     bamg_options['errg'] = options.getfieldvalue('errg', 0.1)
     bamg_options['field'] = options.getfieldvalue('field', np.empty((0, 1)))
     bamg_options['gradation'] = options.getfieldvalue('gradation', 1.5)
     bamg_options['Hessiantype'] = options.getfieldvalue('Hessiantype', 0)
-    bamg_options['hmin'] = options.getfieldvalue('hmin', pow(10.0, -100))
-    bamg_options['hmax'] = options.getfieldvalue('hmax', pow(10.0, 100))
+    bamg_options['hmin'] = options.getfieldvalue('hmin', 1e-100)
+    bamg_options['hmax'] = options.getfieldvalue('hmax', 1e100)
     bamg_options['hminVertices'] = options.getfieldvalue('hminVertices', np.empty((0, 1)))
     bamg_options['hmaxVertices'] = options.getfieldvalue('hmaxVertices', np.empty((0, 1)))
     bamg_options['hVertices'] = options.getfieldvalue('hVertices', np.empty((0, 1)))
     bamg_options['KeepVertices'] = options.getfieldvalue('KeepVertices', 1)
-    bamg_options['maxnbv'] = options.getfieldvalue('maxnbv', pow(10, 6))
+    bamg_options['maxnbv'] = options.getfieldvalue('maxnbv', 1e6)
     bamg_options['maxsubdiv'] = options.getfieldvalue('maxsubdiv', 10.0)
     bamg_options['metric'] = options.getfieldvalue('metric', np.empty((0, 1)))
     bamg_options['Metrictype'] = options.getfieldvalue('Metrictype', 0)
@@ -577,7 +529,7 @@ def bamg(md, *args):
     bamg_options['verbose'] = options.getfieldvalue('verbose', 1)
     # }}}
 
-    # Call Bamg
+    # Call BAMG
     bamgmesh_out, bamggeom_out = BamgMesher(bamg_mesh.__dict__, bamg_geometry.__dict__, bamg_options)
 
     # Plug results onto model
@@ -631,7 +583,7 @@ def bamg(md, *args):
         md.mesh.vertexonboundary = np.zeros(md.mesh.numberofvertices, int)
         md.mesh.vertexonboundary[md.mesh.segments[:, 0:2] - 1] = 1
 
-    # Bamg private fields
+    # BAMG private fields
     md.private.bamg = OrderedDict()
     md.private.bamg['mesh'] = bamgmesh(bamgmesh_out)
     md.private.bamg['geometry'] = bamggeom(bamggeom_out)
@@ -731,7 +683,7 @@ def processgeometry(geom, tol, outline):  # {{{
             i -= 1
 
     if num:
-        print(('WARNING: {} points outside the domain outline have been removed'.format(num)))
+        print('WARNING: {} points outside the domain outline have been removed'.format(num))
 
     """
     %Check point spacing

@@ -19,17 +19,16 @@ void GroundinglineMigrationx(Elements* elements,Nodes* nodes, Vertices* vertices
 
 	if(VerboseModule()) _printf0_("   Migrating grounding line based on "<<EnumToStringx(migration_style)<<"\n");
 
-	/*Set toolkit to default*/
-	ToolkitsOptionsFromAnalysis(parameters,DefaultAnalysisEnum);
-
 	switch(migration_style){
 		case SoftMigrationEnum:
+			ToolkitsOptionsFromAnalysis(parameters,DefaultAnalysisEnum);
 			/*Create flag for grounded vertices above the hydrostatic equilibrium: */
 			vertices_potentially_ungrounding=PotentialUngrounding(elements,vertices,parameters);
 			/*propagate ice shelf into connex areas of the ice sheet that potentially want to unground: */
 			phi_ungrounding=PropagateFloatingiceToGroundedNeighbors(elements,nodes,vertices,parameters,vertices_potentially_ungrounding);
 			break;
 		case ContactEnum:
+			ToolkitsOptionsFromAnalysis(parameters,DefaultAnalysisEnum);
 			phi_ungrounding=ContactFSLevelset(elements,vertices);
 			break;
 		case SubelementMigrationEnum:

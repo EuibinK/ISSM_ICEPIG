@@ -19,11 +19,6 @@
 #define NUMVERTICES 2
 
 #define C_W         4.22e3   /*specific heat capacity of water (J/kg/K)*/
-#define ALPHA_C     5./4.
-#define BETA_C      3./2.
-/*Make sure these are the same as in HydrologyGlaDSAnalysis::CreateKMatrix*/
-#define ALPHA_S     5./4.
-#define BETA_S      3./2.
 #define AEPS        2.2204460492503131E-015
 
 /*Channel constructors and destructor*/
@@ -358,7 +353,7 @@ ElementMatrix* Channel::CreateKMatrixHydrologyGlaDS(void){/*{{{*/
 
 	/*Initialize Element matrix and return if necessary*/
 	Tria*  tria=(Tria*)element;
-	if(!tria->IsIceInElement()) return NULL;
+	if(!tria->IsIceOnlyInElement()) return NULL;
 	_assert_(tria->FiniteElement()==P1Enum); 
 	int index1=tria->GetVertexIndex(vertices[0]);
 	int index2=tria->GetVertexIndex(vertices[1]);
@@ -366,6 +361,7 @@ ElementMatrix* Channel::CreateKMatrixHydrologyGlaDS(void){/*{{{*/
 	/*Intermediaries */
 	IssmDouble  Jdet,v1,qc,fFactor,Afactor,Bfactor,Xifactor;
 	IssmDouble  A,B,n,phi_old,phi,phi_0,dPw,ks,kc,Ngrad;
+	IssmDouble  h_r;
 	IssmDouble  H,h,b,dphi[2],dphids,dphimds,db[2],dbds;
 	IssmDouble  xyz_list[NUMVERTICES][3];
 	IssmDouble  xyz_list_tria[3][3];
@@ -381,20 +377,31 @@ ElementMatrix* Channel::CreateKMatrixHydrologyGlaDS(void){/*{{{*/
 	GetVerticesCoordinates(&xyz_list[0][0]     ,this->vertices,NUMVERTICES);
 	GetVerticesCoordinates(&xyz_list_tria[0][0],tria->vertices,3);
 
+	bool istransition;
+	element->FindParam(&istransition,HydrologyIsTransitionEnum);
+	bool isincludesheetthickness;
+	element->FindParam(&isincludesheetthickness,HydrologyIsIncludeSheetThicknessEnum);
 	IssmDouble L         = element->FindParam(MaterialsLatentheatEnum);
+	IssmDouble mu_water  = element->FindParam(MaterialsMuWaterEnum);
 	IssmDouble rho_ice   = element->FindParam(MaterialsRhoIceEnum);
 	IssmDouble rho_water = element->FindParam(MaterialsRhoFreshwaterEnum);
 	IssmDouble g         = element->FindParam(ConstantsGEnum);
 	IssmDouble lc        = element->FindParam(HydrologyChannelSheetWidthEnum);
 	IssmDouble c_t       = element->FindParam(HydrologyPressureMeltCoefficientEnum);
+	IssmDouble alpha_c   = element->FindParam(HydrologyChannelAlphaEnum);
+	IssmDouble beta_c    = element->FindParam(HydrologyChannelBetaEnum);
+	IssmDouble alpha_s   = element->FindParam(HydrologySheetAlphaEnum);
+	IssmDouble beta_s    = element->FindParam(HydrologySheetBetaEnum);
+	IssmDouble omega     = element->FindParam(HydrologyOmegaEnum);
 
 	Input* h_input      = element->GetInput(HydrologySheetThicknessEnum);      _assert_(h_input);
 	Input* H_input      = element->GetInput(ThicknessEnum);                    _assert_(H_input);
 	Input* b_input      = element->GetInput(BedEnum);                          _assert_(b_input);
-	Input* B_input      = element->GetInput(MaterialsRheologyBEnum);           _assert_(B_input);
+	Input* B_input      = element->GetInput(HydrologyRheologyBBaseEnum);       _assert_(B_input);
 	Input* n_input      = element->GetInput(MaterialsRheologyNEnum);           _assert_(n_input);
 	Input* ks_input     = element->GetInput(HydrologySheetConductivityEnum);   _assert_(ks_input);
 	Input* kc_input     = element->GetInput(HydrologyChannelConductivityEnum); _assert_(kc_input);
+	Input* hr_input     = element->GetInput(HydrologyBumpHeightEnum);          _assert_(hr_input);
 	Input* phi_input    = element->GetInput(HydraulicPotentialEnum);           _assert_(phi_input);
 
 	/*Get tangent vector*/
@@ -421,24 +428,34 @@ ElementMatrix* Channel::CreateKMatrixHydrologyGlaDS(void){/*{{{*/
 		h_input->GetInputValue(&h,gauss);
 		ks_input->GetInputValue(&ks,gauss);
 		kc_input->GetInputValue(&kc,gauss);
+		hr_input->GetInputValue(&h_r,gauss);
 		B_input->GetInputValue(&B,gauss);
 		n_input->GetInputValue(&n,gauss);
 		b_input->GetInputValue(&b,gauss);
 		H_input->GetInputValue(&H,gauss);
 
-		/*Hard code B*/
-		B = Cuffey(273.15-2);
-
 		/*Get values for a few potentials*/
 		phi_0   = rho_water*g*b + rho_ice*g*H;
+		if(isincludesheetthickness) phi_0 += rho_water*g*h;
 		dphids  = dphi[0]*tx + dphi[1]*ty;
 		dphimds = rho_water*g*(db[0]*tx + db[1]*ty);
 		Ngrad   = fabs(dphids);
 		if(Ngrad<AEPS) Ngrad = AEPS;
 
-		/*Compute the effective conductivity Kc = k h^alpha |grad Phi|^{beta-2} (same for sheet)*/
-		IssmDouble Kc = kc * pow(this->S,ALPHA_C) * pow(Ngrad,BETA_C-2.);
-		IssmDouble Ks = ks * pow(h      ,ALPHA_S) * pow(Ngrad,BETA_S-2.);
+		/*Compute the effective conductivity Kc = k h^alpha |grad Phi|^{beta-2} (same for sheet) and use transition model if specified*/
+		IssmDouble Kc;
+		IssmDouble Ks;
+		IssmDouble nu = mu_water/rho_water;
+		if(istransition==1 && omega>=AEPS){
+			IssmDouble hratio = h/h_r;
+			IssmDouble coarg = 1. + 4.*omega*pow(hratio,3-2*alpha_s)*ks*pow(h,3)*Ngrad/nu;
+			Ks = nu/2./omega*pow(hratio,2*alpha_s-3) * (-1 + pow(coarg, 0.5))/Ngrad;
+			Kc = kc * pow(this->S,alpha_c) * pow(Ngrad,beta_c-2.);
+		}
+		else {
+			Ks = ks*pow(h,alpha_s)*pow(Ngrad,beta_s-2.);
+			Kc = kc * pow(this->S,alpha_c) * pow(Ngrad,beta_c-2.);
+		}
 
 		/*Approx. discharge in the sheet flowing folwing in the direction of the channel ofver a width lc*/
 		qc = - Ks * dphids;
@@ -475,9 +492,17 @@ ElementMatrix* Channel::CreateKMatrixHydrologyGlaDS(void){/*{{{*/
 			}
 		}
 
-		/*Closing rate term, see Gagliardini and Werder 2018 eq. A2 (v = v1*phi_i + v2(phi_{i+1}))*/
-		A=pow(B,-n);
-		v1 = 2./pow(n,n)*A*S*(pow(fabs(phi_0 - phi),n-1.)*( - n));
+		/*Closing rate term*/ 
+		/*See Gagliardini and Werder 2018 eq. A2 (v = v1*phi_i + v2(phi_{i+1}))*/
+		A = pow(B,-n);
+		if(phi_0-phi<0){
+			v1 = 0.;
+		}
+		else{
+			v1 = 2./pow(n,n)*A*S*(pow(fabs(phi_0-phi),n-1.)*( - n));
+
+		}
+
 		for(int i=0;i<numnodes;i++){
 			for(int j=0;j<numnodes;j++){
 				Ke->values[i*numnodes+j] += gauss->weight*Jdet*(-v1)*basis[i]*basis[j];
@@ -494,7 +519,7 @@ ElementVector* Channel::CreatePVectorHydrologyGlaDS(void){/*{{{*/
 
 	/*Initialize Element matrix and return if necessary*/
 	Tria* tria=(Tria*)element;
-	if(!tria->IsIceInElement()) return NULL;
+	if(!tria->IsIceOnlyInElement()) return NULL;
 	_assert_(tria->FiniteElement()==P1Enum); 
 	int index1=tria->GetVertexIndex(vertices[0]);
 	int index2=tria->GetVertexIndex(vertices[1]);
@@ -503,6 +528,7 @@ ElementVector* Channel::CreatePVectorHydrologyGlaDS(void){/*{{{*/
 	IssmDouble  Jdet,v2,Afactor,Bfactor,fFactor;
 	IssmDouble  A,B,n,phi_old,phi,phi_0,dphimds,dphi[2];
 	IssmDouble  H,h,b,db[2],dphids,qc,dPw,ks,kc,Ngrad;
+	IssmDouble  h_r;
 	IssmDouble  xyz_list[NUMVERTICES][3];
 	IssmDouble  xyz_list_tria[3][3];
 	const int   numnodes = NUMNODES;
@@ -515,21 +541,30 @@ ElementVector* Channel::CreatePVectorHydrologyGlaDS(void){/*{{{*/
 	GetVerticesCoordinates(&xyz_list[0][0],this->vertices,NUMVERTICES);
 	GetVerticesCoordinates(&xyz_list_tria[0][0],tria->vertices,3);
 
+	bool istransition;
+	element->FindParam(&istransition,HydrologyIsTransitionEnum);
+	bool isincludesheetthickness;
+	element->FindParam(&isincludesheetthickness,HydrologyIsIncludeSheetThicknessEnum);
 	IssmDouble L         = element->FindParam(MaterialsLatentheatEnum);
+	IssmDouble mu_water  = element->FindParam(MaterialsMuWaterEnum);
 	IssmDouble rho_ice   = element->FindParam(MaterialsRhoIceEnum);
 	IssmDouble rho_water = element->FindParam(MaterialsRhoFreshwaterEnum);
 	IssmDouble g         = element->FindParam(ConstantsGEnum);
 	IssmDouble lc        = element->FindParam(HydrologyChannelSheetWidthEnum);
 	IssmDouble c_t       = element->FindParam(HydrologyPressureMeltCoefficientEnum);
+	IssmDouble alpha_s   = element->FindParam(HydrologySheetAlphaEnum);
+	IssmDouble beta_s    = element->FindParam(HydrologySheetBetaEnum);
+	IssmDouble omega     = element->FindParam(HydrologyOmegaEnum);
 
 	Input* h_input      = element->GetInput(HydrologySheetThicknessEnum);      _assert_(h_input);
 	Input* H_input      = element->GetInput(ThicknessEnum);                    _assert_(H_input);
 	Input* b_input      = element->GetInput(BedEnum);                          _assert_(b_input);
-	Input* B_input      = element->GetInput(MaterialsRheologyBEnum);           _assert_(B_input);
+	Input* B_input      = element->GetInput(HydrologyRheologyBBaseEnum);       _assert_(B_input);
 	Input* n_input      = element->GetInput(MaterialsRheologyNEnum);           _assert_(n_input);
 	Input* ks_input     = element->GetInput(HydrologySheetConductivityEnum);   _assert_(ks_input);
 	Input* kc_input     = element->GetInput(HydrologyChannelConductivityEnum); _assert_(kc_input);
 	Input* phi_input    = element->GetInput(HydraulicPotentialEnum);           _assert_(phi_input);
+	Input* hr_input     = element->GetInput(HydrologyBumpHeightEnum);          _assert_(hr_input);
 
 	/*Get tangent vector*/
 	IssmDouble tx = xyz_list_tria[index2][0] - xyz_list_tria[index1][0];
@@ -556,19 +591,27 @@ ElementVector* Channel::CreatePVectorHydrologyGlaDS(void){/*{{{*/
 		phi_input->GetInputValue(&phi,gauss);
 		b_input->GetInputValue(&b,gauss);
 		H_input->GetInputValue(&H,gauss);
+		hr_input->GetInputValue(&h_r,gauss);
 
-		/*Hard code B*/
-		B = Cuffey(273.15-2);
-		
 		/*Get values for a few potentials*/
 		phi_0   = rho_water*g*b + rho_ice*g*H;
+		if(isincludesheetthickness) phi_0 += rho_water*g*h;
 		dphids  = dphi[0]*tx + dphi[1]*ty;
 		dphimds = rho_water*g*(db[0]*tx + db[1]*ty);
 		Ngrad   = fabs(dphids);
 		if(Ngrad<AEPS) Ngrad = AEPS;
 
-		/*Compute the effective conductivity Ks = k h^alpha |grad Phi|^{beta-2} (same for sheet)*/
-		IssmDouble Ks = ks * pow(h,ALPHA_S) * pow(Ngrad,BETA_S-2.);
+		/*Approx. discharge in the sheet flowing folwing in the direction of the channel ofver a width lc, use transition model if specified*/
+		IssmDouble Ks;
+		if (istransition==1 && omega>=AEPS){
+		IssmDouble hratio = h/h_r;
+			IssmDouble nu = mu_water/rho_water;
+			IssmDouble coarg = 1. + 4.*omega*pow(hratio,3-2*alpha_s)*ks*pow(h,3)*Ngrad/nu;
+			Ks = nu/2./omega*pow(hratio,2*alpha_s-3) * (-1 + pow(coarg, 0.5))/Ngrad;
+		}
+		else {
+			Ks = ks * pow(h,alpha_s) * pow(Ngrad,beta_s-2.);
+		}
 
 		/*Approx. discharge in the sheet flowing folwing in the direction of the channel ofver a width lc*/
 		qc = - Ks * dphids;
@@ -588,8 +631,13 @@ ElementVector* Channel::CreatePVectorHydrologyGlaDS(void){/*{{{*/
 
 		/*Compute closing rate*/
 		/*See Gagliardini and Werder 2018 eq. A2 (v = v2(phi_i) + v1*phi_{i+1})*/
-		A=pow(B,-n);
-		v2 = 2./pow(n,n)*A*this->S*(pow(fabs(phi_0 - phi),n-1.)*(phi_0 +(n-1.)*phi));
+		A = pow(B,-n);
+		if(phi_0-phi<0){
+			v2 = 0.;
+		}
+		else{
+			v2 = 2./pow(n,n)*A*this->S*(pow(fabs(phi_0 - phi),n-1.)*(phi_0 +(n-1.)*phi));
+		}
 
 		for(int i=0;i<numnodes;i++){
 			pe->values[i]+= - Jdet*gauss->weight*(-v2)*basis[i];
@@ -611,7 +659,7 @@ void           Channel::UpdateChannelCrossSection(void){/*{{{*/
 
 	/*Initialize Element matrix and return if necessary*/
 	Tria*  tria=(Tria*)element;
-	if(this->boundary){
+	if(this->boundary || !tria->IsIceOnlyInElement()){
 		this->S = 0.;
 		return;
 	}
@@ -635,6 +683,7 @@ void           Channel::UpdateChannelCrossSection(void){/*{{{*/
 
 	/*Intermediaries */
 	IssmDouble  A,B,n,phi,phi_0,ks,kc,Ngrad;
+	IssmDouble  h_r;
 	IssmDouble  H,h,b,dphi[2],dphids,dphimds,db[2],dbds;
 	IssmDouble  xyz_list[NUMVERTICES][3];
 	IssmDouble  xyz_list_tria[3][3];
@@ -643,22 +692,33 @@ void           Channel::UpdateChannelCrossSection(void){/*{{{*/
 	GetVerticesCoordinates(&xyz_list[0][0]     ,this->vertices,NUMVERTICES);
 	GetVerticesCoordinates(&xyz_list_tria[0][0],tria->vertices,3);
 
+	bool istransition;
+	element->FindParam(&istransition,HydrologyIsTransitionEnum);
+	bool isincludesheetthickness;
+	element->FindParam(&isincludesheetthickness,HydrologyIsIncludeSheetThicknessEnum);
 	IssmDouble L         = element->FindParam(MaterialsLatentheatEnum);
 	IssmDouble rho_ice   = element->FindParam(MaterialsRhoIceEnum);
 	IssmDouble rho_water = element->FindParam(MaterialsRhoFreshwaterEnum);
+	IssmDouble mu_water  = element->FindParam(MaterialsMuWaterEnum);
 	IssmDouble g         = element->FindParam(ConstantsGEnum);
 	IssmDouble lc        = element->FindParam(HydrologyChannelSheetWidthEnum);
 	IssmDouble c_t       = element->FindParam(HydrologyPressureMeltCoefficientEnum);
 	IssmDouble dt        = element->FindParam(TimesteppingTimeStepEnum);
+	IssmDouble alpha_c   = element->FindParam(HydrologyChannelAlphaEnum);
+	IssmDouble beta_c    = element->FindParam(HydrologyChannelBetaEnum);
+	IssmDouble alpha_s   = element->FindParam(HydrologySheetAlphaEnum);
+	IssmDouble beta_s    = element->FindParam(HydrologySheetBetaEnum);
+	IssmDouble omega     = element->FindParam(HydrologyOmegaEnum);
 
 	Input* h_input      = element->GetInput(HydrologySheetThicknessEnum);      _assert_(h_input);
 	Input* H_input      = element->GetInput(ThicknessEnum);                    _assert_(H_input);
 	Input* b_input      = element->GetInput(BedEnum);                          _assert_(b_input);
-	Input* B_input      = element->GetInput(MaterialsRheologyBEnum);           _assert_(B_input);
+	Input* B_input      = element->GetInput(HydrologyRheologyBBaseEnum);       _assert_(B_input);
 	Input* n_input      = element->GetInput(MaterialsRheologyNEnum);           _assert_(n_input);
 	Input* ks_input     = element->GetInput(HydrologySheetConductivityEnum);   _assert_(ks_input);
 	Input* kc_input     = element->GetInput(HydrologyChannelConductivityEnum); _assert_(kc_input);
 	Input* phi_input    = element->GetInput(HydraulicPotentialEnum);           _assert_(phi_input);
+	Input* hr_input     = element->GetInput(HydrologyBumpHeightEnum);          _assert_(hr_input);
 
 	/*Get tangent vector*/
 	IssmDouble tx = xyz_list_tria[index2][0] - xyz_list_tria[index1][0];
@@ -678,12 +738,11 @@ void           Channel::UpdateChannelCrossSection(void){/*{{{*/
 	b_input->GetInputValue(&b,gauss);
 	b_input->GetInputDerivativeValue(&db[0],&xyz_list_tria[0][0],gauss);
 	H_input->GetInputValue(&H,gauss);
-
-	/*Hard code B*/
-	B = Cuffey(273.15-2);
+	hr_input->GetInputValue(&h_r,gauss);
 
 	/*Get values for a few potentials*/
 	phi_0   = rho_water*g*b + rho_ice*g*H;
+	if(isincludesheetthickness) phi_0 += rho_water*g*h;
 	dphids  = dphi[0]*tx + dphi[1]*ty;
 	dphimds = rho_water*g*(db[0]*tx + db[1]*ty);
 	Ngrad   = fabs(dphids);
@@ -692,14 +751,23 @@ void           Channel::UpdateChannelCrossSection(void){/*{{{*/
 	/*d(phi - phi_m)/ds*/
 	IssmDouble dPw = dphids - dphimds;
 
-	/*Approx. discharge in the sheet flowing folwing in the direction of the channel ofver a width lc*/
-	IssmDouble qc = - ks * pow(h,ALPHA_S) * pow(Ngrad,BETA_S-2.) * dphids;
+	/*Approx. discharge in the sheet flowing folwing in the direction of the channel ofver a width lc, use transition model if necessary*/
+	IssmDouble qc;
+	if (istransition==1 && omega>=AEPS){
+	IssmDouble hratio = h/h_r;
+		IssmDouble nu = mu_water/rho_water;
+		IssmDouble coarg = 1. + 4.*omega*pow(hratio,3-2*alpha_s)*ks*pow(h,3)*fabs(Ngrad)/nu;
+		qc = -nu/2./omega*pow(hratio,2*alpha_s-3) * (-1 + pow(coarg, 0.5))*dphids/Ngrad;
+	}
+	else {
+		qc = - ks * pow(h,alpha_s) * pow(Ngrad,beta_s-2.) * dphids;
+	}
 
 	/*Ice rate factor*/
-	A=pow(B,-n);
+	A = pow(B,-n);
 
 	IssmDouble C = C_W*c_t*rho_water;
-	IssmDouble Qprime = -kc * pow(Ngrad,BETA_C-2.)*dphids;
+	IssmDouble Qprime = -kc * pow(Ngrad,beta_c-2.)*dphids;
 	IssmDouble N = phi_0 - phi;
 
 	bool converged  = false;
@@ -716,9 +784,15 @@ void           Channel::UpdateChannelCrossSection(void){/*{{{*/
 		}
 
 		IssmDouble alpha = 1./(rho_ice*L)*(
-					fabs(Qprime*pow(Snew,ALPHA_C-1.)*dphids)
-					+ C*Qprime*pow(Snew,ALPHA_C-1.)*dPw
+					fabs(Qprime*pow(Snew,alpha_c-1.)*dphids)
+					+ C*Qprime*pow(Snew,alpha_c-1.)*dPw
 					) - 2./pow(n,n)*A*pow(fabs(N),n-1.)*N;
+		if(N<0){
+			alpha = 1./(rho_ice*L)*(
+               fabs(Qprime*pow(Snew,alpha_c-1.)*dphids)
+               + C*Qprime*pow(Snew,alpha_c-1.)*dPw
+               );
+		}
 
 		IssmDouble beta = 1./(rho_ice*L)*( fabs(lc*qc*dphids) + C*fFactor*dPw );
 
@@ -728,10 +802,7 @@ void           Channel::UpdateChannelCrossSection(void){/*{{{*/
 
 		/*Constrain the cross section to be between 0 and 500 m^2*/
 		if(this->S<0.)   this->S = 0.;
-		if(this->S>100.) this->S = 100.;
-		
-		/*Do not allow channels to grow in areas with no sheet thickness*/
-		if(H<200.) this->S = 0.;
+		if(this->S>500.) this->S = 500.;
 
 		count++;
 
@@ -739,7 +810,7 @@ void           Channel::UpdateChannelCrossSection(void){/*{{{*/
 	}
 
 	/*Compute new channel discharge for output only*/
-	IssmDouble Kc = kc * pow(this->S,ALPHA_C) * pow(Ngrad,BETA_C-2.);
+	IssmDouble Kc = kc * pow(this->S,alpha_c) * pow(Ngrad,beta_c-2.);
 	this->discharge = -Kc*dphids;
 
 	/*Clean up and return*/

@@ -29,6 +29,7 @@ class matice(object):
         self.thermal_exchange_velocity = 0
         self.rheology_B = np.nan
         self.rheology_n = np.nan
+        self.rheology_phi = 0.0
         self.rheology_law = ''
 
         # SLC
@@ -54,7 +55,8 @@ class matice(object):
         s += '{}\n'.format(fielddisplay(self, 'thermal_exchange_velocity', 'thermal exchange velocity [m/s]'))
         s += '{}\n'.format(fielddisplay(self, 'rheology_B', 'flow law parameter [Pa s^(1/n)]'))
         s += '{}\n'.format(fielddisplay(self, 'rheology_n', 'Glen\'s flow law exponent'))
-        s += '{}\n'.format(fielddisplay(self, 'rheology_law', 'law for the temperature dependance of the rheology: \'None\', \'BuddJacka\', \'Cuffey\', \'CuffeyTemperate\', \'Paterson\', \'Arrhenius\', \'LliboutryDuval\', \'NyeCO2\', or \'NyeH2O\''))
+        s += '{}\n'.format(fielddisplay(self, 'rheology_phi', 'rheology phi (dimensionless)'))
+        s += '{}\n'.format(fielddisplay(self, 'rheology_law', 'law for the temperature dependance of the rheology: \'None\', \'BuddJacka\', \'Cuffey\', \'CuffeyTemperate\', \'Paterson\', \'Arrhenius\', \'LliboutryDuval\', \'NyeCO2\', \'NyeH2O\', or \'GBSH2O\''))
         s += '{}\n'.format(fielddisplay(self, 'earth_density', 'Mantle density [kg/m^-3]'))
         return s
     # }}}
@@ -99,6 +101,7 @@ class matice(object):
         # Rheology for ice
         self.rheology_B = 2.1 * 1e8
         self.rheology_n = 3
+        self.rheology_phi = 0.01
 
         # SLR
         self.earth_density = 5512  # average density of the Earth, (kg/m^3)
@@ -114,7 +117,7 @@ class matice(object):
             md = checkfield(md, 'fieldname', 'materials.mu_water', '>', 0)
             md = checkfield(md, 'fieldname', 'materials.rheology_B', '>', 0, 'universal', 1, 'NaN', 1, 'Inf', 1)
             md = checkfield(md, 'fieldname', 'materials.rheology_n', '>', 0, 'universal',1, 'NaN', 1, 'Inf', 1)
-            md = checkfield(md, 'fieldname', 'materials.rheology_law', 'values', ['None', 'BuddJacka', 'Cuffey', 'CuffeyTemperate', 'Paterson', 'Arrhenius', 'LliboutryDuval', 'NyeCO2', 'NyeH2O'])
+            md = checkfield(md, 'fieldname', 'materials.rheology_law', 'values', ['None', 'BuddJacka', 'Cuffey', 'CuffeyTemperate', 'Paterson', 'Arrhenius', 'LliboutryDuval', 'NyeCO2', 'NyeH2O', 'GBSH2O'])
             md = checkfield(md, 'fieldname', 'materials.effectiveconductivity_averaging', 'numel', [1], 'values', [0, 1, 2])
 
         return md
@@ -144,6 +147,7 @@ class matice(object):
             tsl = md.mesh.numberofelements
         WriteData(fid, prefix, 'object', self, 'class', 'materials', 'fieldname', 'rheology_B', 'format', 'DoubleMat', 'mattype', mattype, 'timeserieslength', tsl + 1, 'yts', md.constants.yts)
         WriteData(fid, prefix, 'object', self, 'class', 'materials', 'fieldname', 'rheology_n', 'format', 'DoubleMat', 'mattype', 2)
+        WriteData(fid, prefix, 'object', self, 'class', 'materials', 'fieldname', 'rheology_phi', 'format', 'Double')
         WriteData(fid, prefix, 'data', self.rheology_law, 'name', 'md.materials.rheology_law', 'format', 'String')
         WriteData(fid, prefix, 'object', self, 'class', 'materials', 'fieldname', 'earth_density', 'format', 'Double')
     # }}}

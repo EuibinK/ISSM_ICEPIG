@@ -47,6 +47,7 @@ class Input: public Object{
 		virtual void   PointWiseMult(Input* xinput){_error_("Not implemented yet");};
 		virtual void   Pow(IssmDouble scale_factor){_error_("Not implemented yet");};
 		virtual void   Scale(IssmDouble scale_factor){_error_("Not implemented yet");};
+		virtual void   AverageAndReplace(void){_error_("Not implemented yet");};
 
 		virtual int  GetResultArraySize(void){_error_("Not implemented yet");};
 		virtual int  GetResultInterpolation(void){_error_("Not implemented yet");};

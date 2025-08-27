@@ -1,7 +1,6 @@
 /*!\file:  Material.h
  * \brief abstract class for Material object
  */ 
-#define _IS_MULTI_ICE_
 
 #ifndef _MATERIAL_H_
 #define _MATERIAL_H_
@@ -58,8 +57,6 @@ class Material: public Object{
 		virtual void       ViscosityBFS(IssmDouble* pmudB,int dim,IssmDouble* xyz_list,Gauss* gauss,Input* vx_input,Input* vy_input,Input* vz_input,IssmDouble epseff)=0;
 		virtual void       ViscosityBHO(IssmDouble* pmudB,int dim,IssmDouble* xyz_list,Gauss* gauss,Input* vx_input,Input* vy_input,IssmDouble epseff)=0;
 		virtual void       ViscosityBSSA(IssmDouble* pmudB,int dim,IssmDouble* xyz_list,Gauss* gauss,Input* vx_input,Input* vy_input,IssmDouble epseff)=0;
-		#ifdef _IS_MULTI_ICE_
-		virtual IssmDouble GetMaterialValue( int materialPropEnum)=0;  
-		#endif
+
 };
 #endif

@@ -18,23 +18,24 @@ class m1qn3inversion(object):
     def __init__(self, *args):  # {{{
         if not len(args):
             print('empty init')
-            self.iscontrol = 0
-            self.incomplete_adjoint = 0
-            self.control_parameters = np.nan
-            self.control_scaling_factors = np.nan
-            self.maxsteps = 0
-            self.maxiter = 0
-            self.dxmin = 0.
-            self.gttol = 0.
-            self.cost_functions = np.nan
+            self.iscontrol                   = 0
+            self.incomplete_adjoint          = 0
+            self.control_parameters          = np.nan
+            self.control_scaling_factors     = np.nan
+            self.maxsteps                    = 0
+            self.maxiter                     = 0
+            self.dxmin                       = 0.
+            self.dfmin_frac                  = 0.
+            self.gttol                       = 0.
+            self.cost_functions              = np.nan
             self.cost_functions_coefficients = np.nan
-            self.min_parameters = np.nan
-            self.max_parameters = np.nan
-            self.vx_obs = np.nan
-            self.vy_obs = np.nan
-            self.vz_obs = np.nan
-            self.vel_obs = np.nan
-            self.thickness_obs = np.nan
+            self.min_parameters              = np.nan
+            self.max_parameters              = np.nan
+            self.vx_obs                      = np.nan
+            self.vy_obs                      = np.nan
+            self.vz_obs                      = np.nan
+            self.vel_obs                     = np.nan
+            self.thickness_obs               = np.nan
 
             self.setdefaultparameters()
         elif len(args) == 1 and args[0].__module__ == 'inversion':
@@ -70,6 +71,7 @@ class m1qn3inversion(object):
         s += '{}\n'.format(fielddisplay(self, 'maxsteps', 'maximum number of iterations (gradient computation)'))
         s += '{}\n'.format(fielddisplay(self, 'maxiter', 'maximum number of Function evaluation (forward run)'))
         s += '{}\n'.format(fielddisplay(self, 'dxmin', 'convergence criterion: two points less than dxmin from eachother (sup - norm) are considered identical'))
+        s += '{}\n'.format(fielddisplay(self, 'dfmin_frac', 'expected reduction of J during the first step (e.g., 0.3=30% reduction in cost function)'))
         s += '{}\n'.format(fielddisplay(self, 'gttol', '||g(X)||/||g(X0)|| (g(X0): gradient at initial guess X0)'))
         s += '{}\n'.format(fielddisplay(self, 'cost_functions', 'indicate the type of response for each optimization step'))
         s += '{}\n'.format(fielddisplay(self, 'cost_functions_coefficients', 'cost_functions_coefficients applied to the misfit of each vertex and for each control_parameter'))
@@ -107,6 +109,7 @@ class m1qn3inversion(object):
         self.cost_functions = 101
         #m1qn3 parameters
         self.dxmin = 0.1
+        self.dfmin_frac = 1.
         self.gttol = 1e-4
 
         return self
@@ -141,6 +144,7 @@ class m1qn3inversion(object):
         md = checkfield(md, 'fieldname', 'inversion.maxsteps', 'numel', [1], '>=', 0)
         md = checkfield(md, 'fieldname', 'inversion.maxiter', 'numel', [1], '>=', 0)
         md = checkfield(md, 'fieldname', 'inversion.dxmin', 'numel', [1], '>', 0.)
+        md = checkfield(md, 'fieldname', 'inversion.dfmin_frac', 'numel', [1], '>=', 0., '<=', 1.)
         md = checkfield(md, 'fieldname', 'inversion.gttol', 'numel', [1], '>', 0.)
         md = checkfield(md, 'fieldname', 'inversion.cost_functions', 'size', [num_costfunc], 'values', supportedcostfunctions())
         md = checkfield(md, 'fieldname', 'inversion.cost_functions_coefficients', 'size', [md.mesh.numberofvertices, num_costfunc], '>=', 0)
@@ -168,6 +172,7 @@ class m1qn3inversion(object):
         WriteData(fid, prefix, 'object', self, 'class', 'inversion', 'fieldname', 'maxsteps', 'format', 'Integer')
         WriteData(fid, prefix, 'object', self, 'class', 'inversion', 'fieldname', 'maxiter', 'format', 'Integer')
         WriteData(fid, prefix, 'object', self, 'class', 'inversion', 'fieldname', 'dxmin', 'format', 'Double')
+        WriteData(fid, prefix, 'object', self, 'class', 'inversion', 'fieldname', 'dfmin_frac', 'format', 'Double')
         WriteData(fid, prefix, 'object', self, 'class', 'inversion', 'fieldname', 'gttol', 'format', 'Double')
         WriteData(fid, prefix, 'object', self, 'class', 'inversion', 'fieldname', 'cost_functions_coefficients', 'format', 'DoubleMat', 'mattype', 1)
         WriteData(fid, prefix, 'object', self, 'class', 'inversion', 'fieldname', 'min_parameters', 'format', 'DoubleMat', 'mattype', 3)

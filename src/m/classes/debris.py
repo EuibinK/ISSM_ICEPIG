@@ -20,6 +20,7 @@ class debris(object):
         self.packingfraction = 0
         self.removalmodel = 0
         self.displacementmodel = 0
+        self.max_displacementvelocity = 0
         self.removal_slope_threshold = 0
         self.removal_stress_threshold = 0
         self.vertex_pairing = np.nan
@@ -43,6 +44,7 @@ class debris(object):
         s += '{}\n'.format(fielddisplay(self,'stabilization','0: no stabilization, 1: artificial diffusion, 2: streamline upwinding, 3: streamline upwind Petrov-Galerkin (SUPG)'))
         s += '{}\n'.format(fielddisplay(self,'removalmodel','frontal removal of debris. 0: no removal, 1: Slope-triggered debris removal, 2: driving-stress triggered debris removal'))
         s += '{}\n'.format(fielddisplay(self,'displacementmodel','debris displacement. 0: no displacement, 1: ...'))
+        s += '{}\n'.format(fielddisplay(self,'max_displacementvelocity','maximum velocity of debris transport (v_ice + v_displacement) (m/a)'))
         s += '{}\n'.format(fielddisplay(self,'removal_slope_threshold','critical slope (degrees) for removalmodel (1)'))
         s += '{}\n'.format(fielddisplay(self,'removal_stress_threshold','critical stress (Pa) for removalmodel (2)'))
 
@@ -53,7 +55,7 @@ class debris(object):
     # }}}
 
     def defaultoutputs(self, md):  # {{{
-        return ['DebrisThickness']
+        return ['DebrisThickness', 'DebrisMaskNodeActivation', 'VxDebris', 'VyDebris']
     # }}}
 
     def setdefaultparameters(self):  # {{{
@@ -78,6 +80,9 @@ class debris(object):
         # Stress threshold for removalmodel (2)
         self.removal_stress_threshold = 0
 
+        # Max velocity for displacementmodel (1)
+        self.max_displacementvelocity = 0
+
         # Default output
         self.requested_outputs = ['default']
         return self
@@ -89,11 +94,12 @@ class debris(object):
             return md
 
         md = checkfield(md, 'fieldname', 'debris.spcthickness')
-        md = checkfield(md, 'fieldname', 'debris.stabilization', 'values', [0, 1, 2, 3])
+        md = checkfield(md, 'fieldname', 'debris.stabilization', 'values', [0, 1, 2, 3, 4, 5])
         md = checkfield(md, 'fieldname', 'debris.min_thickness', '>=', 0)
         md = checkfield(md, 'fieldname', 'debris.packingfraction', '>=', 0)
         md = checkfield(md, 'fieldname', 'debris.removalmodel', 'values', [0, 1, 2])
         md = checkfield(md, 'fieldname', 'debris.displacementmodel', 'values', [0, 1, 2])
+        md = checkfield(md, 'fieldname', 'debris.max_displacementvelocity', '>=', 0)
         md = checkfield(md, 'fieldname', 'debris.removal_slope_threshold', '>=', 0)
         md = checkfield(md, 'fieldname', 'debris.removal_stress_threshold', '>=', 0)
         md = checkfield(md, 'fieldname', 'debris.requested_outputs', 'stringrow', 1)
@@ -109,6 +115,7 @@ class debris(object):
         WriteData(fid, prefix, 'object', self, 'fieldname', 'stabilization', 'format', 'Integer')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'removalmodel', 'format', 'Integer')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'displacementmodel', 'format', 'Integer')
+        WriteData(fid, prefix, 'object', self, 'fieldname', 'max_displacementvelocity', 'format', 'Double')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'removal_slope_threshold', 'format', 'Double')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'removal_stress_threshold', 'format', 'Double')
         WriteData(fid, prefix, 'object', self, 'fieldname', 'packingfraction', 'format', 'Double')

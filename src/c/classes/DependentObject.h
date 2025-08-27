@@ -17,13 +17,12 @@ class DependentObject: public Object{
 	public:
 
 		char* name;
-		int   index;  /*0: scalar, 1: vertex*/
 		IssmDouble response_value;
 
 		/*DependentObject constructors, destructors */
 		DependentObject();
-		DependentObject(char* name,int index);
-		DependentObject(char* name,int index,IssmDouble in_response);
+		DependentObject(char* name);
+		DependentObject(char* name, IssmDouble in_response);
 		~DependentObject();
 
 		/*Object virtual functions definitions*/
@@ -35,9 +34,8 @@ class DependentObject: public Object{
 		void    Marshall(MarshallHandle  *marshallhandle);
 
 		/*DependentObject methods: */
-		void       Responsex(IssmDouble *poutput_value,FemModel*femmodel);
+		void       RecordResponsex(FemModel*femmodel);
 		IssmDouble GetValue(void);
-		void       AddValue(IssmDouble in_value);
 		void       ResetResponseValue(void);
 
 };

@@ -1,5 +1,5 @@
-/*\file FetchData.cpp:
- * \brief: general I/O interface to fetch data in matlab
+/*\file FetchMatlabData.cpp:
+ *\brief: general I/O interface to fetch data in matlab
  */
 
 #ifdef HAVE_CONFIG_H
@@ -537,7 +537,7 @@ int MatlabMatrixToDoubleMatrix(double** pmatrix,int* pmatrix_rows,int* pmatrix_c
       int count=0;
       for(int i=0;i<cols;i++){
          for(int j=0;j<(jc[i+1]-jc[i]);j++){
-            matrix[rows*ir[count]+i]=pmxmatrix[count];
+            matrix[cols*ir[count]+i]=pmxmatrix[count];
             count++;
          }
       }

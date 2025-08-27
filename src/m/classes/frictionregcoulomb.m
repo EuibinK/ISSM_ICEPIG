@@ -38,22 +38,22 @@ classdef frictionregcoulomb
 			md = checkfield(md,'fieldname','friction.m','NaN',1,'Inf',1,'>',0.,'size',[md.mesh.numberofelements,1]);
 		end % }}}
 		function disp(self) % {{{
-			%See Joughin et al. 2019 (equivalent form by Matt Trevers, poster at AGU 2022) https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2019GL082526
-			disp('Regularized Couloub friction law (Joughin et al., 2019) parameters:');
-			disp('   Regularized Couloub friction law reads:');
+			%See Joughin et al. 2019 (equivalent form by Matt Trevers, poster at AGU 2022) https://agupubs.onlinelåibrary.wiley.com/doi/full/10.1029/2019GL082526
+			disp('Regularized Coulomb friction law (Joughin et al., 2019) parameters:');
+			disp('   Regularized Coulomb friction law reads:');
 			disp('                       C^2 |u|^(1/m)         ');
 			disp('      tau_b = -  ____________________________');
-			disp('                        (|u|/u0 + 1)^(1/m)   ');
+			disp('                     (|u|/u0 + 1)^(1/m)      ');
 			disp(' ');
 			fielddisplay(self,'C','friction coefficient [SI]');
 			fielddisplay(self,'m','m exponent (set to m=3 in original paper)');
-			fielddisplay(self,'u0','velocity controling plastic limit');
+			fielddisplay(self,'u0','velocity controlling plastic limit');
 		end % }}}
 		function marshall(self,prefix,md,fid) % {{{
 			yts=md.constants.yts;
 
 			WriteData(fid,prefix,'name','md.friction.law','data',14,'format','Integer');
-			WriteData(fid,prefix,'class','friction','object',self,'fieldname','C','format','DoubleMat','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',md.constants.yts);
+			WriteData(fid,prefix,'class','friction','object',self,'fieldname','C','format','DoubleMat','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',yts);
 			WriteData(fid,prefix,'class','friction','object',self,'fieldname','u0','format','Double','scale',1/yts);
 			WriteData(fid,prefix,'class','friction','object',self,'fieldname','m','format','DoubleMat','mattype',2);
 		end % }}}

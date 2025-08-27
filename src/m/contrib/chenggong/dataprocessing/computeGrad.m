@@ -1,5 +1,5 @@
 function [gradx, grady]=computeGrad(index,x,y,field)
-%COMPUTEHESSIAN - compute the gradient from a field
+%COMPUTEGRAD - compute the gradient from a field
 
 %some variables
 numberofnodes=length(x);

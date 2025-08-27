@@ -91,7 +91,7 @@ classdef issmsettings
 			fielddisplay(self,'results_on_nodes','list of output for which results will be output for all the nodes of each element, Use ''all'' for all output on nodes.');
 			fielddisplay(self,'io_gather','I/O gathering strategy for result outputs (default 1)');
 			fielddisplay(self,'lowmem','is the memory limited ? (0 or 1)');
-			fielddisplay(self,'output_frequency','frequency at which results are saved in all solutions with multiple time_steps');
+			fielddisplay(self,'output_frequency','number of time steps between two saves (e.g., 5 means that results are only saved every 5 time steps)');
 			fielddisplay(self,'sb_coupling_frequency','frequency at which StressBalance solver is coupled (default 1)');
 			fielddisplay(self,'checkpoint_frequency','frequency at which the runs are being recorded, allowing for a restart');
 			fielddisplay(self,'waitonlock','maximum number of minutes to wait for batch results (NaN to deactivate)');

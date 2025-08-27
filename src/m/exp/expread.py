@@ -7,7 +7,7 @@ import MatlabFuncs as m
 
 
 def expread(filename):
-    """EXPREAD - read a exp file and build a list of OrderedDicts
+    """expread - read a exp file and build a list of OrderedDicts
 
     This routine reads a file .exp and builds a list of OrderedDicts containing 
     the fields x and y corresponding to the coordinates, one for the filename 
@@ -24,8 +24,8 @@ def expread(filename):
         contours = expread('domainoutline.exp')
 
     See Also:
-    - EXPDOC
-    - EXPWRITEASVERTICES
+    - expdoc
+    - expwriteasvertices
 
     TODO:
     - Convert returned data structure from list of OrderedDict objects to list 

@@ -29,7 +29,7 @@ class issmsettings(object):
         s += '{}\n'.format(fielddisplay(self, "results_on_nodes", "list of output for which results will be output for all the nodes of each element, Use 'all' for all output on nodes."))
         s += '{}\n'.format(fielddisplay(self, "io_gather", "I / O gathering strategy for result outputs (default 1)"))
         s += '{}\n'.format(fielddisplay(self, "lowmem", "is the memory limited ? (0 or 1)"))
-        s += '{}\n'.format(fielddisplay(self, "output_frequency", "frequency at which results are saved in all solutions with multiple time_steps"))
+        s += '{}\n'.format(fielddisplay(self, "output_frequency", "number of time steps between two saves (e.g., 5 means that results are only saved every 5 time steps)"))
         s += '{}\n'.format(fielddisplay(self, "sb_coupling_frequency", "frequency at which StressBalance solver is coupled (default 1)"))
         s += '{}\n'.format(fielddisplay(self, "checkpoint_frequency", "frequency at which the runs are being recorded, allowing for a restart"))
         s += '{}\n'.format(fielddisplay(self, "waitonlock", "maximum number of minutes to wait for batch results, or return 0"))

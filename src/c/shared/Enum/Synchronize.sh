@@ -212,6 +212,14 @@ cat temp |  awk '{print "\tif(enum==" $1 ") return \"" substr($1,1,length($1)-4)
 #Move on to StringToEnumx
 cat <<END >> $ISSM_DIR/src/c/shared/Enum/issmenums.jl
 end
+
+function StringToEnum(name::String)
+END
+cat temp |  awk '{print "\tif(name==\"" substr($1,1,length($1)-4) "\") return " $1 "  end"}' >> $ISSM_DIR/src/c/shared/Enum/issmenums.jl
+
+cat <<END >> $ISSM_DIR/src/c/shared/Enum/issmenums.jl
+	error("Enum ", name, " not found");
+end
 END
 #}}}
 

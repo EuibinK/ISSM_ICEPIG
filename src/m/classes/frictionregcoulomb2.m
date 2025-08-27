@@ -1,13 +1,13 @@
 %FRICTIONREGCOULOMB2 class definition
 %
 %   Usage:
-%      frictionregcoulomb=frictionregcoulomb();
+%      frictionregcoulomb2=frictionregcoulomb2();
 
 classdef frictionregcoulomb2
 	properties (SetAccess=public) 
-		C  = NaN;
-		K  = NaN;
-		m  = NaN;
+		C                        = NaN;
+		K                        = NaN;
+		m                        = NaN;
 		effective_pressure_limit = 0;
 	end
 	methods
@@ -42,23 +42,23 @@ classdef frictionregcoulomb2
 		end % }}}
 		function disp(self) % {{{
 			%See Zoet and Iverson 2020 or Choi et al., 2022 
-			disp('Regularized Couloub friction law 2  parameters:');
-			disp('   Regularized Couloub friction law reads:');
+			disp('Regularized Coulomb friction law 2 parameters:');
+			disp('   Regularized Coulomb friction law reads:');
 			disp('                       C N |u|^(1/m)         ');
 			disp('      tau_b = -  ____________________________');
-			disp('                        (|u| + (K*N)^m)^(1/m)   ');
+			disp('                   (|u| + (K*N)^m)^(1/m)     ');
 			disp(' ');
 			fielddisplay(self,'C','friction coefficient [SI]');
 			fielddisplay(self,'m','m exponent');
-			fielddisplay(self,'K','(K*N)^m to be velocity controling plastic limit');
+			fielddisplay(self,'K','(K*N)^m to be velocity controlling plastic limit');
 			fielddisplay(self,'effective_pressure_limit','Neff do not allow to fall below a certain limit: effective_pressure_limit*rho_ice*g*thickness (default 0)');
 		end % }}}
 		function marshall(self,prefix,md,fid) % {{{
 			yts=md.constants.yts;
 
 			WriteData(fid,prefix,'name','md.friction.law','data',15,'format','Integer');
-			WriteData(fid,prefix,'class','friction','object',self,'fieldname','C','format','DoubleMat','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',md.constants.yts);
-			WriteData(fid,prefix,'class','friction','object',self,'fieldname','K','format','DoubleMat','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',md.constants.yts);
+			WriteData(fid,prefix,'class','friction','object',self,'fieldname','C','format','DoubleMat','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',yts);
+			WriteData(fid,prefix,'class','friction','object',self,'fieldname','K','format','DoubleMat','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',yts);
 			WriteData(fid,prefix,'class','friction','object',self,'fieldname','m','format','DoubleMat','mattype',2);
 			WriteData(fid,prefix,'object',self,'class','friction','fieldname','effective_pressure_limit','format','Double');
 		end % }}}

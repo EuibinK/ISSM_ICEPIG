@@ -63,7 +63,7 @@ WRAPPER(Kriging_python){
 	if(nlhs>=1) WriteData(PREDICTIONS,predictions,M_interp,N_interp);
 	if(nlhs==2) WriteData(ERROR,error,M_interp,N_interp);
 
-	/*Free ressources: */
+	/*Free resources: */
 	xDelete<double>(x);
 	xDelete<double>(y);
 	xDelete<double>(observations);

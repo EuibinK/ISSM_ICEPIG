@@ -83,6 +83,7 @@ class toolkits(object):
             'DefaultAnalysis',
             'RecoveryAnalysis',
             'StressbalanceAnalysis',
+            'StressbalanceVerticalAnalysis',
             'GLheightadvectionAnalysis',
             'MasstransportAnalysis',
             'ThermalAnalysis',

@@ -434,11 +434,13 @@ void TransientInput::SetCurrentTimeInput(IssmDouble time){/*{{{*/
 
 	/*First, recover current time from parameters: */
 	bool linear_interp,average,cycle;
+	int  timestepping;
 	IssmDouble dt;
 	this->parameters->FindParam(&linear_interp,TimesteppingInterpForcingEnum);
 	this->parameters->FindParam(&average,TimesteppingAverageForcingEnum);
 	this->parameters->FindParam(&cycle,TimesteppingCycleForcingEnum);
 	this->parameters->FindParam(&dt,TimesteppingTimeStepEnum);          /*transient core time step*/
+	this->parameters->FindParam(&timestepping,TimesteppingTypeEnum);
 
 	if(cycle){
 
@@ -446,11 +448,14 @@ void TransientInput::SetCurrentTimeInput(IssmDouble time){/*{{{*/
 		IssmDouble time0 = this->timesteps[0];
 		IssmDouble time1 = this->timesteps[this->numtimesteps - 1];
 
-		/*We need the end time to be the last timestep that would be taken*/
-		/* i.e., the case where GEMB has time stamps (finer timestep) after the last timestep */
-		IssmDouble nsteps = reCast<int,IssmDouble>(time1/dt);
-		if (reCast<IssmDouble>(nsteps)<time1/dt) nsteps=nsteps+1;
-		time1 = nsteps*dt;
+		if(timestepping!=AdaptiveTimesteppingEnum){
+			/*We need the end time to be the last timestep that would be taken*/
+			/* i.e., the case where GEMB has time stamps (finer timestep) after the last timestep */
+			/* warning: this assumes dt = constant!!*/
+			IssmDouble nsteps = reCast<int,IssmDouble>(time1/dt);
+			if (reCast<IssmDouble>(nsteps)<time1/dt) nsteps=nsteps+1;
+			time1 = nsteps*dt;
+		}
 
 		/*See by how many intervals we have to offset time*/
 		IssmDouble deltat = time1-time0;
@@ -557,7 +562,6 @@ void TransientInput::SetAverageAsCurrentTimeInput(IssmDouble start_time,IssmDoub
 	IssmDouble  dtsum=0;
 	IssmDouble  timespan,mid_step;
 	int         found,start_offset,end_offset,input_offset;
-
 
 	/*go through the timesteps, and grab offset for start and end*/
 	found=binary_search(&start_offset,start_time,this->timesteps,this->numtimesteps);

@@ -138,7 +138,7 @@ classdef basalforcingsbeckmanngoosse
 				WriteData(fid,prefix,'object',self,'fieldname','ocean_temp','format','DoubleMat','name','md.basalforcings.ocean_temp','mattype',1,'timeserieslength',md.mesh.numberofvertices+1);
 				WriteData(fid,prefix,'object',self,'fieldname','ocean_salinity','format','DoubleMat','name','md.basalforcings.ocean_salinity','mattype',1,'timeserieslength',md.mesh.numberofvertices+1);
 			elseif(self.isthermalforcing==1)
-				WriteData(fid,prefix,'object',self,'fieldname','ocean_thermalforcing','format','DoubleMat','name','md.basalforcings.ocean_thermalforcing','mattype',1,'timeserieslength',md.mesh.numberofvertices+1);
+				WriteData(fid,prefix,'object',self,'fieldname','ocean_thermalforcing','format','DoubleMat','name','md.basalforcings.ocean_thermalforcing','mattype',1,'timeserieslength',md.mesh.numberofvertices+1,'yts',md.constants.yts);
 			end
 		end % }}}
 	end

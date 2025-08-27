@@ -2,7 +2,7 @@ import numpy as np
 
 
 def expwrite(contours, filename):
-    """EXPWRITE - write an Argus file from a dictionary given in input
+    """expwrite - write an Argus file from a dictionary given in input
 
     This routine writes an Argus file from a dict containing the fields:
     x and y of the coordinates of the points.
@@ -15,7 +15,10 @@ def expwrite(contours, filename):
     Example:
         expwrite(coordstruct, 'domainoutline.exp')
 
-    See also EXPDOC, EXPREAD, EXPWRITEASVERTICES
+    See also:
+    - expdoc
+    - expread
+    - expwriteasvertices
     """
 
     fid = open(filename, 'w')

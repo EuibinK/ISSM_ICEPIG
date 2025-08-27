@@ -18,6 +18,8 @@
 #include "./Elements/Elements.h"
 #include "./FemModel.h"
 #include "../modules/SurfaceAreax/SurfaceAreax.h"
+#include "../modules/OutputDefinitionsResponsex/OutputDefinitionsResponsex.h"
+#include "../modules/GetVectorFromInputsx/GetVectorFromInputsx.h"
 #include "../classes/Params/Parameters.h"
 #include "../classes/gauss/Gauss.h"
 /*}}}*/
@@ -225,12 +227,15 @@ IssmDouble Misfit::Response(FemModel* femmodel){/*{{{*/
 	 else{ /*global computation: {{{ */
 
 		 IssmDouble model, observation;
+		 int ierr;
 
 		 /*If we are locked, return time average: */
 		 if(this->lock) return misfit/(time-starttime);
 
 		 /*First, the global  model response: */
-		 model=OutputDefinitionsResponsex(femmodel,this->model_enum);
+		 ierr = OutputDefinitionsResponsex(&model, femmodel, this->model_enum);
+		 if(ierr) _error_("could not evaluate response");
+
 		 /*Now, the observation is buried inside the elements, go fish it in the first element (cludgy, needs fixing): */
 		 Element* element = (Element*)femmodel->elements->GetObjectByOffset(0); _assert_(element);
 		 Input*  input   = element->GetInput(observation_enum); _assert_(input);

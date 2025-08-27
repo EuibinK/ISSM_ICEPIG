@@ -172,7 +172,8 @@ if (datasize(1)==numberofelements & datasize(2)==1),
 		bounds=getfieldvalue(options,'caxis',[min(data(:)) max(data(:))]);
 		data(find(data<bounds(1)))=bounds(1);
 		if any(data<=0),
-			error('Log option cannot be applied on negative values. Use caxis option (Rignot''s settings: [1.5 max(data)])');
+			warning('Log option cannot be applied on negative values. Using 1 as default, otherwise use ''caxis'' option');
+			data(find(data<0)) = 1;
 		end
 		pos=find(~isnan(data));
 		data(pos)=log(data(pos))/log(getfieldvalue(options,'log'));
@@ -202,7 +203,8 @@ if (datasize(1)==numberofvertices & datasize(2)==1),
 		bounds=getfieldvalue(options,'caxis_pre',[min(data(:)) max(data(:))]);
 		data(find(data<bounds(1)))=bounds(1);
 		if any(data<=0),
-			error('Log option cannot be applied on negative values. Use caxis option (Rignot''s settings: [1.5 max(data)])');
+			warning('Log option cannot be applied on negative values. Using 1 as default, otherwise use ''caxis'' option');
+			data(find(data<0)) = 1;
 		end
 		pos=find(~isnan(data));
 		data(pos)=log(data(pos))/log(getfieldvalue(options,'log'));
@@ -220,8 +222,7 @@ end
 %control arrow density if quiverplot
 if datatype==3 & exist(options,'density')
 	databak=data;
-	%KASRA data=NaN*ones(datasize);
-    	data=NaN*ones(size(databak,1),size(databak,2)); %KASRA 
+	data=NaN*ones(datasize);
 	density=getfieldvalue(options,'density');
 	data(1:density:end,:)=databak(1:density:end,:);
 	clear databak

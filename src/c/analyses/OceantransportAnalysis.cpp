@@ -49,9 +49,9 @@ void OceantransportAnalysis::UpdateElements(Elements* elements,Inputs* inputs,Io
 		iomodel->FetchData(&modelid,"md.dsl.modelid");
 
 		/*replace dataset of forcings with only one, the modelid'th:*/
-		MmeToInputFromIdx(inputs,elements,modelid,OceantransportSpcbottompressureEnum, P1Enum);
-		MmeToInputFromIdx(inputs,elements,modelid,OceantransportSpcdslEnum, P1Enum);
-		MmeToInputFromIdx(inputs,elements,modelid,OceantransportSpcstrEnum, P0Enum);
+		MmeToInputFromIdx(inputs,elements,NULL,modelid,OceantransportSpcbottompressureEnum, P1Enum);
+		MmeToInputFromIdx(inputs,elements,NULL,modelid,OceantransportSpcdslEnum, P1Enum);
+		MmeToInputFromIdx(inputs,elements,NULL,modelid,OceantransportSpcstrEnum, P0Enum);
 	}
 
 	/*Initialize sea level cumulated sea level loads :*/
@@ -71,7 +71,7 @@ void OceantransportAnalysis::UpdateParameters(Parameters* parameters,IoModel* io
 	/*Deal with dsl multi-model ensembles: {{{*/
 	iomodel->FetchData(&dslmodel,"md.dsl.model");
 	if(dslmodel==2){
-		IssmDouble modelid; 
+		int modelid; 
 		int nummodels;
 
 		/*create double param, not int param, because Dakota will be updating it as 

@@ -27,7 +27,7 @@ if ((exist(options.list{1},'ncols') & ~exist(options.list{1},'ncols')) | (~exist
 	error('plotmodel error message: nlines and ncols  need to be specified together, or not at all');
 end
 
-% Add option for subplot, only support one subplot per one plotmodel call  northarrow
+% Add option for subplot, only support one subplot per one plotmodel call
 subindex = 0;
 if (exist(options.list{1},'subplot'))
     subops = getfieldvalue(options.list{1},'subplot',NaN);

@@ -48,7 +48,7 @@ WRAPPER(DistanceToMaskBoundary_python){
 	/*Write results: */
 	WriteData(DISTANCE,distance,nods);
 
-	/*Free ressources: */
+	/*Free resources: */
 	xDelete<double>(x);
 	xDelete<double>(y);
 	xDelete<double>(mask);

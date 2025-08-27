@@ -152,8 +152,8 @@ class SMBpdd(object):
             md = checkfield(md, 'fieldname', 'smb.rlapslgm', '>=', 0, 'numel', [1])
 
             if (self.isdelta18o == 0 and self.ismungsm == 0):
-                md = checkfield(md, 'fieldname', 'smb.monthlytemperatures', 'NaN', 1, 'Inf', 1, 'timeseries', 1)
-                md = checkfield(md, 'fieldname', 'smb.precipitation', 'NaN', 1, 'Inf', 1, 'timeseries', 1)
+                md = checkfield(md, 'fieldname', 'smb.monthlytemperatures', 'size', [md.mesh.numberofvertices, 12], 'NaN', 1, 'Inf', 1)
+                md = checkfield(md, 'fieldname', 'smb.precipitation', 'size', [md.mesh.numberofvertices, 12], 'NaN', 1, 'Inf', 1)
             elif self.isdelta18o:
                 md = checkfield(md, 'fieldname', 'smb.delta18o', 'NaN', 1, 'Inf', 1, 'size', [2, np.nan], 'singletimeseries', 1)
                 md = checkfield(md, 'fieldname', 'smb.delta18o_surface', 'NaN', 1, 'Inf', 1, 'size', [2, np.nan], 'singletimeseries', 1)

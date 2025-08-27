@@ -9,7 +9,6 @@ classdef dependent
 		fos_reverse_index    = NaN;
 		exp                  = '';
 		segments             = [];
-		index                = -1;
 		nods                 = 0;
 	end
 	methods
@@ -21,7 +20,6 @@ classdef dependent
 			self.name=getfieldvalue(options,'name','');
 			self.exp=getfieldvalue(options,'exp','');
 			self.segments=getfieldvalue(options,'segments',[]);
-			self.index=getfieldvalue(options,'index',-1);
 			self.nods=getfieldvalue(options,'nods',0);
 
 			%if name is mass flux: 

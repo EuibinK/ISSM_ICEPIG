@@ -94,7 +94,7 @@ classdef computecanada
 			 fprintf(fid,'#SBATCH --error=%s.errlog \n\n',modelname);
 			 fprintf(fid,'export ISSM_DIR="%s/../"\n',cluster.codepath); %FIXME
 			 fprintf(fid,'cd %s/%s\n\n',cluster.executionpath,dirname);
-			 fprintf(fid,'srun %s/issm.exe %s %s %s\n',cluster.codepath,solution,[cluster.executionpath '/' dirname],modelname);
+			 fprintf(fid,'srun -n %i %s/issm.exe %s %s %s\n',cluster.np(),cluster.codepath,solution,[cluster.executionpath '/' dirname],modelname); 
 			 if ~io_gather, %concatenate the output files:
 				 fprintf(fid,'cat %s.outbin.* > %s.outbin',modelname,modelname);
 			 end

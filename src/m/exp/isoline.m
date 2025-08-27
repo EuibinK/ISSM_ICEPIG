@@ -1,14 +1,17 @@
-function contours=isoline(md,field,varargin)
+function [contours edges_tria]=isoline(md,field,varargin)
 %ISOLINE - construct isovalue lines based on field provided
 %
 %   Usage:
-%      contours=isoline(md,field,varargin)
+%      [contours edges]=isoline(md,field,varargin)
 %
 %   Supported options:
 %      'value': isoline value, default is 0
 %      'output': 'struct' exp structure with individual contours (default)
 %                'matrix' contours are concatenated and separated by NaNs
 %                'filename.exp' saved as exp file
+%      'edges': if edges are returned (as a second output) after a first call
+%               they can be provided again so that isoline does not need to
+%               recreate a set of edges
 %
 %   Example:
 %      contours=isoline(md, md.results.TransientSolution(end).MaskOceanLevelset,'value',0);
@@ -29,12 +32,18 @@ else
 	y=md.mesh.y;
 	index=md.mesh.elements;
 end
+if exist(options,'amr')
+	amr = getfieldvalue(options,'amr');
+	x=amr.MeshX;
+	y=amr.MeshY;
+	index=amr.MeshElements;
+end
 
 %Deal with z coordinate
 if isprop(md.mesh,'z'),
 	z=md.mesh.z;
 else
-	z=zeros(md.mesh.numberofvertices,1);
+	z=zeros(numel(x),1);
 end
 
 if isempty(field), error('field provided is empty'); end
@@ -43,7 +52,7 @@ if dimension(md.mesh)==3,
 		error('field provided should be of size md.mesh.numberofvertices2d'); 
 	end
 else
-	if length(field)~=md.mesh.numberofvertices
+	if length(field)~=numel(x)
 		error('field provided should be of size md.mesh.numberofvertices'); 
 	end
 end
@@ -57,16 +66,20 @@ elementslist=1:numberofelements;
 c=[];
 h=[];
 
-%get unique edges in mesh
-%1: list of edges
-edges=[index(:,[1,2]); index(:,[2,3]); index(:,[3,1])];
-%2: find unique edges
-[edges,I,J]=unique(sort(edges,2),'rows');
-%3: unique edge numbers
-vec=J;
-%4: unique edges numbers in each triangle (2 triangles sharing the same edge will have
-%   the same edge number)
-edges_tria=[vec(elementslist), vec(elementslist+numberofelements), vec(elementslist+2*numberofelements)];
+if exist(options,'edges')
+	edges_tria = getfieldvalue(options, 'edges');
+else
+	%get unique edges in mesh
+	%1: list of edges
+	edges=[index(:,[1,2]); index(:,[2,3]); index(:,[3,1])];
+	%2: find unique edges
+	[edges,I,J]=unique(sort(edges,2),'rows');
+	%3: unique edge numbers
+	vec=J;
+	%4: unique edges numbers in each triangle (2 triangles sharing the same edge will have
+	%   the same edge number)
+	edges_tria=[vec(elementslist), vec(elementslist+numberofelements), vec(elementslist+2*numberofelements)];
+end
 
 %segments [nodes1 nodes2]
 Seg1=index(:,[1 2]);
@@ -159,7 +172,7 @@ for j=1:numelems,
 		edge_l(j,1)=Seg2_num(poselem(j));
 		edge_l(j,2)=Seg3_num(poselem(j));
 	else
-		%it shoud not go here
+		%should never get here
 	end
 end
 
@@ -257,6 +270,9 @@ elseif strcmp(outputformat(end-3:end),'.exp')
 	expwrite(contours,outputformat);
 elseif strcmp(outputformat,'struct')
 	%nothing to do, this is the default
+elseif strcmp(outputformat,'longest')
+	[~, mId] = max([contours.nods]);
+	contours = contours(mId);
 else
 	disp('output format not supported, returning struct');
 end

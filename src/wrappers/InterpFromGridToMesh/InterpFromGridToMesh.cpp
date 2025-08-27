@@ -53,11 +53,11 @@ WRAPPER(InterpFromGridToMesh_python){
 	}
 
 	/*Input datasets: */
-	FetchData(&x,&x_rows,NULL,XHANDLE);
-	FetchData(&y,&y_rows,NULL,YHANDLE);
+	FetchData(&x,&x_rows,XHANDLE);
+	FetchData(&y,&y_rows,YHANDLE);
 	FetchData(&data,&data_rows,&data_cols,DATAHANDLE);
-	FetchData(&x_mesh,&x_mesh_rows,NULL,XMESHHANDLE);
-	FetchData(&y_mesh,&y_mesh_rows,NULL,YMESHHANDLE);
+	FetchData(&x_mesh,&x_mesh_rows,XMESHHANDLE);
+	FetchData(&y_mesh,&y_mesh_rows,YMESHHANDLE);
 	FetchData(&default_value,DEFAULTHANDLE);
 
 	/* Run core computations: */
@@ -79,5 +79,6 @@ WRAPPER(InterpFromGridToMesh_python){
 	xDelete<double>(data);
 	xDelete<double>(x_mesh);
 	xDelete<double>(y_mesh);
+	delete data_mesh;
 	MODULEEND();
 }

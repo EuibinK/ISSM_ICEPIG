@@ -1,7 +1,6 @@
 /*!\file Matice.h
  * \brief: header file for matice object
  */
-#define _IS_MULTI_ICE_
 
 #ifndef MATICE_H_
 #define MATICE_H_
@@ -24,11 +23,7 @@ class Input;
 
 class Matice: public Material{
 
-	#ifdef _IS_MULTI_ICE_
-	protected: 
-	#else 
-	private:
-	#endif
+	private: 
 		int      mid;
 		bool     isdamaged;
 		bool     isenhanced;
@@ -90,10 +85,6 @@ class Matice: public Material{
 		void       ViscosityBHO(IssmDouble* pmudB,int dim,IssmDouble* xyz_list,Gauss* gauss,Input* vx_input,Input* vy_input,IssmDouble eps_eff){_error_("not supported");};
 		void       ViscosityBSSA(IssmDouble* pmudB,int dim,IssmDouble* xyz_list,Gauss* gauss,Input* vx_input,Input* vy_input,IssmDouble eps_eff){_error_("not supported");};
 		/*}}}*/
-		#ifdef _IS_MULTI_ICE_
-		IssmDouble GetMaterialValue( int materialPropEnum){return NAN;};
-		#endif
-
 };
 
 #endif  /* _MATICE_H_ */

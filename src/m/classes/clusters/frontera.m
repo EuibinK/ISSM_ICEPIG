@@ -10,15 +10,15 @@ classdef frontera
 		% {{{
 		name          = 'frontera'
 		login         = '';
-		modules        = {'petsc/3.15'};
-		numnodes      = 1;
+		modules        = {'intel/23.1.0', 'impi/21.9.0', 'petsc/3.21'};
+		numnodes      = 4;
 		cpuspernode   = 56;
 		port          = 0;
 		queue         = 'normal';
 		codepath      = '';
 		executionpath = '';
 		interactive   = 0;
-		time          = 48*60*60;
+		time          = 5;
 		email         = '';
 	end
 	%}}}
@@ -60,9 +60,9 @@ classdef frontera
 		function md = checkconsistency(cluster,md,solution,analyses) % {{{
 
 			%https://frontera-portal.tacc.utexas.edu/user-guide/running/
-			available_queues={'small','normal','development'};
-			queue_requirements_time=[48*60*60 48*60*60 2*60*60];
-			queue_requirements_np=[2*56 512*56 40*56];
+			available_queues={'flex','normal','development'};
+			queue_requirements_time=[48 48 2];
+			queue_requirements_np=[128*56 512*56 40*56];
 
 			QueueRequirements(available_queues,queue_requirements_time,queue_requirements_np,cluster.queue,cluster.nprocs(),cluster.time)
 
@@ -123,7 +123,11 @@ classdef frontera
 			fprintf(fid,'#SBATCH -e %s.errlog \n',modelname);
 			fprintf(fid,'#SBATCH -n %i \n',cluster.numnodes*max(cluster.nprocs()/cluster.numnodes,56));
 			fprintf(fid,'#SBATCH -N %i \n',cluster.numnodes);
-			fprintf(fid,'#SBATCH -t %02i:%02i:00 \n\n',floor(cluster.time/3600),floor(mod(cluster.time,3600)/60));
+			fprintf(fid,'#SBATCH -t %02i:00:00 \n\n',ceil(cluster.time));
+			if length(find(cluster.email=='@'))>0
+				fprintf(fid,'#SBATCH --mail-user=%s \n',cluster.email);
+				fprintf(fid,'#SBATCH --mail-type=all \n\n');
+			end
 			for i=1:numel(cluster.modules),
 				fprintf(fid,['module load ' cluster.modules{i} '\n']);
 			end
@@ -132,12 +136,6 @@ classdef frontera
 				fprintf(fid,'export KMP_AFFINITY="granularity=fine,compact,verbose" \n\n');
 			end
 
-			if length(find(cluster.email=='@'))>0
-				fprintf(fid,'#SBATCH --mail-user=%s \n',cluster.email);
-				fprintf(fid,'#SBATCH --mail-type=end \n\n');
-
-				%fprintf(fid,'ssh login1 "mail -s ''SLURM Jobid=${SLURM_JOBID} Name=${SLURM_JOB_NAME} Began on Lonestar 5.'' %s <<< ''Job Started'' " \n\n',cluster.email);
-			end
 
 			fprintf(fid,'export PATH="$PATH:."\n\n');
 			fprintf(fid,'export ISSM_DIR="%s/../"\n',cluster.codepath); %FIXME

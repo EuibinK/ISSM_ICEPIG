@@ -9,8 +9,6 @@
 #include "./Definition.h"
 #include "./FemModel.h"
 
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,int output_enum);
-
 class Cfsurfacelogvel: public Object, public Definition{
 
 	public: 
@@ -19,10 +17,12 @@ class Cfsurfacelogvel: public Object, public Definition{
 		char*       name;
 		IssmDouble	datatime;
 		bool			timepassedflag;
+		IssmDouble  J;
 
 		/*Cfsurfacelogvel constructors, destructors :*/
 		Cfsurfacelogvel();
-		Cfsurfacelogvel(char* in_name, int in_definitionenum, IssmDouble in_datatime, bool timepassedflag);
+		Cfsurfacelogvel(char* in_name, int in_definitionenum, IssmDouble in_datatime);
+		Cfsurfacelogvel(char* in_name, int in_definitionenum, IssmDouble in_datatime, bool timepassedflag, IssmDouble in_J);
 		~Cfsurfacelogvel();
 
 		/*Object virtual function resolutoin: */

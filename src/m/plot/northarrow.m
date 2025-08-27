@@ -68,7 +68,7 @@ D=Ap+[-width/2*sin(alpha)
 %Plot arrow
 hold on
 p1=patch([A(1) B(1) C(1) D(1)],[A(2) B(2) C(2) D(2)],'Black');
-%p2=patch([E(1) F(1) G(1) H(1)],[E(2) F(2) G(2) H(2)],'Black');
+p2=patch([E(1) F(1) G(1) H(1)],[E(2) F(2) G(2) H(2)],'Black');
 
 %Text North
 xN=max([A(1) D(1) E(1) F(1) G(1)])+ratio/3*abs(lengtharrow);

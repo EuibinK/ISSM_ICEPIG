@@ -1,8 +1,6 @@
 /*!\file: CreateParameters.cpp
  * \brief general driver for creating parameters dataset
  */
-// Revision History
-#define _IS_MULTI_ICE_
 
 #ifdef HAVE_CONFIG_H
 	#include <config.h>
@@ -13,7 +11,6 @@
 #include "../../toolkits/toolkits.h"
 #include "../../classes/classes.h"
 #include "../../shared/shared.h"
-#include "../MeshPartitionx/MeshPartitionx.h"
 #include "../ParseToolkitsOptionsx/ParseToolkitsOptionsx.h"
 #include "./ModelProcessorx.h"
 
@@ -77,8 +74,10 @@ void CreateParameters(Parameters* parameters,IoModel* iomodel,char* rootpath,FIL
 		parameters->AddObject(iomodel->CopyConstantObject("md.groundingline.migration",GroundinglineMigrationEnum));
 		parameters->AddObject(iomodel->CopyConstantObject("md.groundingline.friction_interpolation",GroundinglineFrictionInterpolationEnum));
 		parameters->AddObject(iomodel->CopyConstantObject("md.groundingline.melt_interpolation",GroundinglineMeltInterpolationEnum));
+		parameters->AddObject(iomodel->CopyConstantObject("md.groundingline.intrusion_distance",GroundinglineIntrusionDistanceEnum));
 		parameters->AddObject(iomodel->CopyConstantObject("md.transient.isstressbalance",TransientIsstressbalanceEnum));
 		parameters->AddObject(iomodel->CopyConstantObject("md.transient.ismasstransport",TransientIsmasstransportEnum));
+		parameters->AddObject(iomodel->CopyConstantObject("md.transient.ismmemasstransport",TransientIsmmemasstransportEnum));
 		parameters->AddObject(iomodel->CopyConstantObject("md.transient.isoceantransport",TransientIsoceantransportEnum));
 		parameters->AddObject(iomodel->CopyConstantObject("md.transient.isage",TransientIsageEnum));
 		parameters->AddObject(iomodel->CopyConstantObject("md.transient.issmb",TransientIssmbEnum));
@@ -349,13 +348,6 @@ void CreateParameters(Parameters* parameters,IoModel* iomodel,char* rootpath,FIL
 	iomodel->FindConstant(&materialstype,"md.materials.type");
 
 	switch(materialstype){
-#ifdef _IS_MULTI_ICE_
-		case MatMultiIceEnum: 
-			parameters->AddObject(iomodel->CopyConstantObject("md.constants.g",ConstantsGEnum));
-			parameters->AddObject(iomodel->CopyConstantObject("md.constants.referencetemperature",ConstantsReferencetemperatureEnum));
-		break;
-#endif
-
 		case MaticeEnum:
 		case MatdamageiceEnum:
 		case MatenhancediceEnum:
@@ -371,6 +363,7 @@ void CreateParameters(Parameters* parameters,IoModel* iomodel,char* rootpath,FIL
 			parameters->AddObject(iomodel->CopyConstantObject("md.materials.latentheat",MaterialsLatentheatEnum));
 			parameters->AddObject(iomodel->CopyConstantObject("md.materials.beta",MaterialsBetaEnum));
 			parameters->AddObject(iomodel->CopyConstantObject("md.materials.meltingpoint",MaterialsMeltingpointEnum));
+			parameters->AddObject(iomodel->CopyConstantObject("md.materials.rheology_phi",MaterialsRheologyPhiEnum));
 			parameters->AddObject(iomodel->CopyConstantObject("md.constants.referencetemperature",ConstantsReferencetemperatureEnum));
 			parameters->AddObject(iomodel->CopyConstantObject("md.materials.mixed_layer_capacity",MaterialsMixedLayerCapacityEnum));
 			parameters->AddObject(iomodel->CopyConstantObject("md.materials.thermal_exchange_velocity",MaterialsThermalExchangeVelocityEnum));
@@ -403,6 +396,7 @@ void CreateParameters(Parameters* parameters,IoModel* iomodel,char* rootpath,FIL
 						parameters->AddObject(iomodel->CopyConstantObject("md.materials.latentheat",MaterialsLatentheatEnum));
 						parameters->AddObject(iomodel->CopyConstantObject("md.materials.beta",MaterialsBetaEnum));
 						parameters->AddObject(iomodel->CopyConstantObject("md.materials.meltingpoint",MaterialsMeltingpointEnum));
+						parameters->AddObject(iomodel->CopyConstantObject("md.materials.rheology_phi",MaterialsRheologyPhiEnum));
 						parameters->AddObject(iomodel->CopyConstantObject("md.constants.referencetemperature",ConstantsReferencetemperatureEnum));
 						parameters->AddObject(iomodel->CopyConstantObject("md.materials.mixed_layer_capacity",MaterialsMixedLayerCapacityEnum));
 						parameters->AddObject(iomodel->CopyConstantObject("md.materials.thermal_exchange_velocity",MaterialsThermalExchangeVelocityEnum));
@@ -497,8 +491,20 @@ void CreateParameters(Parameters* parameters,IoModel* iomodel,char* rootpath,FIL
 			parameters->AddObject(iomodel->CopyConstantObject("md.smb.rdl",SmbRdlEnum));
 			parameters->AddObject(iomodel->CopyConstantObject("md.smb.ismethod",SmbSemicMethodEnum));
 			break;
-		case SMBdebrisMLEnum:
-			break;
+		case SMBdebrisEvattEnum:
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.qlaps",SmbDesfacEnum));
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.rlaps",SmbRlapsEnum));
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.dsgrad",SmbSWgradEnum));
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.dlgrad",SmbLWgradEnum));
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.windspeedgrad",SmbWindspeedgradEnum));
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.humiditygrad",SmbHumiditygradEnum));
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.icealbedo",SmbIcealbedoEnum));
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.snowalbedo",SmbSnowalbedoEnum));
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.debrisalbedo",SmbDebrisalbedoEnum));
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.isAnderson",SmbDebrisIsAndersonEnum));
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.iscryokarst",SmbDebrisIsCryokarstEnum));
+                        parameters->AddObject(iomodel->CopyConstantObject("md.smb.AndersonD0",SmbDebrisAndersonD0Enum));
+                        break;
 		default:
 			_error_("Surface mass balance model "<<EnumToStringx(smb_model)<<" not supported yet");
 	}
@@ -583,11 +589,12 @@ void CreateParameters(Parameters* parameters,IoModel* iomodel,char* rootpath,FIL
 	/*Stochastic Effective Pressure false by default*/
 	parameters->AddObject(new BoolParam(StochasticForcingIsWaterPressureEnum,false));
    if(isstochasticforcing){
-      int num_fields,stochastic_dim;
+      int num_fields,num_tcov,stochastic_dim;
       char** fields;
       parameters->AddObject(iomodel->CopyConstantObject("md.stochasticforcing.num_fields",StochasticForcingNumFieldsEnum));
       parameters->AddObject(iomodel->CopyConstantObject("md.stochasticforcing.defaultdimension",StochasticForcingDefaultDimensionEnum));
       parameters->AddObject(iomodel->CopyConstantObject("md.stochasticforcing.stochastictimestep",StochasticForcingTimestepEnum));
+      parameters->AddObject(iomodel->CopyConstantObject("md.stochasticforcing.num_timescovariance",StochasticForcingNumTimesCovarianceEnum));
       iomodel->FindConstant(&fields,&num_fields,"md.stochasticforcing.fields");
       if(num_fields<1) _error_("no stochasticforcing fields found");
       int* stochasticforcing_enums = xNew<int>(num_fields);
@@ -601,6 +608,9 @@ void CreateParameters(Parameters* parameters,IoModel* iomodel,char* rootpath,FIL
       parameters->AddObject(iomodel->CopyConstantObject("md.stochasticforcing.randomflag",StochasticForcingRandomflagEnum));
       iomodel->FetchData(&transparam,&M,&N,"md.stochasticforcing.dimensions");
       parameters->AddObject(new IntVecParam(StochasticForcingDimensionsEnum,transparam,N));
+      xDelete<IssmDouble>(transparam);
+      iomodel->FetchData(&transparam,&M,&N,"md.stochasticforcing.timecovariance");
+      parameters->AddObject(new DoubleVecParam(StochasticForcingTimeCovarianceEnum,transparam,N));
       xDelete<IssmDouble>(transparam);
       iomodel->FetchData(&transparam,&M,&N,"md.stochasticforcing.covariance");
       parameters->AddObject(new DoubleMatParam(StochasticForcingCovarianceEnum,transparam,M,N));

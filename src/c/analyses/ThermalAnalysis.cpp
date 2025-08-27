@@ -1,5 +1,3 @@
-#define _IS_MULTI_ICE_
-
 #include "./ThermalAnalysis.h"
 #include "../toolkits/toolkits.h"
 #include "../classes/classes.h"
@@ -165,9 +163,6 @@ void ThermalAnalysis::UpdateElements(Elements* elements,Inputs* inputs,IoModel* 
 			iomodel->FetchDataToInput(inputs,elements,"md.materials.rheology_Ec",MaterialsRheologyEcEnum);
 			iomodel->FetchDataToInput(inputs,elements,"md.materials.rheology_Es",MaterialsRheologyEsEnum);
 			break;
-		#ifdef _IS_MULTI_ICE_
-		case MatMultiIceEnum:
-		#endif
 		case MaticeEnum:
 			iomodel->FetchDataToInput(inputs,elements,"md.materials.rheology_n",MaterialsRheologyNEnum);
 			break;
@@ -299,7 +294,7 @@ ElementMatrix* ThermalAnalysis::CreateKMatrixVolume(Element* element){/*{{{*/
 	int         stabilization;
 	IssmDouble  Jdet,dt,u,v,w,um,vm,wm,vel;
 	IssmDouble  h,hx,hy,hz,vx,vy,vz,D_scalar;
-	IssmDouble  tau_parameter,diameter;
+	IssmDouble  tau_parameter,diameter,factor;
 	IssmDouble  tau_parameter_anisotropic[2],tau_parameter_hor,tau_parameter_ver;	
 	IssmDouble* xyz_list = NULL;
 
@@ -341,11 +336,11 @@ ElementMatrix* ThermalAnalysis::CreateKMatrixVolume(Element* element){/*{{{*/
 		if(dt!=0.) D_scalar=D_scalar*dt;
 
 		/*Conduction: */
+		factor = D_scalar*kappa;
 		for(int i=0;i<numnodes;i++){
 			for(int j=0;j<numnodes;j++){
-				Ke->values[i*numnodes+j] += D_scalar*kappa*(
-							dbasis[0*numnodes+j]*dbasis[0*numnodes+i] + dbasis[1*numnodes+j]*dbasis[1*numnodes+i] + dbasis[2*numnodes+j]*dbasis[2*numnodes+i]
-							);
+				Ke->values[i*numnodes+j] += factor*(
+							dbasis[0*numnodes+j]*dbasis[0*numnodes+i] + dbasis[1*numnodes+j]*dbasis[1*numnodes+i] + dbasis[2*numnodes+j]*dbasis[2*numnodes+i]);
 			}
 		}
 
@@ -373,9 +368,10 @@ ElementMatrix* ThermalAnalysis::CreateKMatrixVolume(Element* element){/*{{{*/
 			element->ElementSizes(&hx,&hy,&hz);
 			vel=sqrt(vx*vx + vy*vy + vz*vz)+1.e-14;
 			h=sqrt( pow(hx*vx/vel,2) + pow(hy*vy/vel,2) + pow(hz*vz/vel,2));
-			K[0][0]=h/(2.*vel)*fabs(vx*vx);  K[0][1]=h/(2.*vel)*fabs(vx*vy); K[0][2]=h/(2.*vel)*fabs(vx*vz);
-			K[1][0]=h/(2.*vel)*fabs(vy*vx);  K[1][1]=h/(2.*vel)*fabs(vy*vy); K[1][2]=h/(2.*vel)*fabs(vy*vz);
-			K[2][0]=h/(2.*vel)*fabs(vz*vx);  K[2][1]=h/(2.*vel)*fabs(vz*vy); K[2][2]=h/(2.*vel)*fabs(vz*vz);
+			factor = h/(2.*vel);
+			K[0][0]=factor*fabs(vx*vx);  K[0][1]=factor*fabs(vx*vy); K[0][2]=factor*fabs(vx*vz);
+			K[1][0]=factor*fabs(vy*vx);  K[1][1]=factor*fabs(vy*vy); K[1][2]=factor*fabs(vy*vz);
+			K[2][0]=factor*fabs(vz*vx);  K[2][1]=factor*fabs(vz*vy); K[2][2]=factor*fabs(vz*vz);
 			for(int i=0;i<3;i++) for(int j=0;j<3;j++) K[i][j] = D_scalar*K[i][j];
 
 			for(int i=0;i<numnodes;i++){
@@ -391,18 +387,20 @@ ElementMatrix* ThermalAnalysis::CreateKMatrixVolume(Element* element){/*{{{*/
 		else if(stabilization==2){
 			diameter=element->MinEdgeLength(xyz_list);
 			tau_parameter=element->StabilizationParameter(u-um,v-vm,w-wm,diameter,kappa);
+
+			factor = tau_parameter*D_scalar;
 			for(int i=0;i<numnodes;i++){
 				for(int j=0;j<numnodes;j++){
-					Ke->values[i*numnodes+j]+=tau_parameter*D_scalar*
+					Ke->values[i*numnodes+j]+=factor*
 					  ((u-um)*dbasis[0*numnodes+i]+(v-vm)*dbasis[1*numnodes+i]+(w-wm)*dbasis[2*numnodes+i])*
 					  ((u-um)*dbasis[0*numnodes+j]+(v-vm)*dbasis[1*numnodes+j]+(w-wm)*dbasis[2*numnodes+j]);
 				}
 			}
 			if(dt!=0.){
-				D_scalar=gauss->weight*Jdet;
+				D_scalar=gauss->weight*Jdet*tau_parameter;
 				for(int i=0;i<numnodes;i++){
 					for(int j=0;j<numnodes;j++){
-						Ke->values[i*numnodes+j]+=tau_parameter*D_scalar*basis[j]*((u-um)*dbasis[0*numnodes+i]+(v-vm)*dbasis[1*numnodes+i]+(w-wm)*dbasis[2*numnodes+i]);
+						Ke->values[i*numnodes+j]+=D_scalar*basis[j]*((u-um)*dbasis[0*numnodes+i]+(v-vm)*dbasis[1*numnodes+i]+(w-wm)*dbasis[2*numnodes+i]);
 					}
 				}
 			}
@@ -687,6 +685,7 @@ void           ThermalAnalysis::InputUpdateFromSolution(IssmDouble* solution,Ele
 		//if(values[i]<0)      _printf_("temperature < 0°K found in solution vector\n");
 		//if(values[i]>275)    _printf_("temperature > 275°K found in solution vector (Paterson's rheology associated is negative)\n");
 	}
+
 	/*Force temperature between [Tpmp-50 Tpmp] to disable penalties*/
 	if(hack){
 		IssmDouble* pressure = xNew<IssmDouble>(numnodes);
@@ -715,55 +714,45 @@ void           ThermalAnalysis::InputUpdateFromSolution(IssmDouble* solution,Ele
 		 * otherwise the rheology could be negative*/
 		element->FindParam(&rheology_law,MaterialsRheologyLawEnum);
 		element->GetInputListOnNodes(&surface[0],SurfaceEnum);
-		#ifdef _IS_MULTI_ICE_
-		if(element->material->ObjectEnum()!=MatMultiIceEnum){  
-		#endif
-			switch(rheology_law){
-				case NoneEnum:
-					/*Do nothing: B is not temperature dependent*/
-					break;
-				case BuddJackaEnum:
-					for(i=0;i<numnodes;i++) B[i]=BuddJacka(values[i]);
-					element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
-					break;
-				case CuffeyEnum:
-					for(i=0;i<numnodes;i++) B[i]=Cuffey(values[i]);
-					element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
-					break;
-				case PatersonEnum:
-					for(i=0;i<numnodes;i++) B[i]=Paterson(values[i]);
-					element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
-					break;
-				case NyeH2OEnum:
-					for(i=0;i<numnodes;i++) B[i]=NyeH2O(values[i]);
-					element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
-					break;
-				case GBSH2OEnum:
-					for(i=0;i<numnodes;i++) B[i]=GBSH2O(values[i]);
-					element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
-					break;  
-				case NyeCO2Enum:
-					for(i=0;i<numnodes;i++) B[i]=NyeCO2(values[i]);
-					element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
-					break;
-				#ifdef _IS_MULTI_ICE_
-				case NyeN2Enum:{
-					for(i=0;i<numnodes;i++) B[i]=NyeN2(values[i]);
-					element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
+
+		switch(rheology_law){
+			case NoneEnum:
+				/*Do nothing: B is not temperature dependent*/
+				break;
+			case BuddJackaEnum:
+				for(i=0;i<numnodes;i++) B[i]=BuddJacka(values[i]);
+				element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
+				break;
+			case CuffeyEnum:
+				for(i=0;i<numnodes;i++) B[i]=Cuffey(values[i]);
+				element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
+				break;
+			case PatersonEnum:
+				for(i=0;i<numnodes;i++) B[i]=Paterson(values[i]);
+				element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
+				break;
+			case NyeH2OEnum:
+				for(i=0;i<numnodes;i++) B[i]=NyeH2O(values[i]);
+				element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
+				break; 
+			case GBSH2OEnum:{
+				IssmDouble phi = element->FindParam(MaterialsRheologyPhiEnum);
+				for(i=0;i<numnodes;i++) B[i]=GBSH2O(values[i],phi);
+				element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
 				break;}
-				#endif
-				case ArrheniusEnum:{
-					element->GetVerticesCoordinates(&xyz_list);
-					for(i=0;i<numnodes;i++) B[i]=Arrhenius(values[i],surface[i]-xyz_list[i*3+2],n[i]);
-					element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
-					break;
-					}
-				default:
-					_error_("Rheology law " << EnumToStringx(rheology_law) << " not supported yet");
-			}
-		#ifdef _IS_MULTI_ICE_
+			case NyeCO2Enum:
+				for(i=0;i<numnodes;i++) B[i]=NyeCO2(values[i]);
+				element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
+				break;
+			case ArrheniusEnum:{
+				element->GetVerticesCoordinates(&xyz_list);
+				for(i=0;i<numnodes;i++) B[i]=Arrhenius(values[i],surface[i]-xyz_list[i*3+2],n[i]);
+				element->AddInput(MaterialsRheologyBEnum,&B[0],element->GetElementType());
+				break;
+				}
+			default:
+				_error_("Rheology law " << EnumToStringx(rheology_law) << " not supported yet");
 		}
-		#endif
 		xDelete<IssmDouble>(n);
 	}
 	else{

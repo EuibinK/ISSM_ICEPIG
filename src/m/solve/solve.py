@@ -10,7 +10,7 @@ from waitonlock import waitonlock
 
 
 def solve(md, solutionstring, *args):
-    """SOLVE - apply solution sequence for this model
+    """solve - apply solution sequence for this model
 
     Usage:
         md = solve(md, solutionstring, varargin)
@@ -97,7 +97,7 @@ def solve(md, solutionstring, *args):
     # Check model consistency
     if options.getfieldvalue('checkconsistency', 'yes') == 'yes':
         if md.verbose.solution:
-            print("checking model consistency")
+            print('checking model consistency')
         ismodelselfconsistent(md)
 
     # If we are restarting, actually use the provided runtime name
@@ -111,7 +111,7 @@ def solve(md, solutionstring, *args):
         else:
             if options.getfieldvalue('runtimename', True):
                 c = datetime.now()
-                md.private.runtimename = "%s-%02i-%02i-%04i-%02i-%02i-%02i-%i" % (md.miscellaneous.name, c.month, c.day, c.year, c.hour, c.minute, c.second, os.getpid())
+                md.private.runtimename = '%s-%02i-%02i-%04i-%02i-%02i-%02i-%i' % (md.miscellaneous.name, c.month, c.day, c.year, c.hour, c.minute, c.second, os.getpid())
             else:
                 md.private.runtimename = md.miscellaneous.name
 

@@ -5,7 +5,6 @@
 #include "../../../toolkits/toolkits.h"
 #include "../../../classes/classes.h"
 #include "../../../shared/shared.h"
-#include "../../MeshPartitionx/MeshPartitionx.h"
 #include "../ModelProcessorx.h"
 
 void	UpdateElementsAndMaterialsControl(Elements* elements,Parameters* parameters,Inputs* inputs,Materials* materials, IoModel* iomodel){
@@ -84,7 +83,7 @@ void	UpdateElementsAndMaterialsControl(Elements* elements,Parameters* parameters
 		}
 		for(Object* & object : elements->objects){
 			Element* element=xDynamicCast<Element*>(object);
-			element->DatasetInputAdd(InversionCostFunctionsCoefficientsEnum,&weights[i*iomodel->numberofvertices],inputs,iomodel,M,1,1,cost_function,7,cost_function);
+			element->DatasetInputAdd(InversionCostFunctionsCoefficientsEnum,&weights[i*iomodel->numberofvertices],inputs,iomodel,M,1,1,cost_function,cost_function);
 		}
 	}
 	parameters->AddObject(new IntParam(ControlInputSizeMEnum,iomodel->numberofvertices));
@@ -116,6 +115,7 @@ void	UpdateElementsAndMaterialsControl(Elements* elements,Parameters* parameters
 	int offset = 0;
 	for(int i=0;i<num_controls;i++){
 		control = control_enums[i];
+		if(!IsInputEnum(control)) _error_("Only inputs can be parameters except if you use AD");
 		scale   = 1.;
 
 		switch(control){
@@ -229,8 +229,8 @@ void UpdateElementsAndMaterialsControlAD(Elements* elements,Parameters* paramete
 	iomodel->FetchMultipleData(&names,&M,"md.autodiff.independent_name"); _assert_(M==num_independent_objects);
 	iomodel->FetchMultipleData(&types,&M,"md.autodiff.independent_type"); _assert_(M==num_independent_objects);
 
-	int* M_all = xNew<int>(num_independent_objects);
-	int* N_all = xNew<int>(num_independent_objects);
+	int* M_all = NULL;
+	int* N_all = NULL;
 	int* Interp_all = xNew<int>(num_independent_objects);
 
 	/*create independent objects, and at the same time, fetch the corresponding independent variables, 
@@ -263,9 +263,12 @@ void UpdateElementsAndMaterialsControlAD(Elements* elements,Parameters* paramete
 					independents_max[N*m+n]=independents_fullmax[i][N*m+n];
 				}
 			}
-			if(N!=1) M_all[i]=M-1;
 
 			if(IsInputEnum(input_enum)){
+
+				/*remove last row if time series*/
+				if(N!=1) M_all[i]=M-1;
+
 				if(M_all[i]==iomodel->numberofvertices){
 					Interp_all[i] = P1Enum;
 				}
@@ -282,7 +285,14 @@ void UpdateElementsAndMaterialsControlAD(Elements* elements,Parameters* paramete
 				}
 			}
 			else if(IsParamEnum(input_enum)){
-				_error_("not supported yet");
+				//_error_("not supported yet");
+				Interp_all[i] = DummyEnum; //Placeholder
+				parameters->AddObject(new ControlParam(independent,independents_min,independents_max,input_enum,M_all[i],N_all[i]));
+
+				if(M!=1){
+					_assert_(M==2); //TransientParam
+					M_all[i]=M-1;
+				}
 			}
 			xDelete<IssmDouble>(independent);
 			xDelete<IssmDouble>(independents_min);
@@ -300,14 +310,16 @@ void UpdateElementsAndMaterialsControlAD(Elements* elements,Parameters* paramete
 	/*cleanup*/
 	for(int i=0;i<num_independent_objects;i++){
 		xDelete<char>(names[i]);
+		xDelete<IssmDouble>(independents_fullmin[i]);
+		xDelete<IssmDouble>(independents_fullmax[i]);
 	}
 	xDelete<char*>(names);
 	xDelete<int>(types);
 	xDelete<int>(M_all);
 	xDelete<int>(N_all);
 	xDelete<int>(Interp_all);
-	xDelete<IssmDouble>(independents_fullmin);
-	xDelete<IssmDouble>(independents_fullmax);
+	xDelete<IssmDouble*>(independents_fullmin);
+	xDelete<IssmDouble*>(independents_fullmax);
 	xDelete<int>(control_sizes);
 
 	return;

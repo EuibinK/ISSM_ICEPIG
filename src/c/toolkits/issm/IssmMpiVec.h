@@ -587,14 +587,19 @@ class IssmMpiVec:public IssmAbsVec<doubletype>{
 		}
 		/*}}}*/
 		void Pow(doubletype scale_factor){/*{{{*/
-
-			int i;
-			for(i=0;i<this->M;i++)this->vector[i]=pow(this->vector[i],scale_factor);
-
+			for(int i=0;i<this->M;i++)this->vector[i]=pow(this->vector[i],scale_factor);
 		}
 		/*}}}*/
 		void Sum(doubletype* pvalue){/*{{{*/
-			_error_("not support yet!");
+
+			doubletype local_sum=0;
+			doubletype sum;
+
+			for(int i=0;i<this->m;i++) local_sum+=this->vector[i];
+			ISSM_MPI_Reduce(&local_sum, &sum, 1, ISSM_MPI_DOUBLE, ISSM_MPI_SUM, 0, IssmComm::GetComm());
+			ISSM_MPI_Bcast(&sum,1,ISSM_MPI_DOUBLE,0,IssmComm::GetComm());
+			*pvalue=sum;
+
 		}
 		/*}}}*/
 		void BucketsBuildScatterBuffers(int** pnumvalues_forcpu,int** prow_indices_forcpu,doubletype** pvalues_forcpu,int** pmodes_forcpu,DataSet** bucketsforcpu,int num_procs){/*{{{*/

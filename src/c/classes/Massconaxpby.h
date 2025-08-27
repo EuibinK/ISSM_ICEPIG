@@ -13,7 +13,7 @@
 #include "./Elements/Elements.h"
 #include "./FemModel.h"
 #include "../classes/Params/Parameters.h"
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,const char* output_string);
+int OutputDefinitionsResponsex(IssmDouble* pres, FemModel* femmodel,const char* output_string);
 /*}}}*/
 class Massconaxpby: public Object, public Definition{
 
@@ -107,11 +107,14 @@ class Massconaxpby: public Object, public Definition{
 		/*}}}*/
 		 IssmDouble Response(FemModel* femmodel){/*{{{*/
 
+			 int ierr;
 			 IssmDouble xresponse,yresponse;
 
 			 /*Get response from both masscons: */
-			 xresponse=OutputDefinitionsResponsex(femmodel,this->namex);
-			 yresponse=OutputDefinitionsResponsex(femmodel,this->namey);
+			 ierr=OutputDefinitionsResponsex(&xresponse,femmodel,this->namex);
+			 if(ierr) _error_("not found");
+			 ierr=OutputDefinitionsResponsex(&yresponse,femmodel,this->namey);
+			 if(ierr) _error_("not found");
 
 			 return this->alpha*xresponse+this->beta*yresponse;
 		 }

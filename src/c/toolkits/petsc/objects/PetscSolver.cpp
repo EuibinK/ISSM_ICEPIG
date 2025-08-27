@@ -15,6 +15,7 @@
 #include "../../../shared/io/Comm/IssmComm.h"
 #include "../../../shared/Enum/Enum.h"
 #include "../../../shared/io/Print/Print.h"
+#include "../../../shared/Numerics/recast.h"
 
 void	PetscSolve(PetscVec** puf, PetscMat* Kff, PetscVec* pf, PetscVec* uf0,PetscVec* df, Parameters* parameters){ /*{{{*/
 
@@ -79,8 +80,10 @@ void	SolverxPetsc(Vec* puf, Mat Kff, Vec pf, Vec uf0,Vec df, Parameters* paramet
 	/*Now, check that we are not giving an initial guess to the solver, if we are running a direct solver: */
 	#if PETSC_VERSION_LT(3,7,0)
 	PetscOptionsGetString(PETSC_NULL,"-ksp_type",ksp_type,49,&flg);
-	#else
+	#elif PETSC_VERSION_LT(3,19,0)
 	PetscOptionsGetString(NULL,PETSC_NULL,"-ksp_type",ksp_type,49,&flg);
+	#else
+	PetscOptionsGetString(NULL,PETSC_NULLPTR,"-ksp_type",ksp_type,49,&flg);
 	#endif
 	if(flg!=PETSC_TRUE) _error_("could not find option -ksp_type, maybe you are not using the right toolkit?");
 	if (strcmp(ksp_type,"preonly")==0) uf0=NULL;
@@ -131,12 +134,16 @@ void	SolverxPetsc(Vec* puf, Mat Kff, Vec pf, Vec uf0,Vec df, Parameters* paramet
 
 		/*Set field splits: */
 		KSPGetPC(ksp,&pc);
-		#if (PETSC_VERSION_MAJOR == 3) && (PETSC_VERSION_MINOR == 1)
+
+		#if PETSC_VERSION_LT(3,1,0)
 		PCFieldSplitSetIS(pc,isv);
 		PCFieldSplitSetIS(pc,isp);
-		#else
+		#elif PETSC_VERSION_LT(3,19,0)
 		PCFieldSplitSetIS(pc,PETSC_NULL,isv);
 		PCFieldSplitSetIS(pc,PETSC_NULL,isp);
+		#else
+		PCFieldSplitSetIS(pc,PETSC_NULLPTR,isv);
+		PCFieldSplitSetIS(pc,PETSC_NULLPTR,isp);
 		#endif
 
 	}
@@ -193,7 +200,7 @@ void DofTypesToIndexSet(IS* pisv, IS* pisp, Vec df,int typeenum){ /*{{{*/
 		pressure_num=0;
 		velocity_num=0;
 		for(int i=0;i<df_local_size;i++){
-			if (df_local[i]==PressureEnum)pressure_num++;
+			if (reCast<int>(df_local[i])==PressureEnum)pressure_num++;
 			else velocity_num++;
 		}
 
@@ -204,11 +211,11 @@ void DofTypesToIndexSet(IS* pisv, IS* pisp, Vec df,int typeenum){ /*{{{*/
 		pressure_count=0;
 		velocity_count=0;
 		for(int i=0;i<df_local_size;i++){
-			if (df_local[i]==PressureEnum){
+			if(reCast<int>(df_local[i])==PressureEnum){
 				pressure_indices[pressure_count]=start+i;
 				pressure_count++;
 			}
-			if (df_local[i]==VelocityEnum){
+			if(reCast<int>(df_local[i])==VelocityEnum){
 				velocity_indices[velocity_count]=start+i;
 				velocity_count++;
 			}

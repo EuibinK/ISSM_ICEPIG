@@ -1,8 +1,6 @@
 /* \file classes.h
  * \brief: prototype header for all classes used in ISSM.
  */
-#define _IS_MULTI_ICE_
-
 
 #ifndef _ALL_CLASSES_H_
 #define _ALL_CLASSES_H_
@@ -25,7 +23,11 @@
 #include "./Nodalvalue.h"
 #include "./Numberedcostfunction.h"
 #include "./Cfsurfacesquare.h"
+#include "./Cfsurfacesquaretransient.h"
 #include "./Cfdragcoeffabsgrad.h"
+#include "./Cfdragcoeffabsgradtransient.h"
+#include "./Cfrheologybbarabsgrad.h"
+#include "./Cfrheologybbarabsgradtransient.h"
 #include "./Cfsurfacelogvel.h"
 #include "./Cflevelsetmisfit.h"
 #include "./Masscon.h"
@@ -69,7 +71,6 @@
 #include "./Options/Option.h"
 #include "./Options/Options.h"
 #include "./Options/GenericOption.h"
-#include "./Options/OptionUtilities.h"
 
 /*Inputs*/
 #include "./Inputs/Inputs.h"
@@ -86,13 +87,11 @@
 #include "./Materials/Matice.h"
 #include "./Materials/Matlitho.h"
 #include "./Materials/Matestar.h"
-#ifdef _IS_MULTI_ICE_
-#include "./Materials/MultiMatice.h"    
-#endif
 
 /*Params: */
 #include "./Params/GenericParam.h"
 #include "./Params/BoolParam.h"
+#include "./Params/ControlParam.h"
 #include "./Params/DoubleMatParam.h"
 #include "./Params/DoubleTransientMatParam.h"
 #include "./Params/DoubleMatArrayParam.h"

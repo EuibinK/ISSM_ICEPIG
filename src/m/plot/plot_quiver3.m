@@ -50,8 +50,8 @@ elseif numcolors==3,
 	%blue yellow and red
 	c=[0 0 1;1 1 0;1 0 0];
 else
-	%let jet choose
-	c=colormap(jet(numcolors));
+	%use turbo
+	c=colormap(turbo(numcolors));
 end
 
 %Scale data

@@ -3,8 +3,6 @@
  */
 /*Headers:*/
 /*{{{*/
-#define _IS_MULTI_ICE_
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #else
@@ -43,7 +41,7 @@ extern "C" void run_semic_transient_(int *nx, int *ntime, int *nloop,
 			int *alb_scheme, IssmDouble *alb_smax, IssmDouble *alb_smin, IssmDouble *albi, IssmDouble *albl,
 			IssmDouble *Tamp, 
 			IssmDouble *tmin, IssmDouble *tmax, IssmDouble *tmid, IssmDouble *mcrit, IssmDouble *wcrit, IssmDouble *tau_a, IssmDouble* tau_f, IssmDouble *afac, bool *verbose,
-			IssmDouble *tsurf_out, IssmDouble *smb_out, IssmDouble *smbi_out, IssmDouble *smbs_out, IssmDouble *saccu_out, IssmDouble *smelt_out, IssmDouble *albedo_out, IssmDouble *albedo_snow_out, IssmDouble *hsnow_out, IssmDouble *hice_out, IssmDouble *qmr_out);
+			IssmDouble *tsurf_out, IssmDouble *smb_out, IssmDouble *smbi_out, IssmDouble *smbs_out, IssmDouble *saccu_out, IssmDouble *smelt_out, IssmDouble *refr_out, IssmDouble *albedo_out, IssmDouble *albedo_snow_out, IssmDouble *hsnow_out, IssmDouble *hice_out, IssmDouble *qmr_out, IssmDouble *runoff_out, IssmDouble *subl_out);
 #endif
 // _HAVE_SEMIC_
 /*}}}*/
@@ -157,11 +155,11 @@ void       Element::ArmaProcess(bool isstepforarma,int arorder,int maorder,int n
 				if(tatstep>=datebreaks_basin[i]) indperiod = i+1;
 			}
 			/*Compute polynomial with parameters of indperiod*/
-			if(indperiod==0) telapsed_break = tatstep;
+			if(indperiod==0) telapsed_break = tatstep-starttime;
 			else             telapsed_break = tatstep-datebreaks_basin[indperiod-1];
 			for(int j=0;j<numparams;j++)   sumpoly[s] = sumpoly[s]+polyparams_basin[indperiod+j*numperiods]*pow(telapsed_break,j);
 		}
-		else for(int j=0;j<numparams;j++) sumpoly[s] = sumpoly[s]+polyparams_basin[j*numperiods]*pow(tatstep,j);
+		else for(int j=0;j<numparams;j++) sumpoly[s] = sumpoly[s]+polyparams_basin[j*numperiods]*pow(tatstep-starttime,j);
 	}
 
 	/*Initialze autoregressive and moving-average values at first time step*/
@@ -185,7 +183,7 @@ void       Element::ArmaProcess(bool isstepforarma,int arorder,int maorder,int n
    else noiseterm = 0.0;
    this->inputs->GetArray(arenum_type,this->lid,&valuesautoregression,&M);
    this->inputs->GetArray(maenum_type,this->lid,&valuesmovingaverage,&M);
-	
+
 	/*If not ARMA model timestep: take the old values of variable*/
    if(isstepforarma==false){
       for(int i=0;i<numvertices;i++) varlist[i]=valuesautoregression[i];
@@ -203,7 +201,7 @@ void       Element::ArmaProcess(bool isstepforarma,int arorder,int maorder,int n
 
 			/*Stochastic variable value*/
          varlist[v] = sumpoly[0]+autoregressionterm+movingaverageterm+noiseterm;
-      
+
 			/*Impose zero-bound*/
 			if(outenum_type == ThermalForcingEnum || outenum_type == FrontalForcingsSubglacialDischargeEnum) varlist[v] = max(varlist[v],0.0);
 
@@ -325,7 +323,6 @@ void       Element::CalvingRateToVector(){/*{{{*/
          calvingratey[iv] = c*dphidy/dphi;
 		}
 	}
-
 
 	/*Add to inputs*/
 	this->AddInput(CalvingratexEnum,&calvingratex[0],P1DGEnum);
@@ -598,17 +595,12 @@ void       Element::ComputeStrainRate(){/*{{{*/
 /*}}}*/
 void       Element::CoordinateSystemTransform(IssmDouble** ptransform,Node** nodes_list,int numnodes,int* cs_array){/*{{{*/
 
-	int         i,counter;
-	int         numdofs   = 0;
-	IssmDouble  norm;
-	IssmDouble *transform = NULL;
-	IssmDouble  coord_system[3][3];
-
 	/*Some checks in debugging mode*/
 	_assert_(numnodes && nodes_list);
 
 	/*Get total number of dofs*/
-	for(i=0;i<numnodes;i++){
+	int numdofs = 0;
+	for(int i=0;i<numnodes;i++){
 		switch(cs_array[i]){
 			case PressureEnum: numdofs+=1; break;
 			case XYEnum:       numdofs+=2; break;
@@ -618,8 +610,8 @@ void       Element::CoordinateSystemTransform(IssmDouble** ptransform,Node** nod
 	}
 
 	/*Allocate and initialize transform matrix*/
-	transform=xNew<IssmDouble>(numdofs*numdofs);
-	for(i=0;i<numdofs*numdofs;i++) transform[i]=0.0;
+	IssmDouble* transform=xNew<IssmDouble>(numdofs*numdofs);
+	for(int i=0;i<numdofs*numdofs;i++) transform[i]=0.0;
 
 	/*Create transform matrix for all nodes (x,y for 2d and x,y,z for 3d). It is a block matrix
 	 *for 3 nodes:
@@ -630,8 +622,9 @@ void       Element::CoordinateSystemTransform(IssmDouble** ptransform,Node** nod
 	 *
 	 * Where T1 is the transform matrix for node 1. It is a simple copy of the coordinate system
 	 * associated to this node*/
-	counter=0;
-	for(i=0;i<numnodes;i++){
+	IssmDouble  coord_system[3][3];
+	int         counter=0;
+	for(int i=0;i<numnodes;i++){
 		nodes_list[i]->GetCoordinateSystem(&coord_system[0][0]);
 		switch(cs_array[i]){
 			case PressureEnum:
@@ -640,13 +633,15 @@ void       Element::CoordinateSystemTransform(IssmDouble** ptransform,Node** nod
 				counter+=1;
 				break;
 			case XYEnum:
+				  {
 				/*We remove the z component, we need to renormalize x and y: x=[x1 x2 0] y=[-x2 x1 0]*/
-				norm = sqrt( coord_system[0][0]*coord_system[0][0] + coord_system[1][0]*coord_system[1][0]); _assert_(norm>1.e-4);
+				IssmDouble norm = sqrt( coord_system[0][0]*coord_system[0][0] + coord_system[1][0]*coord_system[1][0]); _assert_(norm>1.e-4);
 				transform[(numdofs)*(counter+0) + counter+0] =   coord_system[0][0]/norm;
 				transform[(numdofs)*(counter+0) + counter+1] = - coord_system[1][0]/norm;
 				transform[(numdofs)*(counter+1) + counter+0] =   coord_system[1][0]/norm;
 				transform[(numdofs)*(counter+1) + counter+1] =   coord_system[0][0]/norm;
 				counter+=2;
+				  }
 				break;
 			case XYZEnum:
 				/*The 3 coordinates are changed (x,y,z)*/
@@ -1050,9 +1045,6 @@ void       Element::dViscositydBFS(IssmDouble* pdmudB,int dim,IssmDouble* xyz_li
 	/*Get viscosity*/
 	materialstype=this->material->ObjectEnum();
 	switch(materialstype){
-		#ifdef _IS_MULTI_ICE_
-		case MatMultiIceEnum:  
-		#endif
 		case MaticeEnum:
 			material->GetViscosity_B(&dmudB,eps_eff,gauss);
 			break;
@@ -1090,9 +1082,6 @@ void       Element::dViscositydBHO(IssmDouble* pdmudB,int dim,IssmDouble* xyz_li
 	/*Get viscosity*/
 	materialstype=this->material->ObjectEnum();
 	switch(materialstype){
-		#ifdef _IS_MULTI_ICE_
-		case MatMultiIceEnum:  
-		#endif
 		case MaticeEnum:
 			material->GetViscosity_B(&dmudB,eps_eff,gauss);
 			break;
@@ -1125,9 +1114,6 @@ void       Element::dViscositydBMOLHO(IssmDouble* pdmudB,int dim,IssmDouble* xyz
 	/*Get viscosity*/
 	materialstype=this->material->ObjectEnum();
 	switch(materialstype){
-		#ifdef _IS_MULTI_ICE_
-		case MatMultiIceEnum:  
-		#endif
 		case MaticeEnum:
 			material->GetViscosity_B(&dmudB,eps_eff,gauss);
 			break;
@@ -1162,9 +1148,6 @@ void       Element::dViscositydBSSA(IssmDouble* pdmudB,int dim,IssmDouble* xyz_l
 	/*Get viscosity*/
 	materialstype=this->material->ObjectEnum();
 	switch(materialstype){
-		#ifdef _IS_MULTI_ICE_
-		case MatMultiIceEnum:  
-		#endif
 		case MaticeEnum:
 			material->GetViscosity_B(&dmudB,eps_eff,gauss);
 			break;
@@ -1242,32 +1225,14 @@ void       Element::FindParam(bool* pvalue,int paramenum){/*{{{*/
 	this->parameters->FindParam(pvalue,paramenum);
 }/*}}}*/
 void       Element::FindParam(int* pvalue,int paramenum){/*{{{*/
-
-	#ifdef _IS_MULTI_ICE_
-	IssmDouble temp=this->material->GetMaterialValue( paramenum);
-	if (!xIsNan<IssmDouble>(temp)) 
-	{ 
-	    int i=(int)temp;
-		*pvalue=i;
-	}
-	else 
-	#endif
 	this->parameters->FindParam(pvalue,paramenum);
 }/*}}}*/
 void       Element::FindParam(IssmDouble* pvalue,int paramenum){/*{{{*/
 	this->parameters->FindParam(pvalue,paramenum);
-}
-IssmDouble Element::FindParam(int paramenum){/*{{{*/
-#ifdef _IS_MULTI_ICE_
-	IssmDouble temp=this->material->GetMaterialValue(paramenum);
-	if (xIsNan<IssmDouble>(temp)) temp = this->parameters->FindParam(paramenum);
-	return temp;
-#else	
-	return this->parameters->FindParam(paramenum);
-#endif
 }/*}}}*/
-
-
+IssmDouble Element::FindParam(int paramenum){/*{{{*/
+	return this->parameters->FindParam(paramenum);
+}/*}}}*/
 void       Element::FindParam(int** pvalues,int* psize,int paramenum){/*{{{*/
 	this->parameters->FindParam(pvalues,psize,paramenum);
 }/*}}}*/
@@ -1282,6 +1247,52 @@ IssmDouble Element::FloatingArea(IssmDouble* mask, bool scaled){/*{{{*/
 
 	/*Return: */
 	return this->FloatingArea(scaled);
+}
+/*}}}*/
+void       Element::FrictionAlpha2CreateInput(void){/*{{{*/
+
+	/*Return if element is inactive*/
+	if(this->IsAllFloating() || !this->IsIceInElement()) return;
+
+	/*Intermediaries*/
+	int      domaintype, dim;
+	Element* basalelement = NULL;
+
+	/*Get basal element*/
+	this->FindParam(&domaintype,DomainTypeEnum);
+	switch(domaintype){
+		case Domain2DhorizontalEnum:
+			basalelement = this;
+			dim = 2;
+			break;
+		case Domain3DEnum: case Domain2DverticalEnum:
+			if(!this->IsOnBase()) return;
+			basalelement = this->SpawnBasalElement(true);
+			dim = 2;
+			break;
+		default: _error_("mesh "<<EnumToStringx(domaintype)<<" not supported yet");
+	}
+
+	int numvertices = basalelement->GetNumberOfVertices();
+
+	/*build friction object, used later on: */
+	Friction* friction=new Friction(basalelement,dim);
+	IssmDouble alpha2_list[MAXVERTICES];
+	IssmDouble alpha2;
+
+	Gauss* gauss=basalelement->NewGauss();
+	for(int i=0;i<numvertices;i++){
+		gauss->GaussVertex(i);
+
+		friction->GetAlpha2(&alpha2,gauss);
+		alpha2_list[i] = alpha2;
+	}
+
+	/*Clean up and return*/
+	delete gauss;
+	delete friction;
+	if(basalelement->IsSpawnedElement()){basalelement->DeleteMaterials(); delete basalelement;};
+	this->AddBasalInput(FrictionAlpha2Enum,&alpha2_list[0],P1Enum);
 }
 /*}}}*/
 void       Element::GetDofList(int** pdoflist,int approximation_enum,int setenum){/*{{{*/
@@ -1934,10 +1945,13 @@ void       Element::InputCreate(IssmDouble* vector,Inputs* inputs,IoModel* iomod
 
 		/*Are we in transient or static? */
 		if(M==1){
-			values[0]=vector[0];
+			if(N!=1) _error_("Size of Input "<<EnumToStringx(vector_enum)<<" "<<M<<"x"<<N<<" not supported");
+			_assert_(N==1);
 			this->SetElementInput(inputs,vector_enum,vector[0]);
 		}
+
 		else if(M==iomodel->numberofvertices){
+			if(N!=1) _error_("Size of Input "<<EnumToStringx(vector_enum)<<" "<<M<<"x"<<N<<" not supported");
 			for(int i=0;i<NUM_VERTICES;i++) values[i]=vector[vertexids[i]-1];
 			this->SetElementInput(inputs,NUM_VERTICES,vertexlids,values,vector_enum);
 		}
@@ -1976,21 +1990,42 @@ void       Element::InputCreate(IssmDouble* vector,Inputs* inputs,IoModel* iomod
 				inputs->SetPentaInput(vector_enum,P1xP3Enum,this->lid,N,evalues);
 			}
 			else{
-				_error_("Patch interpolation not supported yet");
+				_error_("Size of Input "<<EnumToStringx(vector_enum)<<" "<<M<<"x"<<N<<" not supported");
 			}
 			xDelete<IssmDouble>(evalues);
 
 		}
 		else{
-			_error_("nodal vector is either numberofvertices or numberofvertices+1 long. Field provided (" << EnumToStringx(vector_enum) << ") is " << M << " long");
+			_error_("Size of Input "<<EnumToStringx(vector_enum)<<" "<<M<<"x"<<N<<" not supported");
 		}
 	}
 	else if(vector_type==2){ //element vector
 
-		IssmDouble value;
-
 		/*Are we in transient or static? */
-		if(M==iomodel->numberofelements){
+		if(M==1){
+			if(N!=1) _error_("Size of Input "<<EnumToStringx(vector_enum)<<" "<<M<<"x"<<N<<" not supported");
+			this->SetElementInput(inputs,vector_enum,vector[0]);
+		}
+		else if(M==2){
+			/*create transient input: */
+			IssmDouble* times = xNew<IssmDouble>(N);
+			for(int t=0;t<N;t++) times[t] = vector[(M-1)*N+t];
+
+			inputs->SetTransientInput(vector_enum,times,N);
+			TransientInput* transientinput = inputs->GetTransientInput(vector_enum);
+
+			for(int t=0;t<N;t++){
+				IssmDouble value=vector[t]; //values are on the first line, times are on the second line
+				switch(this->ObjectEnum()){
+					case TriaEnum:  transientinput->AddTriaTimeInput( t,1,&(this->lid),&value,P0Enum); break;
+					case PentaEnum: transientinput->AddPentaTimeInput(t,1,&(this->lid),&value,P0Enum); break;
+					default: _error_("Not implemented yet");
+				}
+			}
+			xDelete<IssmDouble>(times);
+		}
+		else if(M==iomodel->numberofelements){
+			if(N!=1) _error_("Size of Input "<<EnumToStringx(vector_enum)<<" "<<M<<"x"<<N<<" not supported");
 			if (code==5){ //boolean
 				this->SetBoolInput(inputs,vector_enum,reCast<bool>(vector[this->Sid()]));
 			}
@@ -2009,7 +2044,7 @@ void       Element::InputCreate(IssmDouble* vector,Inputs* inputs,IoModel* iomod
 			inputs->SetTransientInput(vector_enum,times,N);
 			TransientInput* transientinput = inputs->GetTransientInput(vector_enum);
 			for(int t=0;t<N;t++){
-				value=vector[N*this->Sid()+t];
+				IssmDouble value=vector[N*this->Sid()+t];
 				switch(this->ObjectEnum()){
 					case TriaEnum:  transientinput->AddTriaTimeInput( t,1,&(this->lid),&value,P0Enum); break;
 					case PentaEnum: transientinput->AddPentaTimeInput(t,1,&(this->lid),&value,P0Enum); break;
@@ -2018,26 +2053,10 @@ void       Element::InputCreate(IssmDouble* vector,Inputs* inputs,IoModel* iomod
 			}
 			xDelete<IssmDouble>(times);
 		}
-		else if(M==1 || M==2){
-			/*create transient input: */
-			IssmDouble* times = xNew<IssmDouble>(N);
-			if(M==1)times[0]=0;
-			if(M==2)for(int t=0;t<N;t++) times[t] = vector[(M-1)*N+t];
 
-			inputs->SetTransientInput(vector_enum,times,N);
-			TransientInput* transientinput = inputs->GetTransientInput(vector_enum);
-
-			for(int t=0;t<N;t++){
-				value=vector[t]; //values are on the first line, times are on the second line
-				switch(this->ObjectEnum()){
-					case TriaEnum:  transientinput->AddTriaTimeInput( t,1,&(this->lid),&value,P0Enum); break;
-					case PentaEnum: transientinput->AddPentaTimeInput(t,1,&(this->lid),&value,P0Enum); break;
-					default: _error_("Not implemented yet");
-				}
-			}
-			xDelete<IssmDouble>(times);
+		else{
+			_error_("Size of Input "<<EnumToStringx(vector_enum)<<" "<<M<<"x"<<N<<" not supported");
 		}
-		else _error_("element vector is either numberofelements or numberofelements+1 long. Field provided (" << EnumToStringx(vector_enum) << ") is " << M << " long");
 	}
 	else if(vector_type==3){ //Double array matrix
 
@@ -2048,9 +2067,13 @@ void       Element::InputCreate(IssmDouble* vector,Inputs* inputs,IoModel* iomod
 			inputs->SetArrayInput(vector_enum,this->lid,layers,N);
 			xDelete<IssmDouble>(layers);
 		}
-		else _error_("element vector is either numberofelements or numberofelements+1 long. Field provided (" << EnumToStringx(vector_enum) << ") is " << M << " long");
+		else{
+			_error_("Size of Input "<<EnumToStringx(vector_enum)<<" "<<M<<"x"<<N<<" not supported");
+		}
 	}
-	else _error_("Cannot add input for vector type " << vector_type << " (not supported)");
+	else{
+		_error_("Cannot add input for vector type " << vector_type << " (not supported)");
+	}
 }
 /*}}}*/
 void       Element::InputCreateP1FromConstant(Inputs* inputs,IoModel* iomodel,IssmDouble value_in,int vector_enum){/*{{{*/
@@ -2070,6 +2093,12 @@ void       Element::InputCreateP1FromConstant(Inputs* inputs,IoModel* iomodel,Is
 
 	for(int i=0;i<NUM_VERTICES;i++) values[i]=value_in;
 	this->SetElementInput(inputs,NUM_VERTICES,vertexlids,values,vector_enum);
+
+}
+/*}}}*/
+void       Element::InputCreateP0FromConstant(Inputs* inputs,IoModel* iomodel,IssmDouble value_in,int vector_enum){/*{{{*/
+
+	this->SetElementInput(inputs,vector_enum,value_in);
 
 }
 /*}}}*/
@@ -2178,12 +2207,11 @@ void       Element::ControlInputCreate(IssmDouble* vector,IssmDouble* min_vector
 	}
 	else _error_("not currently supported type of M and N attempted");
 }/*}}}*/
-void       Element::DatasetInputAdd(int enum_type,IssmDouble* vector,Inputs* inputs,IoModel* iomodel,int M,int N,int vector_type,int input_enum,int code,int input_id){/*{{{*/
+void       Element::DatasetInputAdd(int enum_type,IssmDouble* vector,Inputs* inputs,IoModel* iomodel,int M,int N,int vector_type,int input_enum,int input_id){/*{{{*/
 	/*enum_type: the name of the DatasetInput (eg Outputdefinition1)
 	 * vector: information being stored (eg observations)
 	 * vector_type: is if by element or by vertex
 	 * input_enum: is the name of the vector being stored
-	 * code: what type of data is in the vector (booleans, ints, doubles)
 	 */
 
 	/*Branch on type of vector: nodal or elementary: */
@@ -2242,37 +2270,10 @@ void       Element::DatasetInputAdd(int enum_type,IssmDouble* vector,Inputs* inp
 
 		/*Are we in transient or static? */
 		if(M==iomodel->numberofelements){
-			if (code==5){ //boolean
-				_error_("not implemented");
-				//datasetinput->AddInput(new BoolInput(input_enum,reCast<bool>(vector[this->Sid()])),input_id);
-			}
-			else if (code==6){ //integer
-				_error_("not implemented");
-				//datasetinput->AddInput(new IntInput(input_enum,reCast<int>(vector[this->Sid()])),input_id);
-			}
-			else if (code==7){ //IssmDouble
-				_error_("not implemented");
-				//datasetinput->AddInput(new DoubleInput(input_enum,vector[this->Sid()]),input_id);
-			}
-			else _error_("could not recognize nature of vector from code " << code);
+			_error_("not implemented");
 		}
 		else if(M==iomodel->numberofelements+1){
 			_error_("not supported");
-			///*create transient input: */
-			//IssmDouble* times = xNew<IssmDouble>(N);
-			//for(t=0;t<N;t++) times[t] = vector[(M-1)*N+t];
-			//TransientInput* transientinput=new TransientInput(input_enum,times,N);
-			//TriaInput* bof=NULL;
-			//for(t=0;t<N;t++){
-			//	value=vector[N*this->Sid()+t];
-			//	switch(this->ObjectEnum()){
-			//		case TriaEnum:  transientinput->AddTimeInput(new TriaInput( input_enum,&value,P0Enum)); break;
-			//		case PentaEnum: transientinput->AddTimeInput(new PentaInput(input_enum,&value,P0Enum)); break;
-			//		case TetraEnum: transientinput->AddTimeInput(new TetraInput(input_enum,&value,P0Enum)); break;
-			//		default: _error_("Not implemented yet");
-			//	}
-			//}
-			//xDelete<IssmDouble>(times);
 		}
 		else _error_("element vector is either numberofelements or numberofelements+1 long. Field provided (" << EnumToStringx(input_enum) << ") is " << M << " long");
 	}
@@ -2528,13 +2529,13 @@ void       Element::LapseRateBasinSMB(int numelevbins, IssmDouble* lapserates, I
 		_assert_(dt<yts);
 	   for(int v=0;v<numvertices;v++){
 	      /*Find elevation bin of Reference elevation and of Vertex*/
+			bb1 = 0;
+			bb2 = 0;
 			for(int ii=0;ii<(numelevbins-1);ii++){
-				if(surfacelist[v]<=elevbins_b[ii]) bb1 = ii;	
-				if(refelevation_b<=elevbins_b[ii]) bb2 = ii;
+				if(surfacelist[v]>=elevbins_b[ii]) bb1 = ii+1;
+				if(refelevation_b>=elevbins_b[ii]) bb2 = ii+1;
 			}
-			/*Check for elevations above highest bin limit */
-			if(surfacelist[v]>elevbins_b[numelevbins-1-1]) bb1 = numelevbins-1;
-			if(refelevation_b>elevbins_b[numelevbins-1-1]) bb2 = numelevbins-1;
+
 			/*Vertex and Reference elevation in same elevation bin*/
 			if(bb1==bb2){
 				smblist[v] = smblist[v]+(surfacelist[v]-refelevation_b)*lapserates_b[bb2];
@@ -2814,7 +2815,7 @@ void       Element::MismipFloatingiceMeltingRate(){/*{{{*/
 
 }/*}}}*/
 void       Element::MonthlyFactorBasin(IssmDouble* monthlyfac,int enum_type){/*{{{*/
-	
+
 	/*Variable declaration*/
 	bool ratevariable;
    const int numvertices = this->GetNumberOfVertices();
@@ -2841,7 +2842,7 @@ void       Element::MonthlyFactorBasin(IssmDouble* monthlyfac,int enum_type){/*{
          ratevariable   = false;
 			break;
 	}
-	
+
 	/*Evaluate the month index now and at (now-timestepjump)*/
 	this->parameters->FindParam(&yts,ConstantsYtsEnum);
 	this->parameters->FindParam(&time,TimeEnum);
@@ -2896,7 +2897,7 @@ void       Element::MonthlyFactorBasin(IssmDouble* monthlyfac,int enum_type){/*{
 	xDelete<IssmDouble>(varlistinput);
 }/*}}}*/
 void       Element::MonthlyPiecewiseLinearEffectBasin(int nummonthbreaks,IssmDouble* monthlyintercepts,IssmDouble* monthlytrends,IssmDouble* monthlydatebreaks,int enum_type){/*{{{*/
-	
+
 	/*Variable declaration*/
    const int numvertices = this->GetNumberOfVertices();
 	int basinid,mindex,basinenum_type,varenum_type,indperiod;
@@ -2915,7 +2916,7 @@ void       Element::MonthlyPiecewiseLinearEffectBasin(int nummonthbreaks,IssmDou
          varenum_type   = ThermalForcingEnum;
          break;
 	}
-	
+
 	/*Evaluate the month index*/
 	this->parameters->FindParam(&yts,ConstantsYtsEnum);
 	this->parameters->FindParam(&time,TimeEnum);
@@ -3410,9 +3411,10 @@ void       Element::PositiveDegreeDay(IssmDouble* pdds,IssmDouble* pds,IssmDoubl
 	const int NUM_VERTICES_MONTHS_PER_YEAR = NUM_VERTICES * 12;
 
 	int  		i,vertexlids[MAXVERTICES];
+	bool     isinitialized=false;
 	IssmDouble* agd=xNew<IssmDouble>(NUM_VERTICES); // surface mass balance
-	IssmDouble* melt=xNew<IssmDouble>(NUM_VERTICES); // surface mass balance
-	IssmDouble* accu=xNew<IssmDouble>(NUM_VERTICES); // surface mass balance
+	IssmDouble* melt=xNew<IssmDouble>(NUM_VERTICES); // surface melt
+	IssmDouble* accu=xNew<IssmDouble>(NUM_VERTICES); // surface precipitation
 	IssmDouble* monthlytemperatures=xNew<IssmDouble>(NUM_VERTICES_MONTHS_PER_YEAR);
 	IssmDouble* monthlyprec=xNew<IssmDouble>(NUM_VERTICES_MONTHS_PER_YEAR);
 	IssmDouble* yearlytemperatures=xNew<IssmDouble>(NUM_VERTICES); memset(yearlytemperatures, 0., NUM_VERTICES*sizeof(IssmDouble));
@@ -3423,12 +3425,21 @@ void       Element::PositiveDegreeDay(IssmDouble* pdds,IssmDouble* pds,IssmDoubl
 	IssmDouble* s0t=xNew<IssmDouble>(NUM_VERTICES);
 	IssmDouble pddsnowfac = -1.;
 	IssmDouble pddicefac = -1.;
+	IssmDouble accsumM = 0.0;
+	IssmDouble accsumSMB = 0.0;
+	IssmDouble accsumP = 0.0;
+	IssmDouble avgM = 0.0;
+	IssmDouble avgSMB = 0.0;
+	IssmDouble avgP = 0.0;
 	IssmDouble rho_water,rho_ice,desfac,rlaps,rlapslgm;
 	IssmDouble PfacTime,TdiffTime,sealevTime;
 	IssmDouble mavg=1./12.; //factor for monthly average
 
 	/*Get vertex Lids for later*/
 	this->GetVerticesLidList(&vertexlids[0]);
+
+	/*Check for smb initialization*/
+	this->GetInputValue(&isinitialized,SmbIsInitializedEnum);
 
 	/*Get material parameters :*/
 	rho_water=this->FindParam(MaterialsRhoSeawaterEnum);
@@ -3439,9 +3450,10 @@ void       Element::PositiveDegreeDay(IssmDouble* pdds,IssmDouble* pds,IssmDoubl
 	rlaps=this->FindParam(SmbRlapsEnum);
 	rlapslgm=this->FindParam(SmbRlapslgmEnum);
 
-	IssmDouble time,yts,time_yr;
+	IssmDouble time,yts,time_yr,dt;
 	this->parameters->FindParam(&time,TimeEnum);
 	this->parameters->FindParam(&yts,ConstantsYtsEnum);
+	this->parameters->FindParam(&dt,TimesteppingTimeStepEnum);          /*transient core time step*/
 	time_yr=floor(time/yts)*yts;
 
 	/*Get inputs*/
@@ -3491,6 +3503,16 @@ void       Element::PositiveDegreeDay(IssmDouble* pdds,IssmDouble* pds,IssmDoubl
 	GetInputListOnVertices(&s0p[0],SmbS0pEnum);
 	GetInputListOnVertices(&s0t[0],SmbS0tEnum);
 
+	//Get accumulated input
+	Input *accsumM_input = NULL;
+	Input *accsumP_input = NULL;
+	Input *accsumSMB_input = NULL;
+	if (isinitialized){
+		accsumM_input = this->GetInput(SmbAccumulatedMeltEnum);  _assert_(accsumM_input);
+		accsumP_input = this->GetInput(SmbAccumulatedPrecipitationEnum);  _assert_(accsumP_input);
+		accsumSMB_input = this->GetInput(SmbAccumulatedMassBalanceEnum);  _assert_(accsumSMB_input);
+	}
+
 	/*measure the surface mass balance*/
 	for(int iv = 0; iv<NUM_VERTICES; iv++){
 		gauss->GaussVertex(iv);
@@ -3508,7 +3530,21 @@ void       Element::PositiveDegreeDay(IssmDouble* pdds,IssmDouble* pds,IssmDoubl
 		for(int month=0;month<12;month++) {
 			yearlytemperatures[iv]=yearlytemperatures[iv]+(monthlytemperatures[iv*12+month]+273.15)*mavg; // Has to be in Kelvin
 		}
+
 	}
+
+	/*Save accumulated inputs {{{*/
+	Input *avgM_input = NULL;
+	Input *avgP_input = NULL;
+	Input *avgSMB_input = NULL;
+
+	if (isinitialized){
+		accsumM_input->GetInputAverage(&accsumM);
+		accsumP_input->GetInputAverage(&accsumP);
+		accsumSMB_input->GetInputAverage(&accsumSMB);
+	}
+
+	/*}}}*/
 
 	/*Update inputs*/
 	switch(this->ObjectEnum()){
@@ -3584,6 +3620,22 @@ void       Element::PositiveDegreeDay(IssmDouble* pdds,IssmDouble* pds,IssmDoubl
 			this->InputExtrude(SmbMeltEnum,-1);
 			break;
 		default: _error_("Not implemented yet");
+	}
+
+	avgM_input = this->GetInput(SmbMeltEnum);  _assert_(avgM_input);
+	avgP_input = this->GetInput(SmbAccumulationEnum);  _assert_(avgP_input);
+	avgSMB_input = this->GetInput(SmbMassBalanceEnum);  _assert_(avgSMB_input);
+
+	avgM_input->GetInputAverage(&avgM);
+	avgP_input->GetInputAverage(&avgP);
+	avgSMB_input->GetInputAverage(&avgSMB);
+
+	this->SetElementInput(SmbAccumulatedMassBalanceEnum,accsumSMB+avgSMB*dt);
+	this->SetElementInput(SmbAccumulatedPrecipitationEnum,accsumP+avgP*dt);
+	this->SetElementInput(SmbAccumulatedMeltEnum,accsumM+avgM*dt);
+	if (!isinitialized){
+		/*Flag the initialization:*/
+		this->SetBoolInput(this->inputs,SmbIsInitializedEnum,true);
 	}
 
 	/*clean-up*/
@@ -3788,11 +3840,347 @@ void       Element::PositiveDegreeDaySicopolis(bool isfirnwarming){/*{{{*/
 	xDelete<IssmDouble>(melt_star);
 }
 /*}}}*/
+void       Element::SmbDebrisEvatt(){/*{{{*/
+
+        const int NUM_VERTICES          = this->GetNumberOfVertices();
+        const int NUM_VERTICES_DAYS_PER_YEAR  = NUM_VERTICES * 365; // 365 FIXME
+
+        int             i,vertexlids[MAXVERTICES];;
+        IssmDouble* smb=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* melt=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* summermelt=xNew<IssmDouble>(NUM_VERTICES); 
+        IssmDouble* albedo=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* summeralbedo=xNew<IssmDouble>(NUM_VERTICES); 
+        IssmDouble* accu=xNew<IssmDouble>(NUM_VERTICES);
+
+        // climate inputs
+        IssmDouble* temperature=xNew<IssmDouble>(NUM_VERTICES_DAYS_PER_YEAR);
+        IssmDouble* precip=xNew<IssmDouble>(NUM_VERTICES_DAYS_PER_YEAR);
+        IssmDouble* lw=xNew<IssmDouble>(NUM_VERTICES_DAYS_PER_YEAR);
+        IssmDouble* sw=xNew<IssmDouble>(NUM_VERTICES_DAYS_PER_YEAR);
+        IssmDouble* wind=xNew<IssmDouble>(NUM_VERTICES_DAYS_PER_YEAR);
+        IssmDouble* humidity=xNew<IssmDouble>(NUM_VERTICES_DAYS_PER_YEAR);
+        IssmDouble* yearlytemperatures=xNew<IssmDouble>(NUM_VERTICES); memset(yearlytemperatures, 0., NUM_VERTICES*sizeof(IssmDouble));
+        IssmDouble* p_ampl=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* t_ampl=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* lw_ampl=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* sw_ampl=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* wind_ampl=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* humidity_ampl=xNew<IssmDouble>(NUM_VERTICES);
+
+        IssmDouble* surface=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* s0t=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* snowheight=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* debriscover=xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble rho_water,rho_ice,Tf,debris,debris_here;
+        IssmDouble qlaps,rlaps,dsgrad,dlgrad,windspeedgrad,humiditygrad,Tm;
+        IssmDouble inv_twelve=1./365.;
+        IssmDouble time,yts,time_yr,lambda;
+        IssmDouble DailyMelt,CleanIceDailyMelt, CumDailyMelt=0,CleanIceMelt,CumDailySummerMelt=0;
+        IssmDouble MeanAlbedo=0, MeanSummerAlbedo=0;
+        bool isdebris,isAnderson,iscryokarst;
+        this->parameters->FindParam(&isdebris,TransientIsdebrisEnum);
+        this->parameters->FindParam(&isAnderson,SmbDebrisIsAndersonEnum);
+        this->parameters->FindParam(&iscryokarst,SmbDebrisIsCryokarstEnum);
+        IssmDouble PhiD=0.,p;
+        IssmDouble icealbedo=this->FindParam(SmbIcealbedoEnum);
+        IssmDouble snowalbedo=this->FindParam(SmbSnowalbedoEnum);
+        IssmDouble debrisalbedo=this->FindParam(SmbDebrisalbedoEnum);
+        IssmDouble Lm=this->FindParam(MaterialsLatentheatEnum); 
+        IssmDouble D0=this->FindParam(SmbDebrisAndersonD0Enum);
+        int step;
+        this->FindParam(&step,StepEnum);
+
+        // cryokarst
+        int dim=1,domaintype;
+        this->parameters->FindParam(&domaintype,DomainTypeEnum);
+        if(domaintype!=Domain2DverticalEnum){
+                        dim=2;
+        }
+        IssmDouble taud_plus=110e3, taud_minus=60e3;
+        IssmDouble taud, slope, gravity, taudx, taudy;
+        this->parameters->FindParam(&gravity,ConstantsGEnum);
+        IssmDouble* slopex         = xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* slopey         = xNew<IssmDouble>(NUM_VERTICES);
+        IssmDouble* icethickness   = xNew<IssmDouble>(NUM_VERTICES);
+
+        /*Get material parameters :*/
+        rho_water=this->FindParam(MaterialsRhoSeawaterEnum);
+        rho_ice=this->FindParam(MaterialsRhoIceEnum);
+        IssmDouble sconv=(rho_water/rho_ice); 
+        Tf=this->FindParam(MaterialsMeltingpointEnum);
+
+        /*Get parameters for height corrections*/
+        qlaps=this->FindParam(SmbDesfacEnum); // comment MR; on alpine galciers we dont have the desertification effect
+        rlaps=this->FindParam(SmbRlapsEnum);
+        dsgrad=this->FindParam(SmbSWgradEnum);
+        dlgrad=this->FindParam(SmbLWgradEnum);
+        windspeedgrad=this->FindParam(SmbWindspeedgradEnum);
+        humiditygrad=this->FindParam(SmbHumiditygradEnum);
+
+        /* Get time */
+        this->parameters->FindParam(&time,TimeEnum);
+        this->parameters->FindParam(&yts,ConstantsYtsEnum);
+        time_yr=floor(time/yts)*yts;
+
+        /*Get inputs*/
+        DatasetInput* tempday     =this->GetDatasetInput(SmbMonthlytemperaturesEnum); _assert_(tempday);
+        DatasetInput* precipday   =this->GetDatasetInput(SmbPrecipitationEnum);       _assert_(precipday);
+        DatasetInput* lwday       =this->GetDatasetInput(SmbMonthlydlradiationEnum); _assert_(lwday);
+        DatasetInput* swday       =this->GetDatasetInput(SmbMonthlydsradiationEnum);       _assert_(swday);
+        DatasetInput* windday     =this->GetDatasetInput(SmbMonthlywindspeedEnum); _assert_(windday);
+        DatasetInput* humidityday =this->GetDatasetInput(SmbMonthlyairhumidityEnum); _assert_(humidityday);
+
+        /*loop over vertices: */
+        Gauss* gauss=this->NewGauss();
+        for(int month=0;month<365;month++){
+                for(int iv=0;iv<NUM_VERTICES;iv++){
+                        gauss->GaussVertex(iv);
+                        tempday->GetInputValue(&temperature[iv*365+month],gauss,month);
+                        temperature[iv*365+month]=temperature[iv*365+month]-Tf; // conversion from Kelvin to celcius for PDD module
+                        precipday->GetInputValue(&precip[iv*365+month],gauss,month);
+                        precip[iv*365+month]=precip[iv*365+month]*yts; // from m/s to m/a
+                        lwday->GetInputValue(&lw[iv*365+month],gauss,month);
+                        swday->GetInputValue(&sw[iv*365+month],gauss,month);
+                        windday->GetInputValue(&wind[iv*365+month],gauss,month);
+                        humidityday->GetInputValue(&humidity[iv*365+month],gauss,month);
+                }
+        }
+
+        /*Recover info at the vertices: */
+        GetInputListOnVertices(&surface[0],SurfaceEnum);
+        GetInputListOnVertices(&s0t[0],SmbS0tEnum);
+        GetInputListOnVertices(&snowheight[0],SmbSnowheightEnum);
+        GetInputListOnVertices(&debriscover[0],DebrisThicknessEnum);
+        GetInputListOnVertices(&t_ampl[0],SmbTemperaturesAnomalyEnum);
+        GetInputListOnVertices(&p_ampl[0],SmbPrecipitationsAnomalyEnum);
+        GetInputListOnVertices(&lw_ampl[0],SmbDsradiationAnomalyEnum);
+        GetInputListOnVertices(&sw_ampl[0],SmbDlradiationAnomalyEnum);
+        GetInputListOnVertices(&wind_ampl[0],SmbWindspeedAnomalyEnum);
+        GetInputListOnVertices(&humidity_ampl[0],SmbAirhumidityAnomalyEnum);
+        if(iscryokarst){
+                GetInputListOnVertices(&slopex[0],SurfaceSlopeXEnum);
+                GetInputListOnVertices(&icethickness[0],ThicknessEnum);
+                if(dim==2){
+                        GetInputListOnVertices(&slopey[0],SurfaceSlopeYEnum);
+                }
+                taudx=rho_ice*gravity*icethickness[i]*slopex[i];
+                if(dim==2) taudy=rho_ice*gravity*icethickness[i]*slopey[i];
+                taud=sqrt(taudx*taudx+taudy*taudy);
+        }
+        IssmDouble Alphaeff,Alphaeff_cleanice;
+
+        /*measure the surface mass balance*/
+        for (int iv = 0; iv<NUM_VERTICES; iv++){
+
+                IssmDouble st=(surface[iv]-s0t[iv])/1000.;
+
+                int ismb_end=1;
+                if(isdebris & !isAnderson) ismb_end=2;
+                for (int ismb=0;ismb<ismb_end;ismb++){
+                        if(ismb==0){
+                                // calc a reference smb to identify accum and melt region; debris only develops in ablation area
+                                debris=0.;
+                                PhiD=0.;
+                                if(isAnderson) debris_here=debriscover[iv]; // store debris for later
+                        }else{
+                                // debris only develops in ablation area
+                                /*if((accu[iv]/yts-CleanIceMelt)<(-1e-2)/yts){
+                                        debris=debriscover[iv];
+                                }else{
+                                        debris=0.;
+                                }*/
+                                debris=0.;
+                                if(debris<=0.) debris=0.;
+                                if(isdebris) PhiD=FindParam(DebrisPackingFractionEnum);
+                                CumDailyMelt=0;
+                                CumDailySummerMelt=0;
+                                debris_here=debriscover[iv];
+                        }
+
+                        /* Now run the debris part */
+
+                        // Climate inputs
+                        IssmDouble Tm;          // C air temperature
+                        IssmDouble In;          // Wm^-2 incoming long wave
+                        IssmDouble Q;           // Wm^-2 incoming short wave
+                        IssmDouble Um;          // ms^-1 measured wind speed
+                        IssmDouble Humidity;    // relative humidity
+                        IssmDouble P;           // precip
+
+                        // other parameters
+                        IssmDouble Qh=0.006;   // kg m^-3      saturated humidity level // not used
+                        IssmDouble Qm=0.8*Qh;  // kg m^-3      measured humiditiy level // not used
+                        IssmDouble Rhoaa=1.22; // kgm^-3       air densitiy
+                        IssmDouble K=0.585;    // Wm^-1K^-1    thermal conductivity          0.585
+                        IssmDouble Xr=0.01;    // ms^-1        surface roughness             0.01
+                        IssmDouble Ustar=0.16; // ms^-1        friction velocity             0.16
+                        IssmDouble Ca=1000;    // jkg^-1K^-1   specific heat capacity of air
+                        IssmDouble Lv=2.50E+06;// jkg^-1K^-1   latent heat of evaporation
+                        IssmDouble Eps=0.95;   //              thermal emissivity
+                        IssmDouble Sigma=5.67E-08;// Wm^-2K^-4    Stefan Boltzmann constant
+                        IssmDouble Gamma=180.;    // m^-1         wind speed attenuation        234
+
+                        // Calculate effective albedo
+                        IssmDouble Alphaeff,Alphaeff_cleanice;
+                        IssmDouble mean_ela,delta=2000;
+
+                        // compute cleanice albedo based on previous SMB distribution
+                        //if(step==1){
+                                mean_ela=3000; //FIXME
+                        //}else{
+                        //        mean_ela=FindParam(SmbMeanElaEnum);
+                        //}
+                        Alphaeff_cleanice=icealbedo+(snowalbedo-icealbedo)*(1+tanh(PI*(surface[iv]-mean_ela)/delta))/2;
+                        Alphaeff=Alphaeff_cleanice; // will be updated below
+
+                        accu[iv]=0.;
+                        for (int iday=0;iday<365;iday++) {
+
+                                Tm=temperature[iv*365+iday]-st*rlaps;//+t_ampl[iv];//+(rand()%10-5)/5;
+                                In=lw[iv*365+iday]-st*dlgrad+lw_ampl[iv];
+                                Q=sw[iv*365+iday]+st*dsgrad+sw_ampl[iv];
+                                Humidity=humidity[iv*365+iday]-st*humiditygrad+humidity_ampl[iv];
+                                Um=wind[iv*365+iday]-st*windspeedgrad+wind_ampl[iv];
+                                P=(qlaps*st*precip[iv*365+iday]+precip[iv*365+iday]+p_ampl[iv])*sconv/365.; // convert precip from w.e. -> i.e
+
+                                /*Partition of precip in solid and liquid parts */
+                                IssmDouble temp_plus=1; 
+                                IssmDouble temp_minus=-1.;
+                                IssmDouble frac_solid;
+                                if(Tm>=temp_plus){
+                                        frac_solid=0;
+                                }else if(Tm<=temp_minus){
+                                        frac_solid=1;
+                                }else{
+                                        frac_solid=1*(1-cos(PI*(temp_plus-Tm)/(temp_plus-temp_minus)))/2;
+                                }
+
+                                /*Get yearly temperatures and accumulation */
+                                yearlytemperatures[iv]=yearlytemperatures[iv]+((temperature[iv*365+iday]-rlaps*st+Tf+t_ampl[iv]))/365; // Has to be in Kelvin
+                                accu[iv]=accu[iv]+P*frac_solid;
+                                if(yearlytemperatures[iv]>Tf) yearlytemperatures[iv]=Tf;
+
+                                CleanIceDailyMelt=((In-(Eps*Sigma*(Tf*Tf*Tf*Tf))+
+                                        Q*(1.-Alphaeff)+
+                                        (Rhoaa*Ca*Ustar*Ustar)/(Um-Ustar*(2.-(exp(Gamma*Xr))))*Tm)/((1-PhiD)*rho_ice*Lm)/(1.+
+                                        ((Rhoaa*Ca*Ustar*Ustar)/(Um-Ustar*(2.-(exp(Gamma*Xr))))+4.*Eps*Sigma*(Tf*Tf*Tf))/
+                                        K*debris)-(Lv*Ustar*Ustar*((Humidity))*(exp(-Gamma*Xr)))/((1.-PhiD)*
+                                        rho_ice*Lm*Ustar)/(((Um
+                                        -2.*Ustar)*exp(-Gamma*Xr))/Ustar+exp(Gamma*debris)));
+                                if(CleanIceDailyMelt<0) CleanIceDailyMelt=0.;
+                                DailyMelt=CleanIceDailyMelt;
+
+                                if(ismb==1){
+
+                                        //snowheight[iv]=snowheight[iv]+(P-CleanIceDailyMelt*yts/365);
+                                        IssmDouble sn_prev;
+                                        sn_prev=snowheight[iv];
+                                        snowheight[iv]=sn_prev+(-CleanIceDailyMelt*yts/365);//P
+
+                                        if(snowheight[iv]<=0) snowheight[iv]=0.;
+                                        if(snowheight[iv]<=0.0001){
+                                                p=debris_here*PhiD/(2*0.2*0.01); //Eq. 51 from Evatt et al 2015 without source term g*t
+                                                if(p>1.) p=1.;
+                                                if(p>=0.999){
+                                                        Alphaeff=debrisalbedo;
+                                                } else {
+                                                        Alphaeff=Alphaeff_cleanice+p*(debrisalbedo-Alphaeff_cleanice);
+                                                }
+                                                debris=debris_here;
+                                                DailyMelt=((In-(Eps*Sigma*(Tf*Tf*Tf*Tf))+
+                                                        Q*(1.-Alphaeff)+
+                                                        (Rhoaa*Ca*Ustar*Ustar)/(Um-Ustar*(2.-(exp(Gamma*Xr))))*Tm)/((1-PhiD)*rho_ice*Lm)/(1.+
+                                                        ((Rhoaa*Ca*Ustar*Ustar)/(Um-Ustar*(2.-(exp(Gamma*Xr))))+4.*Eps*Sigma*(Tf*Tf*Tf))/
+                                                        K*debris)-(Lv*Ustar*Ustar*((Humidity))*(exp(-Gamma*Xr)))/((1.-PhiD)*
+                                                        rho_ice*Lm*Ustar)/(((Um-2.*Ustar)*exp(-Gamma*Xr))/Ustar+exp(Gamma*debris)));
+                                                if(DailyMelt<0) DailyMelt=0.;
+                                                MeanSummerAlbedo=MeanSummerAlbedo+Alphaeff;
+                                                CumDailySummerMelt=CumDailySummerMelt+DailyMelt/365;
+                                        }
+                                }
+                                CumDailyMelt=CumDailyMelt+DailyMelt/365;
+                        }
+                        MeanAlbedo=MeanAlbedo+Alphaeff;
+                        if(ismb==0) CleanIceMelt=CumDailyMelt;
+                }
+
+                if(iscryokarst){
+                        if(taud>=taud_plus){
+                                lambda=0;
+                        }else if(taud>=taud_minus & taud<taud_plus){
+                                lambda=0.1*(1-cos(PI*(taud_plus-taud)/(taud_plus-taud_minus)))/2;
+                        }else if(taud<taud_minus){
+                                lambda=0.1;
+                        }
+                }
+
+                // update values
+                melt[iv]=CumDailyMelt; // is already in m/s
+                accu[iv]=accu[iv]/yts;
+                if(isAnderson){
+                        smb[iv]=(accu[iv]-melt[iv])*D0/(D0+debris_here);
+                        if(iscryokarst){ 
+                                smb[iv]=lambda*(accu[iv]-melt[iv])+(1-lambda)*(accu[iv]-melt[iv])*D0/(D0+debris_here);
+                        }else{
+                                smb[iv]=(accu[iv]-melt[iv])*D0/(D0+debris_here);
+                        }
+                }else{
+                        if(iscryokarst){ 
+                                smb[iv]=lambda*(accu[iv]-CleanIceMelt)+(1-lambda)*(accu[iv]-melt[iv]);
+                        }else{
+                                smb[iv]=(accu[iv]-melt[iv]);
+                        }
+                }
+                albedo[iv]=MeanAlbedo;
+                summeralbedo[iv]=MeanSummerAlbedo;
+                summermelt[iv]=CumDailySummerMelt;
+        }
+
+        this->AddInput(SmbMassBalanceEnum,smb,P1Enum);
+        this->AddInput(SmbAccumulationEnum,accu,P1Enum);
+        this->AddInput(SmbMeltEnum,melt,P1Enum);
+        this->AddInput(SmbSummerMeltEnum,summermelt,P1Enum);
+        this->AddInput(SmbSnowheightEnum,snowheight,P1Enum);
+        this->AddInput(SmbAlbedoEnum,albedo,P1Enum);
+        this->AddInput(SmbSummerAlbedoEnum,summeralbedo,P1Enum);
+        this->AddInput(TemperaturePDDEnum,yearlytemperatures,P1Enum); // TemperaturePDD is wrong here, but don't want to create new Enum ...
+
+        /*clean-up*/
+        xDelete<IssmDouble>(temperature);
+        xDelete<IssmDouble>(precip);
+        xDelete<IssmDouble>(lw);
+        xDelete<IssmDouble>(sw);
+        xDelete<IssmDouble>(wind);
+        xDelete<IssmDouble>(humidity);
+        xDelete<IssmDouble>(smb);
+        xDelete<IssmDouble>(surface);
+        xDelete<IssmDouble>(melt);
+        xDelete<IssmDouble>(summermelt);
+        xDelete<IssmDouble>(albedo);
+        xDelete<IssmDouble>(summeralbedo);
+        xDelete<IssmDouble>(accu);
+        xDelete<IssmDouble>(yearlytemperatures);
+        xDelete<IssmDouble>(s0t);
+        xDelete<IssmDouble>(snowheight);
+        xDelete<IssmDouble>(debriscover);
+        xDelete<IssmDouble>(t_ampl);
+        xDelete<IssmDouble>(p_ampl);
+        xDelete<IssmDouble>(lw_ampl);
+        xDelete<IssmDouble>(sw_ampl);
+        xDelete<IssmDouble>(humidity_ampl);
+        xDelete<IssmDouble>(wind_ampl);
+        xDelete<IssmDouble>(slopex);
+        xDelete<IssmDouble>(slopey);
+        xDelete<IssmDouble>(icethickness);
+}
+/*}}}*/
 void       Element::ResultInterpolation(int* pinterpolation,int* pnodesperelement,int* parray_size, int output_enum){/*{{{*/
 
 	/*Some intputs need to be computed, even if they are already in inputs, they might not be up to date!*/
 	switch(output_enum){
 		case ViscousHeatingEnum: this->ViscousHeatingCreateInput(); break;
+		case FrictionAlpha2Enum: this->FrictionAlpha2CreateInput(); break;
 		case StressMaxPrincipalEnum: this->StressMaxPrincipalCreateInput(); break;
 		case StressTensorxxEnum:
 		case StressTensorxyEnum:
@@ -3844,11 +4232,17 @@ void       Element::ResultInterpolation(int* pinterpolation,int* pnodesperelemen
 													  case CalvingDev2Enum:
 														  this->CalvingRateVonmises();
 														  break;
+													  case CalvingVonmisesADEnum:
+														  this->CalvingRateVonmisesAD();
+														  break;
 													  case CalvingCrevasseDepthEnum:
 														  this->CalvingCrevasseDepth();
 														  break;
 													  case CalvingParameterizationEnum:
 														  this->CalvingRateParameterization();
+														  break;
+													  case CalvingCalvingMIPEnum:
+														  this->CalvingRateCalvingMIP();
 														  break;
 													  case CalvingTestEnum:
 														  this->CalvingRateTest();
@@ -4300,18 +4694,24 @@ void       Element::SmbSemicTransient(){/*{{{*/
 	IssmDouble* hsnow_in        =xNew<IssmDouble>(NUM_VERTICES); 
 	IssmDouble* qmr_in          =xNew<IssmDouble>(NUM_VERTICES); 
 
-	// outputs
+	/* outputs 
+	runoff - runoff calculated melting + rainfall - refreezing 
+	subl   - sublimation
+	 * */
 	IssmDouble* tsurf_out  =xNew<IssmDouble>(NUM_VERTICES); memset(tsurf_out, 0., NUM_VERTICES*sizeof(IssmDouble));
 	IssmDouble* smb_out    =xNew<IssmDouble>(NUM_VERTICES); memset(smb_out, 0., NUM_VERTICES*sizeof(IssmDouble));
 	IssmDouble* smbi_out   =xNew<IssmDouble>(NUM_VERTICES); memset(smb_out, 0., NUM_VERTICES*sizeof(IssmDouble));
 	IssmDouble* smbs_out   =xNew<IssmDouble>(NUM_VERTICES); memset(smb_out, 0., NUM_VERTICES*sizeof(IssmDouble));
 	IssmDouble* saccu_out  =xNew<IssmDouble>(NUM_VERTICES); memset(saccu_out, 0., NUM_VERTICES*sizeof(IssmDouble));
 	IssmDouble* smelt_out  =xNew<IssmDouble>(NUM_VERTICES); memset(smelt_out, 0., NUM_VERTICES*sizeof(IssmDouble));
+	IssmDouble* refr_out  =xNew<IssmDouble>(NUM_VERTICES); memset(refr_out, 0., NUM_VERTICES*sizeof(IssmDouble));
 	IssmDouble* albedo_out =xNew<IssmDouble>(NUM_VERTICES); memset(albedo_out, 0., NUM_VERTICES*sizeof(IssmDouble));
 	IssmDouble* albedo_snow_out =xNew<IssmDouble>(NUM_VERTICES); memset(albedo_snow_out, 0., NUM_VERTICES*sizeof(IssmDouble));
 	IssmDouble* hsnow_out   =xNew<IssmDouble>(NUM_VERTICES); memset(hsnow_out, 0., NUM_VERTICES*sizeof(IssmDouble));
 	IssmDouble* hice_out    =xNew<IssmDouble>(NUM_VERTICES); memset(hice_out, 0., NUM_VERTICES*sizeof(IssmDouble));
 	IssmDouble* qmr_out     =xNew<IssmDouble>(NUM_VERTICES); memset(qmr_out, 0., NUM_VERTICES*sizeof(IssmDouble)); 
+	IssmDouble* runoff_out  =xNew<IssmDouble>(NUM_VERTICES); memset(runoff_out, 0., NUM_VERTICES*sizeof(IssmDouble)); 
+	IssmDouble* subl_out  =xNew<IssmDouble>(NUM_VERTICES); memset(subl_out, 0., NUM_VERTICES*sizeof(IssmDouble)); 
 
 	IssmDouble rho_water,rho_ice,desfac,desfacElev,rlaps,rdl;
 	IssmDouble alb_smax, alb_smin, albi, albl;
@@ -4325,6 +4725,8 @@ void       Element::SmbSemicTransient(){/*{{{*/
 	IssmDouble tmid, afac;
 
 	IssmDouble tstart, time,yts,time_yr,dt;
+
+	int isdesertification, isLWDcorrect;
 
 	/* Get time: */
 	this->parameters->FindParam(&time,TimeEnum);
@@ -4364,13 +4766,17 @@ void       Element::SmbSemicTransient(){/*{{{*/
 	GetInputListOnVertices(&s[0],SurfaceEnum);
 	GetInputListOnVertices(&s0gcm[0],SmbS0gcmEnum);
 
+	/* Get specific parameter options */
+	this->FindParam(&isdesertification, SmbSemicIsDesertificationEnum);
+	this->FindParam(&isLWDcorrect, SmbSemicIsLWDcorrectEnum);
+
 	if(isverbose && this->Sid()==0){
 		_printf0_("smb core: allocate inputs.\n");
 		_printf0_("smb core: time_yr  : " << time_yr/yts <<"\n");
 		_printf0_("smb core: time     : " << time <<"\n");
 		_printf0_("smb core: dt       : " << dt <<"\n");
 	}
-	/* loop over vertices and days */ //FIXME account for leap years (365 -> 366)
+	/* loop over vertices and days */
 	Gauss* gauss=this->NewGauss();
 	/* Retrieve inputs: */
 	Input* dailysnowfall_input    = this->GetInput(SmbDailysnowfallEnum,time); _assert_(dailysnowfall_input);
@@ -4399,18 +4805,17 @@ void       Element::SmbSemicTransient(){/*{{{*/
 		enum_albedo_snow=SmbAlbedoSnowInitEnum;
 		enum_qmr        =SmbSemicQmrInitEnum;
 	} 
-	if(isverbose && this->Sid()==0)_printf0_("smb core: assign temp.\n");
+	//if(isverbose && this->Sid()==0)_printf0_("smb core: assign temp.\n");
 	Input* tsurf_input       = this->GetInput(enum_temp); _assert_(tsurf_in);
-	if(isverbose && this->Sid()==0)_printf0_("smb core: assign mask.\n");
+	//if(isverbose && this->Sid()==0)_printf0_("smb core: assign mask.\n");
 	Input* mask_input        = this->GetInput(SmbMaskEnum); _assert_(mask_input);
-	if(isverbose && this->Sid()==0)_printf0_("smb core: assign Tamp.\n");
+	//if(isverbose && this->Sid()==0)_printf0_("smb core: assign Tamp.\n");
 	Input* Tamp_input        = this->GetInput(SmbTampEnum); _assert_(Tamp_input);
-	if(isverbose && this->Sid()==0)_printf0_("smb core: assign albedo.\n");
+	//if(isverbose && this->Sid()==0)_printf0_("smb core: assign albedo.\n");
 	Input* albedo_input      = this->GetInput(enum_albedo); _assert_(albedo_input);
 	Input* albedo_snow_input = this->GetInput(enum_albedo_snow); _assert_(albedo_snow_input);
 	Input* hice_input        = this->GetInput(enum_hice); _assert_(hice_input);
 	Input* hsnow_input       = this->GetInput(enum_hsnow); _assert_(hsnow_input);
-	if(isverbose && this->Sid()==0)_printf0_("smb core: assign qmr.\n");
 	Input* qmr_input         = this->GetInput(enum_qmr); _assert_(qmr_input);
 
 	if(isverbose && this->Sid()==0)_printf0_("smb core: assign inputs done....\n");
@@ -4443,17 +4848,22 @@ void       Element::SmbSemicTransient(){/*{{{*/
 		dailytemperature[iv]=dailytemperature[iv]-rlaps *st[iv];
 
 		/* Precipitation correction (Vizcaino et al. 2010) */
-		if (s0gcm[iv] < desfacElev) {
-			dailysnowfall[iv] = dailysnowfall[iv]*exp(desfac*(max(s[iv],desfacElev)-desfacElev));
-			dailyrainfall[iv] = dailyrainfall[iv]*exp(desfac*(max(s[iv],desfacElev)-desfacElev));
-		}else{
-			dailysnowfall[iv] = dailysnowfall[iv]*exp(desfac*(max(s[iv],desfacElev)-s0gcm[iv]));
-			dailyrainfall[iv] = dailyrainfall[iv]*exp(desfac*(max(s[iv],desfacElev)-s0gcm[iv]));
+		if (isdesertification == 1){
+			if (s0gcm[iv] < desfacElev) {
+				dailysnowfall[iv] = dailysnowfall[iv]*exp(desfac*(max(s[iv],desfacElev)-desfacElev));
+				dailyrainfall[iv] = dailyrainfall[iv]*exp(desfac*(max(s[iv],desfacElev)-desfacElev));
+			}else{
+				dailysnowfall[iv] = dailysnowfall[iv]*exp(desfac*(max(s[iv],desfacElev)-s0gcm[iv]));
+				dailyrainfall[iv] = dailyrainfall[iv]*exp(desfac*(max(s[iv],desfacElev)-s0gcm[iv]));
+			}
 		}
 
 		/* downward longwave radiation correction (Marty et al. 2002) */
-		st[iv]=(s[iv]-s0gcm[iv])/1000.;
-		dailydlradiation[iv]=dailydlradiation[iv]+rdl*st[iv];
+      /* Unit of "md.smb.rdl" is defined in W m-2 km-1 */
+		if (isLWDcorrect == 1){
+			st[iv]=(s[iv]-s0gcm[iv])/1000.; /* unit in km */
+			dailydlradiation[iv]=dailydlradiation[iv]-rdl*st[iv];
+		}
 	}
 	if(isverbose && this->Sid()==0){
 		_printf0_("smb core: assign tsurf_in        :" << tsurf_in[0] << "\n");
@@ -4482,17 +4892,20 @@ void       Element::SmbSemicTransient(){/*{{{*/
 			&alb_scheme, &alb_smax, &alb_smin, &albi, &albl,
 			Tamp_in,
 			&tmin, &tmax, &tmid, &mcrit, &wcrit, &tau_a, &tau_f, &afac, &semic_verbose,
-			tsurf_out, smb_out, smbi_out, smbs_out, saccu_out, smelt_out,albedo_out, albedo_snow_out, hsnow_out, hice_out, qmr_out);
+			tsurf_out, smb_out, smbi_out, smbs_out, saccu_out, smelt_out, refr_out, albedo_out, albedo_snow_out, hsnow_out, hice_out, qmr_out, runoff_out, subl_out);
 
 	for (int iv = 0; iv<NUM_VERTICES; iv++){
 		/* 
 		 unit conversion: water -> ice
 		 w.e. : water equivalenet.
 		 */
-		smb_out[iv]  = smb_out[iv]*yts;  // w.e. m/sec -> m/yr
-		smbi_out[iv] = smbi_out[iv]*rho_water/rho_ice;
-		smbs_out[iv] = smbs_out[iv]*yts; // w.e. m/sec -> m/yr
-		saccu_out[iv] = saccu_out[iv]*yts; // w.e. m/sec -> m/yr
+		smb_out[iv]  = smb_out[iv]*rho_water/rho_ice;      // w.e. m/sec -> ice m/yr
+		smbi_out[iv] = smbi_out[iv]*rho_water/rho_ice*yts; // w.e. m/sec -> ice m/yr
+		smbs_out[iv] = smbs_out[iv]*rho_water/rho_ice*yts; // w.e. m/sec -> ice m/yr
+		saccu_out[iv] = saccu_out[iv]*rho_water/rho_ice*yts; // w.e. m/sec -> ice m/yr
+		smelt_out[iv] = smelt_out[iv]*rho_water/rho_ice; // w.e. m/sec -> ice m/yr
+		refr_out[iv]  = refr_out[iv]*rho_water/rho_ice;  // w.e. m/sec -> ice m/yr
+		runoff_out[iv]= runoff_out[iv]*rho_water/rho_ice; // w.e. m/sec -> ice m/yr
 	}
 
 	if(isverbose && this->Sid()==0){
@@ -4509,20 +4922,22 @@ void       Element::SmbSemicTransient(){/*{{{*/
 			// SMBout = SMB_ice + SMB_snow values.
 			//this->AddInput(SmbMassBalanceTotalEnum,&smb_out[0],P1DGEnum);
 			// water equivalent SMB ice to ice equivalent.
-			this->AddInput(SmbMassBalanceEnum,    &smbi_out[0],P1DGEnum);
-			this->AddInput(SmbMassBalanceIceEnum, &smbi_out[0],P1DGEnum);
-			this->AddInput(SmbMassBalanceSnowEnum,&smbs_out[0],P1DGEnum);
-			this->AddInput(SmbMassBalanceSemicEnum,&smb_out[0],P1DGEnum);
+			this->AddInput(SmbMassBalanceEnum,     &smb_out[0],P1DGEnum);
+			this->AddInput(SmbMassBalanceIceEnum,  &smbi_out[0],P1DGEnum);
+			this->AddInput(SmbMassBalanceSnowEnum, &smbs_out[0],P1DGEnum);
 			//this->AddInput(SmbMassBalanceSnowEnum,&smbs_out[0],P1DGEnum);
 			// saccu - accumulation of snow.
 			this->AddInput(SmbAccumulationEnum,&saccu_out[0],P1DGEnum);
 			// smelt 
 			this->AddInput(SmbMeltEnum,        &smelt_out[0],P1DGEnum);
+			this->AddInput(SmbRefreezeEnum,    &refr_out[0],P1DGEnum);
 			this->AddInput(SmbAlbedoEnum,      &albedo_out[0],P1DGEnum);
 			this->AddInput(SmbAlbedoSnowEnum,  &albedo_snow_out[0],P1DGEnum);
 			this->AddInput(SmbHSnowEnum,       &hsnow_out[0],P1DGEnum);
 			this->AddInput(SmbHIceEnum,        &hice_out[0],P1DGEnum);
 			this->AddInput(SmbSemicQmrEnum,    &qmr_out[0],P1DGEnum);
+			this->AddInput(SmbRunoffEnum,      &runoff_out[0],P1DGEnum);
+			this->AddInput(SmbEvaporationEnum, &subl_out[0],P1DGEnum);
 			break;
 		case PentaEnum:
 			// TODO
@@ -4553,6 +4968,9 @@ void       Element::SmbSemicTransient(){/*{{{*/
 	xDelete<IssmDouble>(smbs_out);
 	xDelete<IssmDouble>(saccu_out);
 	xDelete<IssmDouble>(smelt_out);
+	xDelete<IssmDouble>(refr_out);
+	xDelete<IssmDouble>(runoff_out);
+	xDelete<IssmDouble>(subl_out);
 	xDelete<IssmDouble>(albedo_out);
 	xDelete<IssmDouble>(albedo_snow_out);
 	xDelete<IssmDouble>(hsnow_out);
@@ -4583,7 +5001,7 @@ int        Element::Sid(){/*{{{*/
 
 }
 /*}}}*/
-void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
+void       Element::SmbGemb(IssmDouble timeinputs, int count, int steps){/*{{{*/
 
 	/*only compute SMB at the surface: */
 	if (!IsOnSurface()) return;
@@ -4617,12 +5035,15 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	IssmDouble ccsnowValue=0.0;
 	IssmDouble cciceValue=0.0;
 	IssmDouble dt,time,smb_dt;
+	IssmDouble currentsurface;
+	int        Mappedpoint=0;
 	int        aIdx=0;
 	int        eIdx=0;
 	int        tcIdx=0;
 	int        denIdx=0;
 	int        dsnowIdx=0;
 	int        swIdx=0;
+	int        N=0;
 	IssmDouble cldFrac,t0wet, t0dry, K;
 	IssmDouble lhf=0.0;
 	IssmDouble shf=0.0;
@@ -4647,13 +5068,15 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	IssmDouble accsumEC=0.0;
 	IssmDouble accsumP=0.0;
 	IssmDouble accsumRa=0.0;
-	bool isgraingrowth,isalbedo,isshortwave,isthermal,isaccumulation,ismelt,isdensification,isturbulentflux;
+	bool isgraingrowth,isalbedo,isshortwave,isthermal,isaccumulation,ismelt,isdensification,isturbulentflux,ismappedforcing;
 	bool isconstrainsurfaceT=false;
 	bool isdeltaLWup=false;
 	IssmDouble init_scaling=0.0;
 	IssmDouble thermo_scaling=1.0;
 	IssmDouble adThresh=1023.0;
 	IssmDouble teThresh=10;
+	IssmDouble tlapse=0.0;
+	IssmDouble dlwlapse=0.0;
 	/*}}}*/
 	/*Output variables:{{{ */
 	IssmDouble* dz=NULL;
@@ -4690,6 +5113,21 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	IssmDouble* aini = NULL;
 	IssmDouble* adiffini = NULL;
 	IssmDouble* Tini = NULL;
+	IssmDouble* ECsub=NULL;
+	IssmDouble* SMBsub=NULL;
+	IssmDouble* Msub=NULL;
+	IssmDouble* Rsub=NULL;
+	IssmDouble* Fsub=NULL;
+	IssmDouble* Rasub=NULL;
+	IssmDouble* Psub=NULL;
+	IssmDouble* FACsub=NULL;
+	IssmDouble* ECdsub=NULL;
+	IssmDouble* SMBdsub=NULL;
+	IssmDouble* Mdsub=NULL;
+	IssmDouble* Rdsub=NULL;
+	IssmDouble* Fdsub=NULL;
+	IssmDouble* Radsub=NULL;
+	IssmDouble* Pdsub=NULL;
 	int         m=0;
 	/*}}}*/
 
@@ -4726,6 +5164,7 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	parameters->FindParam(&thermo_scaling,SmbThermoDeltaTScalingEnum);
 	parameters->FindParam(&adThresh,SmbAdThreshEnum);
 	parameters->FindParam(&teThresh,SmbTeThreshEnum);
+	parameters->FindParam(&ismappedforcing,SmbIsmappedforcingEnum);
 	/*}}}*/
 	/*Retrieve inputs: {{{*/
 	Input *zTop_input          = this->GetInput(SmbZTopEnum);         _assert_(zTop_input);
@@ -4734,11 +5173,6 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	Input *zMax_input          = this->GetInput(SmbZMaxEnum);         _assert_(zMax_input);
 	Input *zMin_input          = this->GetInput(SmbZMinEnum);         _assert_(zMin_input);
 	Input *zY_input            = this->GetInput(SmbZYEnum);           _assert_(zY_input);
-	Input *Tmean_input         = this->GetInput(SmbTmeanEnum);        _assert_(Tmean_input);
-	Input *Vmean_input         = this->GetInput(SmbVmeanEnum);        _assert_(Vmean_input);
-	Input *C_input             = this->GetInput(SmbCEnum);            _assert_(C_input);
-	Input *Tz_input            = this->GetInput(SmbTzEnum);           _assert_(Tz_input);
-	Input *Vz_input            = this->GetInput(SmbVzEnum);           _assert_(Vz_input);
 	Input *EC_input            = NULL;
 
 	/*Retrieve input values:*/
@@ -4751,11 +5185,47 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	zMax_input->GetInputValue(&zMax,gauss);
 	zMin_input->GetInputValue(&zMin,gauss);
 	zY_input->GetInputValue(&zY,gauss);
-	Tmean_input->GetInputValue(&Tmean,gauss);
-	Vmean_input->GetInputValue(&Vmean,gauss);
-	C_input->GetInputValue(&C,gauss);
-	Tz_input->GetInputValue(&Tz,gauss);
-	Vz_input->GetInputValue(&Vz,gauss);
+
+	if (!ismappedforcing) {
+		Input *Tmean_input         = this->GetInput(SmbTmeanEnum);        _assert_(Tmean_input);
+		Input *Vmean_input         = this->GetInput(SmbVmeanEnum);        _assert_(Vmean_input);
+		Input *C_input             = this->GetInput(SmbCEnum);            _assert_(C_input);
+		Input *Tz_input            = this->GetInput(SmbTzEnum);           _assert_(Tz_input);
+		Input *Vz_input            = this->GetInput(SmbVzEnum);           _assert_(Vz_input);
+
+		Tmean_input->GetInputValue(&Tmean,gauss);
+		Vmean_input->GetInputValue(&Vmean,gauss);
+		C_input->GetInputValue(&C,gauss);
+		Tz_input->GetInputValue(&Tz,gauss);
+		Vz_input->GetInputValue(&Vz,gauss);
+
+	} else {
+		this->GetInputValue(&Mappedpoint,SmbMappedforcingpointEnum);
+
+		IssmDouble* tmean = NULL;
+		IssmDouble* vmean = NULL;
+		IssmDouble* cmean = NULL;
+		IssmDouble* tzval = NULL;
+		IssmDouble* vzval = NULL;
+	
+		parameters->FindParam(&tmean,&N,SmbTmeanParamEnum);
+		parameters->FindParam(&vmean,&N,SmbVmeanParamEnum);
+		parameters->FindParam(&cmean,&N,SmbCParamEnum);
+		parameters->FindParam(&tzval,&N,SmbTzParamEnum);
+		parameters->FindParam(&vzval,&N,SmbVzParamEnum);
+
+		Tmean = tmean[Mappedpoint-1];
+		Vmean = vmean[Mappedpoint-1];
+		C = cmean[Mappedpoint-1];
+		Tz = tzval[Mappedpoint-1];
+		Vz = vzval[Mappedpoint-1];
+
+		xDelete<IssmDouble>(tmean);
+		xDelete<IssmDouble>(vmean);
+		xDelete<IssmDouble>(cmean);
+		xDelete<IssmDouble>(tzval);
+		xDelete<IssmDouble>(vzval);
+	}
 	/*}}}*/
 
 	/*First, check that the initial structures have been setup in GEMB. If not, initialize profile variables: layer thickness dz, * density d, temperature T, etc. {{{*/
@@ -4825,6 +5295,7 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 		this->SetElementInput(SmbAccumulatedRefreezeEnum,0.0);
 		this->SetElementInput(SmbAccumulatedRainEnum,0.0);
 		this->SetElementInput(SmbAccumulatedPrecipitationEnum,0.0);
+		this->SetElementInput(SmbMSurfEnum,0.0);
 
 		/*Flag the initialization:*/
 		this->SetBoolInput(this->inputs,SmbIsInitializedEnum,true);
@@ -4876,7 +5347,7 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 		Input *DzAdd_input         = this->GetInput(SmbDzAddEnum);  _assert_(DzAdd_input);
 		Input *MassAdd_input       = this->GetInput(SmbMAddEnum);  _assert_(MassAdd_input);
 		Input *InitMass_input      = this->GetInput(SmbMInitnum);  _assert_(InitMass_input);
-		Input *sumMsurf_input         = this->GetInput(SmbMSurfEnum);  _assert_(sumMsurf_input);
+		Input *sumMsurf_input      = this->GetInput(SmbMSurfSumEnum);  _assert_(sumMsurf_input);
 
 		ULW_input->GetInputAverage(&meanULW);
 		LW_input->GetInputAverage(&netLW);
@@ -4901,18 +5372,66 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 		sumRa=sumRa*dt*rho_ice;
 		sumP_input->GetInputAverage(&sumP);
 		sumP=sumP*dt*rho_ice;
+
+		this->inputs->GetArray(SmbAccumulatedECSubstepEnum,this->lid,&ECsub,&steps);
+		this->inputs->GetArray(SmbAccumulatedMeltSubstepEnum,this->lid,&Msub,&steps);
+		this->inputs->GetArray(SmbAccumulatedRunoffSubstepEnum,this->lid,&Rsub,&steps);
+		this->inputs->GetArray(SmbAccumulatedRefreezeSubstepEnum,this->lid,&Fsub,&steps);
+		this->inputs->GetArray(SmbAccumulatedRainSubstepEnum,this->lid,&Rasub,&steps);
+		this->inputs->GetArray(SmbAccumulatedPrecipitationSubstepEnum,this->lid,&Psub,&steps);
+		this->inputs->GetArray(SmbAccumulatedMassBalanceSubstepEnum,this->lid,&SMBsub,&steps);
+		this->inputs->GetArray(SmbFACSubstepEnum,this->lid,&FACsub,&steps);
+
+		this->inputs->GetArray(SmbECSubstepEnum,this->lid,&ECdsub,&steps);
+		this->inputs->GetArray(SmbMeltSubstepEnum,this->lid,&Mdsub,&steps);
+		this->inputs->GetArray(SmbRunoffSubstepEnum,this->lid,&Rdsub,&steps);
+		this->inputs->GetArray(SmbRefreezeSubstepEnum,this->lid,&Fdsub,&steps);
+		this->inputs->GetArray(SmbRainSubstepEnum,this->lid,&Radsub,&steps);
+		this->inputs->GetArray(SmbPrecipitationSubstepEnum,this->lid,&Pdsub,&steps);
+		this->inputs->GetArray(SmbMassBalanceSubstepEnum,this->lid,&SMBdsub,&steps);
+	}
+	else{
+		ECsub=xNewZeroInit<IssmDouble>(steps);
+		SMBsub=xNewZeroInit<IssmDouble>(steps);
+		Msub=xNewZeroInit<IssmDouble>(steps);
+		Rsub=xNewZeroInit<IssmDouble>(steps);
+		Fsub=xNewZeroInit<IssmDouble>(steps);
+		Rasub=xNewZeroInit<IssmDouble>(steps);
+		Psub=xNewZeroInit<IssmDouble>(steps);
+		FACsub=xNewZeroInit<IssmDouble>(steps);
+
+		this->inputs->SetArrayInput(SmbAccumulatedECSubstepEnum,this->lid,ECsub,steps);
+		this->inputs->SetArrayInput(SmbAccumulatedMeltSubstepEnum,this->lid,Msub,steps);
+		this->inputs->SetArrayInput(SmbAccumulatedRunoffSubstepEnum,this->lid,Rsub,steps);
+		this->inputs->SetArrayInput(SmbAccumulatedRefreezeSubstepEnum,this->lid,Fsub,steps);
+		this->inputs->SetArrayInput(SmbAccumulatedRainSubstepEnum,this->lid,Rasub,steps);
+		this->inputs->SetArrayInput(SmbAccumulatedPrecipitationSubstepEnum,this->lid,Psub,steps);
+		this->inputs->SetArrayInput(SmbAccumulatedMassBalanceSubstepEnum,this->lid,SMBsub,steps);
+		this->inputs->SetArrayInput(SmbFACSubstepEnum,this->lid,FACsub,steps);
+
+		ECdsub=xNewZeroInit<IssmDouble>(steps);
+		SMBdsub=xNewZeroInit<IssmDouble>(steps);
+		Mdsub=xNewZeroInit<IssmDouble>(steps);
+		Rdsub=xNewZeroInit<IssmDouble>(steps);
+		Fdsub=xNewZeroInit<IssmDouble>(steps);
+		Radsub=xNewZeroInit<IssmDouble>(steps);
+		Pdsub=xNewZeroInit<IssmDouble>(steps);
+
+		this->inputs->SetArrayInput(SmbECSubstepEnum,this->lid,ECdsub,steps);
+		this->inputs->SetArrayInput(SmbMeltSubstepEnum,this->lid,Mdsub,steps);
+		this->inputs->SetArrayInput(SmbRunoffSubstepEnum,this->lid,Rdsub,steps);
+		this->inputs->SetArrayInput(SmbRefreezeSubstepEnum,this->lid,Fdsub,steps);
+		this->inputs->SetArrayInput(SmbRainSubstepEnum,this->lid,Radsub,steps);
+		this->inputs->SetArrayInput(SmbPrecipitationSubstepEnum,this->lid,Pdsub,steps);
+		this->inputs->SetArrayInput(SmbMassBalanceSubstepEnum,this->lid,SMBdsub,steps);
 	}
 	/*}}}*/
 
-	// Get time forcing inputs
-	Input *Ta_input  = this->GetInput(SmbTaEnum,timeinputs);    _assert_(Ta_input);
-	Input *V_input   = this->GetInput(SmbVEnum,timeinputs);     _assert_(V_input);
-	Input *Dlwr_input= this->GetInput(SmbDlwrfEnum,timeinputs); _assert_(Dlwr_input);
-	Input *Dswr_input= this->GetInput(SmbDswrfEnum,timeinputs); _assert_(Dswr_input);
-	Input *Dswrdiff_input= this->GetInput(SmbDswdiffrfEnum,timeinputs); _assert_(Dswrdiff_input);
-	Input *P_input   = this->GetInput(SmbPEnum,timeinputs);     _assert_(P_input);
-	Input *eAir_input= this->GetInput(SmbEAirEnum,timeinputs);  _assert_(eAir_input);
-	Input *pAir_input= this->GetInput(SmbPAirEnum,timeinputs);  _assert_(pAir_input);
+	// Get surface melt for albedo calculation
+	Input *Msurf_input         = this->GetInput(SmbMSurfEnum);  _assert_(Msurf_input);
+	Msurf_input->GetInputAverage(&Msurf);
+	Msurf=Msurf*dt*rho_ice;
+
 	Input *teValue_input= this->GetInput(SmbTeValueEnum,timeinputs); _assert_(teValue_input);
 	Input *aValue_input= this->GetInput(SmbAValueEnum,timeinputs); _assert_(aValue_input);
 	Input *dulwrfValue_input= this->GetInput(SmbDulwrfValueEnum,timeinputs); _assert_(dulwrfValue_input);
@@ -4921,15 +5440,6 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	Input *ccsnowValue_input= this->GetInput(SmbCcsnowValueEnum,timeinputs); _assert_(ccsnowValue_input);
 	Input *cciceValue_input= this->GetInput(SmbCciceValueEnum,timeinputs); _assert_(cciceValue_input);
 
-	/*extract daily data:{{{*/
-	Ta_input->GetInputValue(&Ta,gauss);//screen level air temperature [K]
-	V_input->GetInputValue(&V,gauss);  //wind speed [m s-1]
-	Dlwr_input->GetInputValue(&dlw,gauss);   //downward longwave radiation flux [W m-2]
-	Dswr_input->GetInputValue(&dsw,gauss);   //downward shortwave radiation flux [W m-2]
-	Dswrdiff_input->GetInputValue(&dswdiff,gauss);   //downward shortwave diffuse radiation flux [W m-2]
-	P_input->GetInputValue(&P,gauss);        //precipitation [kg m-2]
-	eAir_input->GetInputValue(&eAir,gauss);  //screen level vapor pressure [Pa]
-	pAir_input->GetInputValue(&pAir,gauss);  // screen level air pressure [Pa]
 	teValue_input->GetInputValue(&teValue,gauss);  // Emissivity [0-1]
 	dulwrfValue_input->GetInputValue(&dulwrfValue,gauss);  // LWup perturbation [W m-2]
 	aValue_input->GetInputValue(&aValue,gauss);  // Albedo [0 1]
@@ -4937,7 +5447,62 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	cotValue_input->GetInputValue(&cotValue,gauss);  // Cloud Optical Thickness
 	ccsnowValue_input->GetInputValue(&ccsnowValue,gauss); //concentration of light absorbing carbon for snow [ppm1]
 	cciceValue_input->GetInputValue(&cciceValue,gauss); //concentration of light absorbing carbon for ice [ppm1]
-	//_printf_("Time: " << t << " Ta: " << Ta << " V: " << V << " dlw: " << dlw << " dsw: " << dsw << " P: " << P << " eAir: " << eAir << " pAir: " << pAir << "\n");
+
+	/*extract daily data:{{{*/
+	// Get time forcing inputs
+	if (!ismappedforcing) {
+		Input *Ta_input  = this->GetInput(SmbTaEnum,timeinputs);    _assert_(Ta_input);
+		Input *V_input   = this->GetInput(SmbVEnum,timeinputs);     _assert_(V_input);
+		Input *Dlwr_input= this->GetInput(SmbDlwrfEnum,timeinputs); _assert_(Dlwr_input);
+		Input *Dswr_input= this->GetInput(SmbDswrfEnum,timeinputs); _assert_(Dswr_input);
+		Input *Dswrdiff_input= this->GetInput(SmbDswdiffrfEnum,timeinputs); _assert_(Dswrdiff_input);
+		Input *P_input   = this->GetInput(SmbPEnum,timeinputs);     _assert_(P_input);
+		Input *eAir_input= this->GetInput(SmbEAirEnum,timeinputs);  _assert_(eAir_input);
+		Input *pAir_input= this->GetInput(SmbPAirEnum,timeinputs);  _assert_(pAir_input);
+
+		Ta_input->GetInputValue(&Ta,gauss);//screen level air temperature [K]
+		V_input->GetInputValue(&V,gauss);  //wind speed [m s-1]
+		Dlwr_input->GetInputValue(&dlw,gauss);   //downward longwave radiation flux [W m-2]
+		Dswr_input->GetInputValue(&dsw,gauss);   //downward shortwave radiation flux [W m-2]
+		Dswrdiff_input->GetInputValue(&dswdiff,gauss);   //downward shortwave diffuse radiation flux [W m-2]
+		P_input->GetInputValue(&P,gauss);        //precipitation [kg m-2]
+		eAir_input->GetInputValue(&eAir,gauss);  //screen level vapor pressure [Pa]
+		pAir_input->GetInputValue(&pAir,gauss);  // screen level air pressure [Pa]
+		//_printf_("Time: " << t << " Ta: " << Ta << " V: " << V << " dlw: " << dlw << " dsw: " << dsw << " P: " << P << " eAir: " << eAir << " pAir: " << pAir << "\n");
+	} else {
+
+		int timestepping;
+		IssmDouble dt;
+		parameters->FindParam(&dt,TimesteppingTimeStepEnum);          /*transient core time step*/
+		parameters->FindParam(&timestepping,TimesteppingTypeEnum);
+
+		Input *currentsurface_input = this->GetInput(SurfaceEnum);  _assert_(currentsurface_input);
+		currentsurface_input->GetInputAverage(&currentsurface);
+
+		parameters->FindParam(&tlapse,SmbLapseTaValueEnum);
+		parameters->FindParam(&dlwlapse,SmbLapsedlwrfValueEnum);
+
+		IssmDouble* elevation = NULL;
+		parameters->FindParam(&elevation,&N,SmbMappedforcingelevationEnum); _assert_(elevation);
+
+		//Variables for downscaling
+		IssmDouble taparam, dlwrfparam; 
+		parameters->FindParam(&taparam, Mappedpoint-1, timeinputs, timestepping, dt, SmbTaParamEnum);
+		parameters->FindParam(&dlwrfparam, Mappedpoint-1, timeinputs, timestepping, dt, SmbDlwrfParamEnum);
+
+		//Variables not downscaled
+		parameters->FindParam(&V, Mappedpoint-1, timeinputs, timestepping, dt, SmbVParamEnum);
+		parameters->FindParam(&dsw, Mappedpoint-1, timeinputs, timestepping, dt, SmbDswrfParamEnum);
+		parameters->FindParam(&dswdiff, Mappedpoint-1, timeinputs, timestepping, dt, SmbDswdiffrfParamEnum);
+		parameters->FindParam(&P, Mappedpoint-1, timeinputs, timestepping, dt, SmbPParamEnum);
+		parameters->FindParam(&eAir, Mappedpoint-1, timeinputs, timestepping, dt, SmbEAirParamEnum);
+		parameters->FindParam(&pAir, Mappedpoint-1, timeinputs, timestepping, dt, SmbPAirParamEnum);
+
+		Ta = taparam + (currentsurface - elevation[Mappedpoint-1])*tlapse;
+		dlw = fmax(dlwrfparam + (currentsurface - elevation[Mappedpoint-1])*dlwlapse,0.0);
+
+		xDelete<IssmDouble>(elevation);
+	}
 	/*}}}*/
 
 	/*Snow grain metamorphism:*/
@@ -5061,6 +5626,40 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	this->SetElementInput(SmbAccumulatedRefreezeEnum,accsumF+F/rho_ice);
 	this->SetElementInput(SmbAccumulatedRainEnum,accsumRa+Ra/rho_ice);
 	this->SetElementInput(SmbAccumulatedPrecipitationEnum,accsumP+P/rho_ice);
+
+	ECsub[count-1]=accsumEC+EC/rho_ice;
+	Msub[count-1]=accsumM+M/rho_ice;
+	Fsub[count-1]=accsumF+F/rho_ice;
+	Rsub[count-1]=accsumR+R/rho_ice;
+	Rasub[count-1]=accsumRa+Ra/rho_ice;
+	Psub[count-1]=accsumP+P/rho_ice;
+	SMBsub[count-1]=accsumSMB+(P + EC -R)/rho_ice;
+	FACsub[count-1]=fac/1000.;
+
+	ECdsub[count-1]=EC/rho_ice;
+	Mdsub[count-1]=M/rho_ice;
+	Fdsub[count-1]=F/rho_ice;
+	Rdsub[count-1]=R/rho_ice;
+	Radsub[count-1]=Ra/rho_ice;
+	Pdsub[count-1]=P/rho_ice;
+	SMBdsub[count-1]=(P + EC -R)/rho_ice;
+
+	this->inputs->SetArrayInput(SmbAccumulatedECSubstepEnum,this->lid,ECsub,steps);
+	this->inputs->SetArrayInput(SmbAccumulatedMeltSubstepEnum,this->lid,Msub,steps);
+	this->inputs->SetArrayInput(SmbAccumulatedRunoffSubstepEnum,this->lid,Rsub,steps);
+	this->inputs->SetArrayInput(SmbAccumulatedRefreezeSubstepEnum,this->lid,Fsub,steps);
+	this->inputs->SetArrayInput(SmbAccumulatedRainSubstepEnum,this->lid,Rasub,steps);
+	this->inputs->SetArrayInput(SmbAccumulatedPrecipitationSubstepEnum,this->lid,Psub,steps);
+	this->inputs->SetArrayInput(SmbAccumulatedMassBalanceSubstepEnum,this->lid,SMBsub,steps);
+	this->inputs->SetArrayInput(SmbFACSubstepEnum,this->lid,FACsub,steps);
+
+	this->inputs->SetArrayInput(SmbECSubstepEnum,this->lid,ECdsub,steps);
+	this->inputs->SetArrayInput(SmbMeltSubstepEnum,this->lid,Mdsub,steps);
+	this->inputs->SetArrayInput(SmbRunoffSubstepEnum,this->lid,Rdsub,steps);
+	this->inputs->SetArrayInput(SmbRefreezeSubstepEnum,this->lid,Fdsub,steps);
+	this->inputs->SetArrayInput(SmbRainSubstepEnum,this->lid,Radsub,steps);
+	this->inputs->SetArrayInput(SmbPrecipitationSubstepEnum,this->lid,Pdsub,steps);
+	this->inputs->SetArrayInput(SmbMassBalanceSubstepEnum,this->lid,SMBdsub,steps);
    /*}}}*/
 
 	/*Save generated inputs: */
@@ -5073,13 +5672,13 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	this->inputs->SetArrayInput(SmbWEnum,this->lid,W,m);
 	this->inputs->SetArrayInput(SmbAEnum,this->lid,a,m);
 	this->inputs->SetArrayInput(SmbAdiffEnum,this->lid,adiff,m);
-	this->SetElementInput(SmbECEnum,sumEC/dt/rho_ice);
-	this->SetElementInput(SmbMassBalanceEnum,(sumP + sumEC -sumR)/dt/rho_ice);
-	this->SetElementInput(SmbMeltEnum,sumM/dt/rho_ice);
-	this->SetElementInput(SmbRunoffEnum,sumR/dt/rho_ice);
-	this->SetElementInput(SmbRefreezeEnum,sumF/dt/rho_ice);
-	this->SetElementInput(SmbRainEnum,sumRa/dt/rho_ice);
-	this->SetElementInput(SmbPrecipitationEnum,sumP/dt/rho_ice);
+	this->SetElementInput(SmbECEnum,cellsum(ECdsub,steps)/dt);
+	this->SetElementInput(SmbMassBalanceEnum,cellsum(SMBdsub,steps)/dt);
+	this->SetElementInput(SmbMeltEnum,cellsum(Mdsub,steps)/dt);
+	this->SetElementInput(SmbRunoffEnum,cellsum(Rdsub,steps)/dt);
+	this->SetElementInput(SmbRefreezeEnum,cellsum(Fdsub,steps)/dt);
+	this->SetElementInput(SmbRainEnum,cellsum(Radsub,steps)/dt);
+	this->SetElementInput(SmbPrecipitationEnum,cellsum(Pdsub,steps)/dt);
 	this->SetElementInput(SmbMeanULWEnum,meanULW);
 	this->SetElementInput(SmbNetLWEnum,netLW);
 	this->SetElementInput(SmbNetSWEnum,netSW);
@@ -5087,8 +5686,9 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	this->SetElementInput(SmbMeanSHFEnum,meanSHF);
 	this->SetElementInput(SmbDzAddEnum,dz_add);
 	this->SetElementInput(SmbMInitnum,initMass);
+	this->SetElementInput(SmbMSurfEnum,Msurf/dt/rho_ice);
 	this->SetElementInput(SmbMAddEnum,sumMassAdd/dt);
-	this->SetElementInput(SmbMSurfEnum,sumMsurf/dt/rho_ice);
+	this->SetElementInput(SmbMSurfSumEnum,sumMsurf/dt/rho_ice);
 	this->SetElementInput(SmbWAddEnum,sumW/dt);
 	this->SetElementInput(SmbFACEnum,fac/1000.); // output in meters
 	this->SetElementInput(SmbECDtEnum,EC);
@@ -5113,6 +5713,22 @@ void       Element::SmbGemb(IssmDouble timeinputs, int count){/*{{{*/
 	if(adiffini) xDelete<IssmDouble>(adiffini);
 	if(Tini) xDelete<IssmDouble>(Tini);
 	if(swf) xDelete<IssmDouble>(swf);
+
+	if(ECsub) xDelete<IssmDouble>(ECsub);
+	if(SMBsub) xDelete<IssmDouble>(SMBsub);
+	if(Msub) xDelete<IssmDouble>(Msub);
+	if(Rsub) xDelete<IssmDouble>(Rsub);
+	if(Fsub) xDelete<IssmDouble>(Fsub);
+	if(Rasub) xDelete<IssmDouble>(Rasub);
+	if(Psub) xDelete<IssmDouble>(Psub);
+	if(FACsub) xDelete<IssmDouble>(FACsub);
+	if(ECdsub) xDelete<IssmDouble>(ECdsub);
+	if(SMBdsub) xDelete<IssmDouble>(SMBdsub);
+	if(Mdsub) xDelete<IssmDouble>(Mdsub);
+	if(Rdsub) xDelete<IssmDouble>(Rdsub);
+	if(Fdsub) xDelete<IssmDouble>(Fdsub);
+	if(Radsub) xDelete<IssmDouble>(Radsub);
+	if(Pdsub) xDelete<IssmDouble>(Pdsub);
 
 	delete gauss;
 	/*}}}*/
@@ -5453,14 +6069,50 @@ IssmDouble Element::TotalSmb(IssmDouble* mask, bool scaled){/*{{{*/
 	return this->TotalSmb(scaled);
 }
 /*}}}*/
+IssmDouble Element::TotalSmbMelt(IssmDouble* mask, bool scaled){/*{{{*/
+
+	/*Retrieve values of the mask defining the element: */
+	for(int i=0;i<this->GetNumberOfVertices();i++){
+		if(mask[this->vertices[i]->Sid()]<=0.){
+			return 0.;
+		}
+	}
+
+	/*Return: */
+	return this->TotalSmbMelt(scaled);
+}
+/*}}}*/
+IssmDouble Element::TotalSmbRefreeze(IssmDouble* mask, bool scaled){/*{{{*/
+
+	/*Retrieve values of the mask defining the element: */
+	for(int i=0;i<this->GetNumberOfVertices();i++){
+		if(mask[this->vertices[i]->Sid()]<=0.){
+			return 0.;
+		}
+	}
+
+	/*Return: */
+	return this->TotalSmbRefreeze(scaled);
+}
+/*}}}*/
 void       Element::TransformInvStiffnessMatrixCoord(ElementMatrix* Ke,int transformenum){/*{{{*/
 
 	/*All nodes have the same Coordinate System*/
 	int numnodes  = this->GetNumberOfNodes();
+
+	/*Do we need to actually do anything? (only if we have a rotated coordinate system)*/
+	bool isrotation = false;
+	for(int i=0;i<numnodes;i++){
+		if(this->nodes[i]->isrotated){
+			isrotation=true;
+			break;
+		}
+	}
+	if(!isrotation) return;
+
+	/*Rotate stiffness*/
 	int* cs_array = xNew<int>(numnodes);
 	for(int i=0;i<numnodes;i++) cs_array[i]=transformenum;
-
-	/*Call core*/
 	TransformInvStiffnessMatrixCoord(Ke,this->nodes,numnodes,cs_array);
 
 	/*Clean-up*/
@@ -5555,10 +6207,20 @@ void       Element::TransformSolutionCoord(IssmDouble* values,int transformenum)
 
 	/*All nodes have the same Coordinate System*/
 	int  numnodes = this->GetNumberOfNodes();
+
+	/*Do we need to actually do anything? (only if we have a rotated coordinate system)*/
+	bool isrotation = false;
+	for(int i=0;i<numnodes;i++){
+		if(this->nodes[i]->isrotated){
+			isrotation=true;
+			break;
+		}
+	}
+	if(!isrotation) return;
+
+	/*Rotate solution*/
 	int* cs_array = xNew<int>(numnodes);
 	for(int i=0;i<numnodes;i++) cs_array[i]=transformenum;
-
-	/*Call core*/
 	this->TransformSolutionCoord(values,this->nodes,numnodes,cs_array);
 
 	/*Clean-up*/
@@ -5568,6 +6230,16 @@ void       Element::TransformSolutionCoord(IssmDouble* values,int* transformenum
 	this->TransformSolutionCoord(values,this->nodes,this->GetNumberOfNodes(),transformenum_list);
 }/*}}}*/
 void       Element::TransformSolutionCoord(IssmDouble* values,int numnodes,int transformenum){/*{{{*/
+
+	/*Do we need to actually do anything? (only if we have a rotated coordinate system)*/
+	bool isrotation = false;
+	for(int i=0;i<numnodes;i++){
+		if(this->nodes[i]->isrotated){
+			isrotation=true;
+			break;
+		}
+	}
+	if(!isrotation) return;
 
 	/*All nodes have the same Coordinate System*/
 	int* cs_array = xNew<int>(numnodes);
@@ -5584,6 +6256,7 @@ void       Element::TransformSolutionCoord(IssmDouble* solution,int numnodes,int
 }/*}}}*/
 void       Element::TransformSolutionCoord(IssmDouble* values,Node** nodes_list,int numnodes,int transformenum){/*{{{*/
 	/*NOT NEEDED*/
+	_error_("NOT NEEDED??");
 	/*All nodes have the same Coordinate System*/
 	int* cs_array = xNew<int>(numnodes);
 	for(int i=0;i<numnodes;i++) cs_array[i]=transformenum;
@@ -5613,7 +6286,7 @@ void       Element::TransformSolutionCoord(IssmDouble* solution,Node** nodes_lis
 
 	/*Copy current solution vector*/
 	values=xNew<IssmDouble>(numdofs);
-	for(i=0;i<numdofs;i++) values[i]=solution[i];
+	for(int i=0;i<numdofs;i++) values[i]=solution[i];
 
 	/*Get Coordinate Systems transform matrix*/
 	CoordinateSystemTransform(&transform,nodes_list,numnodes,cs_array);
@@ -5631,10 +6304,20 @@ void       Element::TransformStiffnessMatrixCoord(ElementMatrix* Ke,int transfor
 
 	/*All nodes have the same Coordinate System*/
 	int  numnodes = this->GetNumberOfNodes();
-	int* cs_array = xNew<int>(numnodes);
-	for(int i=0;i<numnodes;i++) cs_array[i]=transformenum;
+
+	/*Do we need to actually do anything? (only if we have a rotated coordinate system)*/
+	bool isrotation = false;
+	for(int i=0;i<numnodes;i++){
+		if(this->nodes[i]->isrotated){
+			isrotation=true;
+			break;
+		}
+	}
+	if(!isrotation) return;
 
 	/*Call core*/
+	int* cs_array = xNew<int>(numnodes);
+	for(int i=0;i<numnodes;i++) cs_array[i]=transformenum;
 	this->TransformStiffnessMatrixCoord(Ke,this->nodes,numnodes,cs_array);
 
 	/*Clean-up*/
@@ -5739,18 +6422,8 @@ IssmDouble Element::TMeltingPoint(IssmDouble pressure){/*{{{*/
 
 	/*Get necessary parameters*/
 	IssmDouble beta,meltingpoint;
-#ifdef _IS_MULTI_ICE_
-	parameters->FindParam(this, &beta,MaterialsBetaEnum);
-
-	if (xIsNan<IssmDouble>(beta)) { 
-#endif
-		parameters->FindParam(&beta,MaterialsBetaEnum); 
-#ifdef _IS_MULTI_ICE_
-	}
-	parameters->FindParam(this, &meltingpoint,MaterialsMeltingpointEnum);
-	if (xIsNan<IssmDouble>(meltingpoint))
-#endif
-		parameters->FindParam(&meltingpoint,MaterialsMeltingpointEnum);
+	parameters->FindParam(&beta,MaterialsBetaEnum);
+	parameters->FindParam(&meltingpoint,MaterialsMeltingpointEnum);
 
 	return meltingpoint-beta*pressure;
 }

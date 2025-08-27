@@ -180,7 +180,8 @@ classdef initialization
 			WriteData(fid,prefix,'object',self,'fieldname','channelarea','format','DoubleMat','mattype',1);
 			WriteData(fid,prefix,'object',self,'fieldname','hydraulic_potential','format','DoubleMat','mattype',1);
 			WriteData(fid,prefix,'object',self,'fieldname','sample','format','DoubleMat','mattype',1);
-			WriteData(fid,prefix,'object',self,'fieldname','debris','format','DoubleMat','mattype',1,'scale',yts);
+			WriteData(fid,prefix,'object',self,'fieldname','debris','format','DoubleMat','mattype',1);
+			WriteData(fid,prefix,'object',self,'fieldname','age','format','DoubleMat','mattype',1,'scale',yts);
 
 			if md.thermal.isenthalpy,
 				if numel(self.enthalpy) <= 1,

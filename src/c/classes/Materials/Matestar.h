@@ -1,7 +1,6 @@
 /*!\file Matestar.h
  * \brief: header file for matice object
  */
-#define _IS_MULTI_ICE_
 
 #ifndef MATESTAR_H_
 #define MATESTAR_H_
@@ -86,9 +85,6 @@ class Matestar: public Material{
 		/*}}}*/
 		IssmDouble GetViscosityGeneral(IssmDouble vx,IssmDouble vy,IssmDouble vz,IssmDouble* dvx,IssmDouble* dvy,IssmDouble* dvz,IssmDouble eps_eff,bool isdepthaveraged,Gauss* gauss);
 		IssmDouble GetViscosity_BGeneral(IssmDouble vx,IssmDouble vy,IssmDouble vz,IssmDouble* dvx,IssmDouble* dvy,IssmDouble* dvz,IssmDouble eps_eff,bool isdepthaveraged,Gauss* gauss);
-		#ifdef _IS_MULTI_ICE_
-	    IssmDouble GetMaterialValue( int materialPropEnum) {return NAN;};
-		#endif
 };
 
 #endif  /* _MATESTAR_H_ */

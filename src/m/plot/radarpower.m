@@ -10,7 +10,7 @@ function md=radarpower(md,varargin)
 %      md=radarpower(md)
 
 %Parse inputs
-if nargin==1,
+if nargin==1
 	options=pairoptions;
 else
 	options=varargin{:};
@@ -19,7 +19,6 @@ else
 	end
 end
 
-highres = getfieldvalue(options,'highres',0);
 xlim    = getfieldvalue(options,'xlim',[min(md.mesh.x) max(md.mesh.x)]);
 ylim    = getfieldvalue(options,'ylim',[min(md.mesh.y) max(md.mesh.y)]);
 posting = getfieldvalue(options,'posting',0); % 0 -> image posting default
@@ -27,12 +26,23 @@ a = getfieldvalue(options,'overlay_adjust_a',0);
 b = getfieldvalue(options,'overlay_adjust_b',1);
 c = getfieldvalue(options,'overlay_adjust_c',0);
 d = getfieldvalue(options,'overlay_adjust_d',1);
+if diff(xlim)<1000e3 && diff(ylim)<1000e3
+	highres = getfieldvalue(options,'highres',1);
+else
+	highres = getfieldvalue(options,'highres',0);
+end
 
 %find GDAL coordinates
 x0=min(xlim); x1=max(xlim);
 y0=min(ylim); y1=max(ylim);
 
-if ~exist(options,'overlay_image'), % no image provided, go look into ModelData for one!{{{
+%Fix libraries if need be
+if strcmp(oshostname(),'totten')
+	setenv('LD_LIBRARY_PATH', '/usr/lib/x86_64-linux-gnu/libgeos_c.so.1')
+	setenv('PROJ_LIB', '/usr/share/proj/');
+end
+
+if ~exist(options,'overlay_image'), % no image provided, go look into ModelData for one
 	if exist(options,'geotiff_name'),
 		paths = {getfieldvalue(options,'geotiff_name')};
 	elseif md.mesh.epsg==3031, %Antarctica
@@ -82,7 +92,9 @@ if ~exist(options,'overlay_image'), % no image provided, go look into ModelData 
 
 	%Crop radar image from xylim
 	filename='./temp.tif';
-	eval(['!gdal_translate -quiet -projwin ' num2str(x0) ' ' num2str(y1) ' ' num2str(x1) ' ' num2str(y0) ' ' geotiff_name ' ' filename ]);
+
+
+	system(['gdal_translate -quiet -projwin ' num2str(x0) ' ' num2str(y1) ' ' num2str(x1) ' ' num2str(y0) ' ' geotiff_name ' ' filename ]);
 
 	%Read in temp.tif:
 	im=imread('temp.tif','TIFF');
@@ -97,8 +109,7 @@ if ~exist(options,'overlay_image'), % no image provided, go look into ModelData 
 	if ~getfieldvalue(options,'keep_image',0),
 		system('rm -rf ./temp.tif');
 	end
-	%}}}
-else %user provided image {{{
+else %user provided image
 
 	%user provided an image. check we also have overlay_xlim and overlay_ylim  options, to know what range of coordinates the image covers.
 	filename = getfieldvalue(options,'overlay_image');
@@ -153,9 +164,9 @@ else %user provided image {{{
 		md.radaroverlay.x=(x0:(x1-x0)/(size(md.radaroverlay.pwr,2)-1):x1);
 		md.radaroverlay.y=(y0:(y1-y0)/(size(md.radaroverlay.pwr,1)-1):y1);
 	end
-end %}}}
+end
 
-%Was a triangulation requested for the area of the image that is not covered by the mesh? %{{{
+%Was a triangulation requested for the area of the image that is not covered by the mesh?
 if strcmpi(getfieldvalue(options,'outertriangulation','no'),'yes'),
 
 	%create expfile that is a box controlled by xlim and ylim, with a hole defined by the mesh outer segments.
@@ -193,4 +204,4 @@ if strcmpi(getfieldvalue(options,'outertriangulation','no'),'yes'),
 	md.radaroverlay.outerx=outermd.mesh.x;
 	md.radaroverlay.outery=outermd.mesh.y;
 
-end %}}}
+end

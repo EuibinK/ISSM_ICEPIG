@@ -6,8 +6,6 @@ function [psdx, freq] = psd(x)
 %   psdx: Power Spectral Density(right half plane, value doubled)
 %   freq: frequency(non-negative half)
 %
-%   Author: Cheng Gong
-%   Date: 2021-08-17
 
 % length of data
 Nx = length(x);

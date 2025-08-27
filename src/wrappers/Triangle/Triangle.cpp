@@ -14,7 +14,7 @@ void TriangleUsage(void){/*{{{*/
 	_printf_("\n");
 }/*}}}*/
 WRAPPER(Triangle_python){
-	
+
 	/*intermediary: */
 	double    area;
 	Contours *domain = NULL;
@@ -49,7 +49,7 @@ WRAPPER(Triangle_python){
 	WriteData(SEGMENTS,segments,nsegs,3);
 	WriteData(SEGMENTMARKERLIST,segmentmarkerlist,nsegs);
 
-	/*free ressources: */
+	/*free resources: */
 	delete domain;
 	delete rifts;
 	xDelete<int>(index);

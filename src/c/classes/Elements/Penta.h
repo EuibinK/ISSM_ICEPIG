@@ -57,12 +57,14 @@ class Penta: public Element,public ElementHook,public PentaRef{
 		void           CalvingRateLevermann();
 		void           CalvingFluxLevelset();
 		void           CalvingMeltingFluxLevelset();
+		void           CalvingRateCalvingMIP();
 		IssmDouble     CharacteristicLength(void){_error_("not implemented yet");};
 		void           ComputeBasalStress(void);
 		void           ComputeDeviatoricStressTensor();
 		void           ComputeEsaStrainAndVorticity(){_error_("not implemented yet!");};
 		void           ComputeSigmaNN(){_error_("not implemented yet");};
 		void           ComputeStressTensor();
+		//void           ComputeMeanEla(IssmDouble* paltitude, int* pcounter);
 		void           Configure(Elements* elements,Loads* loads,Nodes* nodes,Vertices* vertices,Materials* materials,Parameters* parameters,Inputs* inputsin);
 		void           ControlInputSetGradient(IssmDouble* gradient,int enum_type,int control_index,int offset,int M,int N,int interp);
 		void           ControlToVectors(Vector<IssmPDouble>* vector_control, Vector<IssmPDouble>* vector_gradient,int control_enum,int control_interp);
@@ -83,7 +85,7 @@ class Penta: public Element,public ElementHook,public PentaRef{
 		Element*       GetBasalElement(void);
 		Penta*         GetBasalPenta(void);
 		int            GetElementType(void);
-		void           GetGroundedPart(int* point1,IssmDouble* fraction1, IssmDouble* fraction2,bool* mainlyfloating);
+		void           GetGroundedPart(int* point1,IssmDouble* fraction1, IssmDouble* fraction2,bool* mainlyfloating, int distance_enum, IssmDouble intrusion_distance);
 		IssmDouble     GetGroundedPortion(IssmDouble* xyz_list);
 		void           GetFractionGeometry(IssmDouble* weights, IssmDouble* pphi, int* ppoint1,IssmDouble* pfraction1,IssmDouble* pfraction2, bool* ptrapezeisnegative, IssmDouble* gl){_error_("not implemented yet");};
 		void           GetFractionGeometry2D(IssmDouble* weights, IssmDouble* pphi, int* ppoint1,IssmDouble* pfraction1,IssmDouble* pfraction2, bool* ptrapezeisnegative, IssmDouble* gl);
@@ -174,7 +176,7 @@ class Penta: public Element,public ElementHook,public PentaRef{
 		void           ResetFSBasalBoundaryCondition(void);
 		void           ResetHooks();
 		void           SetElementInput(int enum_in,IssmDouble value);
-		void           SetElementInput(int enum_in,IssmDouble value,int type){_error_("not implemented yet");};
+		void           SetElementInput(int enum_in,IssmDouble value,int type);
 		void           SetElementInput(Inputs* inputs,int enum_in,IssmDouble value);
 		void           SetElementInput(Inputs* inputs,int enum_in,IssmDouble value,int type){_error_("not implemented yet");};
 		void           SetElementInput(Inputs* inputs,int numindices,int* indices,IssmDouble* values,int enum_in);
@@ -199,6 +201,8 @@ class Penta: public Element,public ElementHook,public PentaRef{
 		IssmDouble     TotalFloatingBmb(bool scaled);
 		IssmDouble     TotalGroundedBmb(bool scaled);
 		IssmDouble     TotalSmb(bool scaled);
+		IssmDouble     TotalSmbMelt(bool scaled);
+		IssmDouble     TotalSmbRefreeze(bool scaled);
 		void           Update(Inputs* inputs,int index, IoModel* iomodel,int analysis_counter,int analysis_type,int finitelement);
 		void           UpdateConstraintsExtrudeFromBase(void);
 		void           UpdateConstraintsExtrudeFromTop(void);
@@ -219,8 +223,8 @@ class Penta: public Element,public ElementHook,public PentaRef{
 		#endif
 
 		#ifdef _HAVE_ESA_
-		void    EsaGeodetic2D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast,Vector<IssmDouble>* pX,Vector<IssmDouble>* pY,IssmDouble* xx,IssmDouble* yy){_error_("not implemented yet!");};
-		void    EsaGeodetic3D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast,IssmDouble* latitude,IssmDouble* longitude,IssmDouble* radius,IssmDouble* xx,IssmDouble* yy,IssmDouble* zz){_error_("not implemented yet!");};
+		void    EsaGeodetic2D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast,Vector<IssmDouble>* pGravity,Vector<IssmDouble>* pX,Vector<IssmDouble>* pY,IssmDouble* xx,IssmDouble* yy){_error_("not implemented yet!");};
+      void    EsaGeodetic3D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast,Vector<IssmDouble>* pGravity,IssmDouble* latitude,IssmDouble* longitude,IssmDouble* radius,IssmDouble* xx,IssmDouble* yy,IssmDouble* zz){_error_("not implemented yet!");};
 		#endif
 		#ifdef _HAVE_SEALEVELCHANGE_
 		void       GiaDeflection(Vector<IssmDouble>* wg,Vector<IssmDouble>* dwgdt,Matlitho* litho, IssmDouble* x,IssmDouble* y){_error_("not implemented yet");};

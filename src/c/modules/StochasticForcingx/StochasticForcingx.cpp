@@ -10,20 +10,22 @@
 
 void StochasticForcingx(FemModel* femmodel){/*{{{*/
 
-
    /*Retrieve parameters*/
    bool randomflag;
-   int M,N,numfields,my_rank;
-   int* fields            = NULL;
-   int* dimensions        = NULL;
-   IssmDouble* covariance = NULL;
+   int M,N,numfields,numtcov,my_rank;
+   int* fields                = NULL;
+   int* dimensions            = NULL;
+   IssmDouble* timecovariance = NULL;
+   IssmDouble* covariance     = NULL;
    femmodel->parameters->FindParam(&randomflag,StochasticForcingRandomflagEnum);
    femmodel->parameters->FindParam(&numfields,StochasticForcingNumFieldsEnum);
+   femmodel->parameters->FindParam(&numtcov,StochasticForcingNumTimesCovarianceEnum);
    femmodel->parameters->FindParam(&fields,&N,StochasticForcingFieldsEnum);    _assert_(N==numfields);
    femmodel->parameters->FindParam(&dimensions,&N,StochasticForcingDimensionsEnum);    _assert_(N==numfields);
+   femmodel->parameters->FindParam(&timecovariance,&N,StochasticForcingTimeCovarianceEnum);    _assert_(N==numtcov);
    int dimtot=0;
    for(int i=0;i<numfields;i++) dimtot = dimtot+dimensions[i];
-   femmodel->parameters->FindParam(&covariance,&M,&N,StochasticForcingCovarianceEnum); _assert_(M==dimtot); _assert_(N==dimtot);
+   femmodel->parameters->FindParam(&covariance,&M,&N,StochasticForcingCovarianceEnum); _assert_(M==numtcov); _assert_(N==dimtot*dimtot);
 
 	/*Check if this is a timestep for new noiseterms computation*/
 	bool isstepforstoch = false;
@@ -32,7 +34,7 @@ void StochasticForcingx(FemModel* femmodel){/*{{{*/
    femmodel->parameters->FindParam(&dt,TimesteppingTimeStepEnum);
    femmodel->parameters->FindParam(&starttime,TimesteppingStartTimeEnum);
    femmodel->parameters->FindParam(&tstep_stoch,StochasticForcingTimestepEnum);
-	
+
 	/*Check if we use HydroarmaPw*/
 	bool ispwHydro;
 	femmodel->parameters->FindParam(&ispwHydro,HydrologyIsWaterPressureArmaEnum);
@@ -44,8 +46,18 @@ void StochasticForcingx(FemModel* femmodel){/*{{{*/
    #endif
 
    /*Compute noise terms*/
-	IssmDouble* noiseterms = xNew<IssmDouble>(dimtot);
+	IssmDouble* timestepcovariance = xNew<IssmDouble>(dimtot*dimtot);
+	IssmDouble* noiseterms         = xNew<IssmDouble>(dimtot);
    if(isstepforstoch){
+		/*Find covariance to be applied at current time step*/
+		int itime;
+		if(numtcov>1){
+			for(int i=0;i<numtcov;i++){
+				if(time>=timecovariance[i]) itime=i;
+			}
+		}
+		else itime=0;
+		for(int i=0;i<dimtot*dimtot;i++) timestepcovariance[i] = covariance[itime*dimtot*dimtot+i];
 		my_rank=IssmComm::GetRank();
    	if(my_rank==0){
    	   int fixedseed;
@@ -54,7 +66,7 @@ void StochasticForcingx(FemModel* femmodel){/*{{{*/
    	   else fixedseed = reCast<int,IssmDouble>((time-starttime)/dt);
 			/*multivariateNormal needs to be passed a NULL pointer to avoid memory leak issues*/
    	   IssmDouble* temparray = NULL;
-   	   multivariateNormal(&temparray,dimtot,0.0,covariance,fixedseed);
+   	   multivariateNormal(&temparray,dimtot,0.0,timestepcovariance,fixedseed);
    	   for(int i=0;i<dimtot;i++) noiseterms[i]=temparray[i];
 			xDelete<IssmDouble>(temparray);
    	}
@@ -75,7 +87,7 @@ void StochasticForcingx(FemModel* femmodel){/*{{{*/
       for(int k=0;k<dimensions[j];k++){
          noisefield[k]=noiseterms[i+k];
       }
-     
+
 		int dimensionid;
 
 		/*Deal with the ARMA models*/
@@ -232,5 +244,7 @@ void StochasticForcingx(FemModel* femmodel){/*{{{*/
    xDelete<int>(fields);
    xDelete<int>(dimensions);
    xDelete<IssmDouble>(covariance);
+   xDelete<IssmDouble>(timecovariance);
+   xDelete<IssmDouble>(timestepcovariance);
    xDelete<IssmDouble>(noiseterms);
 }/*}}}*/

@@ -21,9 +21,18 @@ void SetControlInputsFromVectorx(FemModel* femmodel,IssmDouble* vector){
 
 	int offset = 0;
 	for(int i=0;i<num_controls;i++){
-		for(Object* & object : femmodel->elements->objects){
-			Element* element=xDynamicCast<Element*>(object);
-			element->SetControlInputsFromVector(vector,control_type[i],i,offset,M[i],N[i]);
+		/*Is the control a Param?*/
+		if(IsParamEnum(control_type[i])){
+			femmodel->parameters->SetControlFromVector(vector,control_type[i],M[i],N[i],offset);
+		}
+		else if(IsInputEnum(control_type[i])){
+			for(Object* & object : femmodel->elements->objects){
+				Element* element=xDynamicCast<Element*>(object);
+				element->SetControlInputsFromVector(vector,control_type[i],i,offset,M[i],N[i]);
+			}
+		}
+		else{
+			_error_("not supported yet");
 		}
 		offset += M[i]*N[i]; 
 	}

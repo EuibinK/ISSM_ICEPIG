@@ -9,8 +9,6 @@
 #include "./Definition.h"
 #include "./FemModel.h"
 
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,int output_enum);
-
 class Radar: public Object, public Definition{
 
 	public: 

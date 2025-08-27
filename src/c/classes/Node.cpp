@@ -22,6 +22,7 @@ Node::Node(){/*{{{*/
 	this->clone          = false;
 	this->active         = true;
 	this->freeze         = false;
+	this->isrotated      = false;
 	this->f_set          = NULL;
 	this->s_set          = NULL;
 	this->svalues        = NULL;
@@ -47,6 +48,7 @@ Node::Node(int node_id,int node_sid,int io_index,bool node_clone,IoModel* iomode
 	this->freeze        = false;
 
 	/*Initialize coord_system: Identity matrix by default*/
+	this->isrotated = false;
 	for(int k=0;k<3;k++) for(int l=0;l<3;l++) this->coord_system[k][l]=0.0;
 	for(int k=0;k<3;k++) this->coord_system[k][k]=1.0;
 
@@ -104,7 +106,7 @@ Node::Node(int node_id,int node_sid,int io_index,bool node_clone,IoModel* iomode
 
 		/*Coordinate system provided, convert to coord_system matrix*/
 		_assert_(iomodel->Data("md.stressbalance.referential")); 
-		XZvectorsToCoordinateSystem(&this->coord_system[0][0],&iomodel->Data("md.stressbalance.referential")[io_index*6]);
+		this->isrotated = XZvectorsToCoordinateSystem(&this->coord_system[0][0],&iomodel->Data("md.stressbalance.referential")[io_index*6]);
 		_assert_(sqrt( coord_system[0][0]*coord_system[0][0] + coord_system[1][0]*coord_system[1][0]) >1.e-4);
 
 		if(iomodel->domaintype!=Domain2DhorizontalEnum && iomodel->domaintype!=Domain3DsurfaceEnum){
@@ -197,21 +199,22 @@ Object* Node::copy(void){/*{{{*/
 	/*initalize output: */
 	output=new Node();
 
-	/*id: */
+	output->approximation = this->approximation;
+	output->clone  = this->clone;
 	output->id  = this->id;
 	output->sid = this->sid;
 	output->lid = this->lid;
 	output->pid = this->pid;
-	output->analysis_enum = this->analysis_enum;
-	output->approximation = this->approximation;
+
+	output->analysis_enum  = this->analysis_enum;
+	output->indexingupdate = this->indexingupdate;
+	output->isrotated      = this->isrotated;
 
 	/*Initialize coord_system: */
 	for(int k=0;k<3;k++) for(int l=0;l<3;l++) output->coord_system[k][l]=this->coord_system[k][l];
 
 	/*indexing:*/
-	output->indexingupdate = this->indexingupdate;
 	output->gsize  = this->gsize;
-	output->clone  = this->clone;
 	output->active = this->active;
 	output->freeze = this->freeze;
 	if(output->gsize>0){

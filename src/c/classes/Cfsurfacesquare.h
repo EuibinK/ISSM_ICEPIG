@@ -9,8 +9,6 @@
 #include "./Definition.h"
 #include "./FemModel.h"
 
-IssmDouble OutputDefinitionsResponsex(FemModel* femmodel,int output_enum);
-
 class Cfsurfacesquare: public Object, public Definition{
 
 	public: 
@@ -20,10 +18,12 @@ class Cfsurfacesquare: public Object, public Definition{
 		char       *name;
 		IssmDouble  datatime;
 		bool        timepassedflag;
+		IssmDouble  J;
 
 		/*Cfsurfacesquare constructors, destructors :*/
 		Cfsurfacesquare();
-		Cfsurfacesquare(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime, bool timepassedflag);
+		Cfsurfacesquare(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime);
+		Cfsurfacesquare(char* in_name, int in_definitionenum, int in_model_enum, IssmDouble in_datatime, bool timepassedflag, IssmDouble in_J);
 		~Cfsurfacesquare();
 
 		/*Object virtual function resolutoin: */

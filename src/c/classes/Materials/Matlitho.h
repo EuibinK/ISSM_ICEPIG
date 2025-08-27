@@ -1,7 +1,6 @@
 /*!\file Matlitho.h
  * \brief: header file for matlitho object
  */
-#define _IS_MULTI_ICE_
 
 #ifndef _MATLITHO_H_
 #define _MATLITHO_H_
@@ -79,9 +78,7 @@ class Matlitho: public Material{
 		void       ViscosityBFS(IssmDouble* pmudB,int dim,IssmDouble* xyz_list,Gauss* gauss,Input* vx_input,Input* vy_input,Input* vz_input,IssmDouble epseff){_error_("not supported");};
 		void       ViscosityBHO(IssmDouble* pmudB,int dim,IssmDouble* xyz_list,Gauss* gauss,Input* vx_input,Input* vy_input,IssmDouble epseff){_error_("not supported");};
 		void       ViscosityBSSA(IssmDouble* pmudB,int dim,IssmDouble* xyz_list,Gauss* gauss,Input* vx_input,Input* vy_input,IssmDouble epseff){_error_("not supported");};
-		#ifdef _IS_MULTI_ICE_
-	    IssmDouble GetMaterialValue( int materialPropEnum) {return NAN;};
-		#endif
+
 		/*}}}*/
 
 };

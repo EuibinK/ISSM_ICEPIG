@@ -113,6 +113,13 @@ classdef verbose
 		%}}}
 		function md = checkconsistency(self,md,solution,analyses) % {{{
 
+			if md.inversion.iscontrol
+				temp = verbose('control',1);
+				if(VerboseToBinary(self) ~= VerboseToBinary(temp))
+					disp('INFO: the outlog will look better if only md.verbose.control is turned on');
+				end
+			end
+
 		end % }}}
 		function disp(verbose) % {{{
 

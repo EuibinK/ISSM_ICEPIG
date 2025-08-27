@@ -57,7 +57,7 @@ classdef basalforcingsismip6
 			md = checkfield(md,'fieldname','basalforcings.num_basins','numel',1,'NaN',1,'Inf',1,'>',0);
 			md = checkfield(md,'fieldname','basalforcings.basin_id','Inf',1,'>=',0,'<=',md.basalforcings.num_basins,'size',[md.mesh.numberofelements 1]);
 			md = checkfield(md,'fieldname','basalforcings.gamma_0','numel',1,'NaN',1,'Inf',1,'>',0);
-			md = checkfield(md,'fieldname','basalforcings.tf_depths','NaN',1,'Inf',1);
+			md = checkfield(md,'fieldname','basalforcings.tf_depths','NaN',1,'Inf',1,'size',[1,NaN],'<=',0);
 			md = checkfield(md,'fieldname','basalforcings.delta_t','NaN',1,'Inf',1,'numel',md.basalforcings.num_basins,'size',[1,md.basalforcings.num_basins]);
 			md = checkfield(md,'fieldname','basalforcings.islocal','values',[0 1]);
 			md = checkfield(md,'fieldname','basalforcings.geothermalflux','NaN',1,'Inf',1,'>=',0,'timeseries',1);

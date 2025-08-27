@@ -91,9 +91,25 @@ classdef localpfe
 			fprintf(fid,'mpiexec -np %i %s/%s %s %s %s \n',cluster.np,cluster.codepath,executable,solution,cluster.executionpath,modelname);
 			fclose(fid);
 
-
 			%in interactive mode, create a run file, and errlog and outlog file
 			if cluster.interactive,
+				fid=fopen([modelname '.run'],'w');
+				if cluster.interactive==10,
+						fprintf(fid,'module unload mpi-mvapich2/1.4.1/gcc\n');
+						fprintf(fid,'mpiexec -np %i %s/%s %s %s %s\n',cluster.np,cluster.codepath,executable,solution,[pwd() '/run'],modelname);
+				else
+					if ~isvalgrind,
+						fprintf(fid,'mpiexec -np %i %s/%s %s %s %s\n',cluster.np,cluster.codepath,executable,solution,cluster.executionpath,modelname);
+						%fprintf(fid,'mpiexec -np %i %s/%s %s %s %s\n',cluster.nprocs(),cluster.codepath,executable,solution,[cluster.executionpath '/Interactive' num2str(cluster.interactive)],modelname);
+					else
+						fprintf(fid,'mpiexec -np %i valgrind --leak-check=full %s/%s %s %s %s\n',cluster.np,cluster.codepath,executable,solution,[cluster.executionpath '/Interactive' num2str(cluster.interactive)],modelname);
+					end
+				end
+				if ~io_gather, %concatenate the output files:
+					fprintf(fid,'cat %s.outbin.* > %s.outbin',modelname,modelname);
+				end
+				fclose(fid);
+
 				fid=fopen([modelname '.errlog'],'w'); fclose(fid);
 				fid=fopen([modelname '.outlog'],'w'); fclose(fid);
 			end
@@ -223,7 +239,7 @@ classdef localpfe
 					compressstring = [compressstring ' ' filelist{i}];
 				end
 				if cluster.interactive,
-					compressstring = [compressstring ' ' modelname '.errlog ' modelname '.outlog '];
+					compressstring = [compressstring ' ' modelname '.run '  modelname '.errlog ' modelname '.outlog '];
 				end
 				system(compressstring);
 

@@ -29,9 +29,19 @@ void GetVectorFromControlInputsx(Vector<IssmDouble>** pvector, Elements* element
 	/*3. Populate vector*/
 	int offset = 0;
 	for(int i=0;i<num_controls;i++){
-		for(Object* & object : elements->objects){
-			Element* element=xDynamicCast<Element*>(object);
-			element->GetVectorFromControlInputs(vector,control_type[i],i,N[i],data,offset);
+
+		/*Is the control a Param?*/
+		if(IsParamEnum(control_type[i])){
+			parameters->GetVectorFromControl(vector,control_type[i],i,N[i],data,offset);
+		}
+		else if(IsInputEnum(control_type[i])){
+			for(Object* & object : elements->objects){
+				Element* element=xDynamicCast<Element*>(object);
+				element->GetVectorFromControlInputs(vector,control_type[i],i,N[i],data,offset);
+			}
+		}
+		else{
+			_error_("not supported yet");
 		}
 		offset += M[i]*N[i];
 	}

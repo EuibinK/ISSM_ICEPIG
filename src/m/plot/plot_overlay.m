@@ -148,6 +148,7 @@ else
 
 		ind = ceil((len-1)*(data_grid-data_min)/(data_max - data_min + eps) +1);
 		ind(find(ind>len))=len;
+		ind(isnan(ind))=len;
 		image_rgb=zeros(size(data_grid,1),size(data_grid,2),3);
 		r=colorm(:,1); image_rgb(:,:,1)=r(ind); clear r;
 		g=colorm(:,2); image_rgb(:,:,2)=g(ind); clear g;

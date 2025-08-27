@@ -61,7 +61,7 @@ class Seg: public Element,public ElementHook,public SegRef{
 		void        FSContactMigration(Vector<IssmDouble>* vertexgrounded,Vector<IssmDouble>* vertexfloating){_error_("not implemented yet");};
 		Element*    GetBasalElement(void){_error_("not implemented yet");};
 		int         GetElementType(void){_error_("not implemented yet");};
-		void        GetGroundedPart(int* point1,IssmDouble* fraction1, IssmDouble* fraction2,bool* mainlyfloating){_error_("not implemented yet");};
+		void        GetGroundedPart(int* point1,IssmDouble* fraction1, IssmDouble* fraction2,bool* mainlyfloating, int distance_enum, IssmDouble intrusion_distance){_error_("not implemented yet");};
 		IssmDouble  GetGroundedPortion(IssmDouble* xyz_list);
 		void        GetFractionGeometry(IssmDouble* weights, IssmDouble* pphi, int* ppoint1,IssmDouble* pfraction1,IssmDouble* pfraction2, bool* ptrapezeisnegative, IssmDouble* gl){_error_("not implemented yet");};
 		void       GetNodalWeightsAndAreaAndCentroidsFromLeveset(IssmDouble* loadweights, IssmDouble* ploadarea, IssmDouble* platbar, IssmDouble* plongbar, IssmDouble late, IssmDouble longe, IssmDouble area,  int levelsetenum){_error_("not implemented yet");};
@@ -157,6 +157,8 @@ class Seg: public Element,public ElementHook,public SegRef{
 		IssmDouble  TotalFloatingBmb(bool scaled){_error_("not implemented yet");};
 		IssmDouble  TotalGroundedBmb(bool scaled){_error_("not implemented yet");};
 		IssmDouble  TotalSmb(bool scaled){_error_("not implemented yet");};
+		IssmDouble  TotalSmbMelt(bool scaled){_error_("not implemented yet");};
+		IssmDouble  TotalSmbRefreeze(bool scaled){_error_("not implemented yet");};
 		void        Update(Inputs* inputs,int index, IoModel* iomodel,int analysis_counter,int analysis_type,int finitelement){_error_("not implemented yet");};
 		void        UpdateConstraintsExtrudeFromBase(){_error_("not implemented");};
 		void        UpdateConstraintsExtrudeFromTop(){_error_("not implemented");};
@@ -172,8 +174,8 @@ class Seg: public Element,public ElementHook,public SegRef{
 		IssmDouble GetTriangleAreaSpherical(IssmDouble xyz_list[3][3]){_error_("not implemented yet");};
 
 #ifdef _HAVE_ESA_
-		void    EsaGeodetic2D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast,Vector<IssmDouble>* pX,Vector<IssmDouble>* pY,IssmDouble* xx,IssmDouble* yy){_error_("not implemented yet!");};
-		void    EsaGeodetic3D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast,IssmDouble* latitude,IssmDouble* longitude,IssmDouble* radius,IssmDouble* xx,IssmDouble* yy,IssmDouble* zz){_error_("not implemented yet!");};
+		void    EsaGeodetic2D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast,Vector<IssmDouble>* pGravity,Vector<IssmDouble>* pX,Vector<IssmDouble>* pY,IssmDouble* xx,IssmDouble* yy){_error_("not implemented yet!");};
+      void    EsaGeodetic3D(Vector<IssmDouble>* pUp,Vector<IssmDouble>* pNorth,Vector<IssmDouble>* pEast,Vector<IssmDouble>* pGravity,IssmDouble* latitude,IssmDouble* longitude,IssmDouble* radius,IssmDouble* xx,IssmDouble* yy,IssmDouble* zz){_error_("not implemented yet!");};
 #endif
 #ifdef _HAVE_SEALEVELCHANGE_
 		void       GiaDeflection(Vector<IssmDouble>* wg,Vector<IssmDouble>* dwgdt,Matlitho* litho, IssmDouble* x,IssmDouble* y){_error_("not implemented yet");};
